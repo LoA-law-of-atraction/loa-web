@@ -37,7 +37,7 @@ export default function Home() {
               initial={{ opacity: 0, scale: 1.25 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.8, duration: 0.5 }}
-              className="mt-56 lg:mt-64 text-white w-[80%] md:w-[60%] md:leading-8 text-center"
+              className="mt-52 lg:mt-60 text-white w-[80%] md:w-[60%] md:leading-8 text-center"
             >
               Capture your experiences, reflect on your past, and discover your purpose - one story at a time, with the help of AI.
             </motion.p>

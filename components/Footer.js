@@ -27,7 +27,7 @@ const Footer = () => {
           <section className=''>
             <h2 className='text-silver pb-2'>HELP</h2>
             <div className='flex flex-col gap-2 text-[15] text-[#fff]'>
-              <Link href="/about" className='cursor-pointer transition-all min-w-fit hover:text-silver'>
+              <Link href="/about-us" className='cursor-pointer transition-all min-w-fit hover:text-silver'>
                 About
               </Link>
               <Link href="/features" className='cursor-pointer transition-all min-w-fit hover:text-silver'>

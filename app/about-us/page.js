@@ -22,19 +22,19 @@ const values = [
   {
     id: 1,
     title: 'Preserve Your Legacy',
-    desc: 'Your life is a collection of experiences, lessons, and defining moments that deserve to be remembered. With Ever Journal, you can document your story, turning scattered memories into a beautifully structured biography.',
+    desc: 'Your life is a collection of moments, lessons, and experiences that deserve to be remembered. Ever Journal transforms scattered memories into a beautifully structured biography, ensuring your story lives on for future generations.',
     icon: <RiSecurePaymentFill className="w-8 h-8 text-[#505050]" />
   },
   {
     id: 2,
     title: 'Rediscover Your Purpose',
-    desc: 'Looking back at your journey can reveal patterns, lessons, and new perspectives you may have never noticed before. Ever Journal encourages self-reflection, helping you explore your past to better understand your present and future.',
+    desc: 'Reflect on your journey, uncover hidden patterns, and gain new insights. With AI-guided prompts and storytelling, Ever Journal helps you explore your past to better understand your present and future.',
     icon: <MdOutlineWifiFind className="w-8 h-8 text-[#505050]" />
   },
   {
     id: 3,
     title: 'Beyond Journaling, A Biography',
-    desc: 'Journaling is often seen as a personal habit, but with Ever Journal, it becomes something more—a structured story, a meaningful narrative, and a lasting legacy.',
+    desc: 'More than just a journal—Ever Journal turns your reflections into a meaningful, evolving biography. Whether you keep it private, share it, or publish it, your story is captured, told, and remembered.',
     icon: <TbClockRecord className="w-8 h-8 text-[#505050]" />
   }
 ]

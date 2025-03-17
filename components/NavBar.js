@@ -26,7 +26,7 @@ const Navbar = () => {
 
   return (
     <motion.nav
-      className="fixed top-0 left-0 w-full min-h-[80px] z-50 bg-bg"
+      className="fixed top-0 left-0 w-full min-h-[80px] z-50 bg-primary"
       variants={navbarVariants}
       initial="hidden"
       animate="visible"
@@ -38,6 +38,7 @@ const Navbar = () => {
         </Link>
 
         <ul className="hidden md:flex space-x-12">
+          <li><Link href="/about-us" className={isActive('/about-us')} onClick={toggleMenu}>About Us</Link></li>
           <li><Link href="/features" className={isActive('/features')}>Features</Link></li>
           <li><Link href="/premium" className={isActive('/premium')}>Premium</Link></li>
           <li><Link href="/updates" className={isActive('/updates')}>What&apos;s New</Link></li>
@@ -76,6 +77,7 @@ const Navbar = () => {
         transition={{ duration: 0.3 }}
       >    
         <ul className="flex text-secondary flex-col items-center pt-28 space-y-14">
+          <li className="text-3xl"><Link href="/about-us" className={isActive('/about-us')} onClick={toggleMenu}>About Us</Link></li>
           <li className="text-3xl"><Link href="/features" className={isActive('/features')} onClick={toggleMenu}>Features</Link></li>
           <li className="text-3xl"><Link href="/premium" className={isActive('/premium')} onClick={toggleMenu}>Premium</Link></li>
           <li className="text-3xl"><Link href="/updates" className={isActive('/updates')} onClick={toggleMenu}>What&apos;s New</Link></li>
