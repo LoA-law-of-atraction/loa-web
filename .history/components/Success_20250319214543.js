@@ -10,7 +10,7 @@ const Success = ({ closeForm }) => {
 
       import("react-facebook-pixel")
         .then((module) => {
-          const ReactPixel = module.default;
+          const ReactPixel = module.default; // ✅ Fix: Access `.default`
 
           ReactPixel.init(process.env.NEXT_PUBLIC_META_PIXEL_ID);
           ReactPixel.track("Lead", {

@@ -5,15 +5,12 @@ import { useEffect } from "react";
 
 const Success = ({ closeForm }) => {
   useEffect(() => {
+    
     if (typeof window !== "undefined") {
-      console.log("window is defined - Meta Pixel triggered");
-
       import("react-facebook-pixel")
-        .then((module) => {
-          const ReactPixel = module.default;
-
+        .then((ReactPixel) => {
           ReactPixel.init(process.env.NEXT_PUBLIC_META_PIXEL_ID);
-          ReactPixel.track("Lead", {
+          ReactPixel.trackCustom("Lead", {
             content_name: "Waitlist Signup Success",
             content_category: "Waitlist",
           });
