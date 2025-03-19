@@ -17,9 +17,7 @@ const Success = ({ closeForm }) => {
           console.log("Meta Pixel Event: Lead triggered");
         })
         .catch((error) => console.error("Meta Pixel Error:", error));
-    } else {
-      console.log("window is undefined - Meta Pixel not triggered");
-    }
+    } else 
   }, []);
   return (
     <motion.section
