@@ -12,8 +12,8 @@ const Success = ({ closeForm }) => {
 
           ReactPixel.init(process.env.NEXT_PUBLIC_META_PIXEL_ID);
           ReactPixel.track("Lead", {
-            content_name: "AddedToWaitlist",
-            content_category: "User Engagement",
+            content_name: "Waitlist Signup Success",
+            content_category: "Waitlist",
           });
 
           console.log("Meta Pixel Event: Lead triggered");

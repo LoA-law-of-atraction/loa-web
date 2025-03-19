@@ -21,7 +21,7 @@ export const MetaPixelEvents = () => {
         console.log(`Meta Pixel Event: PageView triggered for ${pathname}`);
 
         // ✅ Track "ViewContent" for key pages dynamically
-        const trackedPages = ["/features", "/premium", "/about-us", "/updates"];
+        const trackedPages = ["/features", "/pricing", "/about"];
 
         if (trackedPages.includes(pathname)) {
           ReactPixel.track("ViewContent", {
@@ -55,20 +55,7 @@ export const MetaPixelEvents = () => {
 
         window.addEventListener("scroll", handleScroll);
 
-        // ✅ Track Time on Page (fires after 30 seconds)
-        const timeOnPageTimeout = setTimeout(() => {
-          ReactPixel.trackCustom("TimeOnPage", {
-            time_spent: "30 seconds",
-            page: pathname,
-          });
-
-          console.log("Meta Pixel Event: TimeOnPage triggered");
-        }, 30000); // Fires after 30 seconds
-
-        return () => {
-          window.removeEventListener("scroll", handleScroll);
-          clearTimeout(timeOnPageTimeout);
-        };
+        return () => window.removeEventListener("scroll", handleScroll);
       });
     }
   }, [pathname]);

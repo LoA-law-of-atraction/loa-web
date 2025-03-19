@@ -21,7 +21,7 @@ export const MetaPixelEvents = () => {
         console.log(`Meta Pixel Event: PageView triggered for ${pathname}`);
 
         // ✅ Track "ViewContent" for key pages dynamically
-        const trackedPages = ["/features", "/premium", "/about-us", "/updates"];
+        const trackedPages = ["/features", "/pricing", "/about"];
 
         if (trackedPages.includes(pathname)) {
           ReactPixel.track("ViewContent", {

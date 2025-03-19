@@ -11,7 +11,7 @@ const Button = ({ text }) => {
       import("react-facebook-pixel").then((module) => {
         const ReactPixel = module.default;
 
-        ReactPixel.init(process.env.NEXT_PUBLIC_META_PIXEL_ID);
+        // ✅ Track "CTA_Click" event when the button is clicked
         ReactPixel.trackCustom("CTA_Click", {
           button_name: text,
         });

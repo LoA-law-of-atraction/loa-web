@@ -86,7 +86,7 @@ const Feature = () => {
           ReactPixel.init(process.env.NEXT_PUBLIC_META_PIXEL_ID);
           ReactPixel.track("ViewContent", {
             content_name: "Features",
-            content_category: "User Engagement",
+            content_category: "Waitlist",
           });
 
           console.log("Meta Pixel Event: Lead triggered");
