@@ -1,4 +1,4 @@
-import { GooglePlayButton } from "react-mobile-app-button";
+import { GooglePlayButton, ButtonsContainer } from "react-mobile-app-button";
 
 const GooglePlayDownloadButton = () => {
   const androidUrl =
@@ -18,9 +18,10 @@ const GooglePlayDownloadButton = () => {
   };
 
   return (
-    // <div onClick={handleClick} style={{ cursor: "pointer" }}>
-    <GooglePlayButton url={androidUrl} theme="dark" />
-    // </div>
+      <div onClick={handleClick} style={{ cursor: "pointer" }}>
+        <GooglePlayButton url={androidUrl} theme="dark" />
+      </div>
+    </ButtonsContainer>
   );
 };
 

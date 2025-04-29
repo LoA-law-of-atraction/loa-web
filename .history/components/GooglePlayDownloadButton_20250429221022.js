@@ -1,4 +1,4 @@
-import { GooglePlayButton } from "react-mobile-app-button";
+import { GooglePlayButton, ButtonsContainer } from "react-mobile-app-button";
 
 const GooglePlayDownloadButton = () => {
   const androidUrl =

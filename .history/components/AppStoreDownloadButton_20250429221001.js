@@ -1,4 +1,4 @@
-import { AppStoreButton } from "react-mobile-app-button";
+import { AppStoreButton, ButtonsContainer } from "react-mobile-app-button";
 
 const AppStoreDownloadButton = () => {
   const iosUrl = "https://apps.apple.com/app/6740745547";
@@ -16,11 +16,7 @@ const AppStoreDownloadButton = () => {
     }
   };
 
-  return (
-    /* <div onClick={handleClick} style={{ cursor: "pointer" }}> */
-    <AppStoreButton url={iosUrl} theme="dark" />
-    // </div>
-  );
+  return <AppStoreButton url={iosUrl} theme="dark" />;
 };
 
 export default AppStoreDownloadButton;
