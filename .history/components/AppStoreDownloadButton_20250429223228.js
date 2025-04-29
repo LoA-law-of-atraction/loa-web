@@ -3,8 +3,6 @@ import Image from "next/image"; // If using Next.js
 
 const AppStoreDownloadButton = () => {
   const iosUrl = "https://apps.apple.com/app/6740745547";
-  const iosAppId = "6740745547";
-  const androidPackageName = "com.ever.journal";
 
   const handleClick = () => {
     if (typeof window !== "undefined") {
@@ -16,29 +14,15 @@ const AppStoreDownloadButton = () => {
         });
         console.log("App Store button clicked");
       });
-
-      const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-
-      if (/android/i.test(userAgent)) {
-        // Open Google Play Store in a new tab
-        window.open(
-          `https://play.google.com/store/apps/details?id=${androidPackageName}`,
-          "_blank"
-        );
-      } else if (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream) {
-        // Open Apple App Store in a new tab
-        window.open(`https://apps.apple.com/app/id${iosAppId}`, "_blank");
-      } else {
-        // Fallback to a landing page or website
-        window.open(iosUrl, "_blank");
-      }
     }
   };
 
   return (
-    <button
+    <a
+      href={iosUrl}
+      target="_blank"
+      rel="noopener noreferrer"
       onClick={handleClick}
-      style={{ border: "none", background: "none", padding: 0 }}
     >
       <Image
         src="/buttons/app-store-badge.svg"
@@ -47,7 +31,7 @@ const AppStoreDownloadButton = () => {
         width={150} // Adjust width as needed
         height={10} // Adjust height as neede
       />
-    </button>
+    </a>
   );
 };
 

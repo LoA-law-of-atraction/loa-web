@@ -3,8 +3,6 @@ import Image from "next/image"; // If using Next.js
 
 const AppStoreDownloadButton = () => {
   const iosUrl = "https://apps.apple.com/app/6740745547";
-  const iosAppId = "6740745547";
-  const androidPackageName = "com.ever.journal";
 
   const handleClick = () => {
     if (typeof window !== "undefined") {
@@ -20,17 +18,14 @@ const AppStoreDownloadButton = () => {
       const userAgent = navigator.userAgent || navigator.vendor || window.opera;
 
       if (/android/i.test(userAgent)) {
-        // Open Google Play Store in a new tab
-        window.open(
-          `https://play.google.com/store/apps/details?id=${androidPackageName}`,
-          "_blank"
-        );
+        // Redirect to Google Play Store
+        window.location.href = `market://details?id=${androidPackageName}`;
       } else if (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream) {
-        // Open Apple App Store in a new tab
-        window.open(`https://apps.apple.com/app/id${iosAppId}`, "_blank");
+        // Redirect to Apple App Store
+        window.location.href = `itms-apps://itunes.apple.com/app/id${iosAppId}`;
       } else {
         // Fallback to a landing page or website
-        window.open(iosUrl, "_blank");
+        window.location.href = iosUrl;
       }
     }
   };

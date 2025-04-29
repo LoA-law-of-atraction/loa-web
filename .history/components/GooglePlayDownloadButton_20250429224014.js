@@ -32,7 +32,7 @@ const GooglePlayDownloadButton = () => {
       window.open(`https://apps.apple.com/app/id${iosAppId}`, "_blank");
     } else {
       // Fallback to a landing page or website
-      window.open(androidUrl, "_blank");
+      window.open("https://www.yourwebsite.com", "_blank");
     }
   };
 
