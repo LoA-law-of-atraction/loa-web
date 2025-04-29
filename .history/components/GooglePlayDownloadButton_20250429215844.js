@@ -8,13 +8,20 @@ const GooglePlayDownloadButton = () => {
     if (typeof window !== "undefined") {
       import("react-facebook-pixel").then((module) => {
         const ReactPixel = module.default;
+
         ReactPixel.init(process.env.NEXT_PUBLIC_META_PIXEL_ID);
-        ReactPixel.trackCustom("GOOGLE_PLAY_Click", {
-          button_name: "Google Play",
+        ReactPixel.trackCustom("CTA_Click", {
+          button_name: text,
         });
-        console.log("Google play button clicked");
+
+        console.log(`Meta Pixel Event: CTA_Click triggered for ${text}`);
       });
     }
+    ReactPixel.init(process.env.NEXT_PUBLIC_META_PIXEL_ID);
+    ReactPixel.trackCustom("GOOGLE_PLAY_Click", {
+      button_name: "Google Play",
+    });
+    console.log("Google play button clicked");
   };
 
   return (

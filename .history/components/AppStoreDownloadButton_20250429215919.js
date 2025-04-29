@@ -1,10 +1,10 @@
-import { GooglePlayButton, ButtonsContainer } from "react-mobile-app-button";
+import { AppStoreButton, ButtonsContainer } from "react-mobile-app-button";
 
-const GooglePlayDownloadButton = () => {
-  const androidUrl =
-    "https://play.google.com/store/apps/details?id=com.ever.journal";
+const AppStoreDownloadButton = () => {
+  const iosUrl = "https://apps.apple.com/app/6740745547";
 
   const handleClick = () => {
+
     if (typeof window !== "undefined") {
       import("react-facebook-pixel").then((module) => {
         const ReactPixel = module.default;
@@ -20,10 +20,10 @@ const GooglePlayDownloadButton = () => {
   return (
     <ButtonsContainer>
       <div onClick={handleClick} style={{ cursor: "pointer" }}>
-        <GooglePlayButton url={androidUrl} theme="dark" />
+        <AppStoreButton url={iosUrl} theme="dark" />
       </div>
     </ButtonsContainer>
   );
 };
 
-export default GooglePlayDownloadButton;
+export default AppStoreDownloadButton;

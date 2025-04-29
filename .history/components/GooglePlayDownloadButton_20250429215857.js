@@ -8,6 +8,7 @@ const GooglePlayDownloadButton = () => {
     if (typeof window !== "undefined") {
       import("react-facebook-pixel").then((module) => {
         const ReactPixel = module.default;
+
         ReactPixel.init(process.env.NEXT_PUBLIC_META_PIXEL_ID);
         ReactPixel.trackCustom("GOOGLE_PLAY_Click", {
           button_name: "Google Play",
