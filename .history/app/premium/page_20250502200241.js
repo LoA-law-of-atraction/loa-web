@@ -4,16 +4,18 @@ import "../globals.css";
 import { useEffect } from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";
-import Button from "@/components/Button";
+
 import Testimonial from "@/components/Testimonial";
 import Faqs from "@/components/Faqs";
 import Feature from "@/components/Features";
 import Analysis from "@/components/Compare";
 import Ready from "@/components/Ready";
+import PricingPlans from "@/components/PricingPolicy";
+import Benefits from "@/components/Benefits";
 import AppStoreDownloadButton from "@/components/AppStoreDownloadButton";
 import GooglePlayDownloadButton from "@/components/GooglePlayDownloadButton";
 
-export default function Features() {
+export default function Premium() {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
@@ -34,7 +36,7 @@ export default function Features() {
               transition={{ delay: 0.5, duration: 0.5 }}
               className="text-white text-h2 md:max-w-[70%] lg:max-w-[100%] lg:text-h4 font-bold text-left"
             >
-              Explore the Features That Bring Your Life Story to Life
+              Explore Premium Features for a Truly Personalized Experience
             </motion.h1>
             <motion.p
               initial={{ opacity: 0, scale: 1.25 }}
@@ -62,14 +64,14 @@ export default function Features() {
             <Image
               src="/features/integrate.png"
               alt="Ever Journal Mockup"
-              className="pb-10"
+              className=""
               width={200}
-              height={100}
+              height={200}
             />
           </motion.article>
         </section>
       </motion.article>
-      <Feature />
+      <PricingPlans />
       <Analysis />
       <Ready />
       <Testimonial />
