@@ -63,6 +63,22 @@ const TermsAndConditions = () => {
           <ul className="list-disc list-inside text-base">
             <li>
               <a
+                href="https://policies.google.com/terms"
+                className="text-[#505050] underline"
+              >
+                Google Play Services
+              </a>
+            </li>
+            <li>
+              <a
+                href="https://admob.google.com/home"
+                className="text-[#505050] underline"
+              >
+                AdMob
+              </a>
+            </li>
+            <li>
+              <a
                 href="https://firebase.google.com/terms/analytics"
                 className="text-[#505050] underline"
               >
@@ -75,6 +91,14 @@ const TermsAndConditions = () => {
                 className="text-[#505050] underline"
               >
                 Firebase Crashlytics
+              </a>
+            </li>
+            <li>
+              <a
+                href="https://www.facebook.com/legal/terms/plain_text_terms"
+                className="text-[#505050] underline"
+              >
+                Facebook
               </a>
             </li>
           </ul>

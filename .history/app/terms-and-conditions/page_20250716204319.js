@@ -63,6 +63,14 @@ const TermsAndConditions = () => {
           <ul className="list-disc list-inside text-base">
             <li>
               <a
+                href="https://admob.google.com/home"
+                className="text-[#505050] underline"
+              >
+                AdMob
+              </a>
+            </li>
+            <li>
+              <a
                 href="https://firebase.google.com/terms/analytics"
                 className="text-[#505050] underline"
               >
