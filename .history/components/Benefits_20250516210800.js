@@ -10,7 +10,7 @@ const features = [
   {
     id: "02",
     title: "Your Life, All in One Place",
-    desc: "Collect your thoughts, photos, emotions, and moments in a private timeline. Ever Journal becomes the center of your story",
+    desc: "Collect your thoughts, photos, emotions, and moments in a private timeline. LoA becomes the center of your story",
   },
   {
     id: "03",
@@ -68,32 +68,31 @@ const Benefits = () => {
               !
             </h3>
             <p className="mt-5 text-justify md:max-w-[60%] md:text-center">
-              Ever Journal isn’t just about capturing memories — it’s about
-              making sense of them. With AI guidance, emotional awareness, and a
-              beautifully organized timeline, your life story unfolds as you
-              live it.
+              LoA isn’t just about capturing memories — it’s about making sense
+              of them. With AI guidance, emotional awareness, and a beautifully
+              organized timeline, your life story unfolds as you live it.
             </p>
           </article>
         </div>
         <div className="mt-16 lg:mt-26 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-16">
           {features.map((feature) => (
             <motion.article
-            key={feature.id}
-            initial={{ opacity: 0, y: 100 }}
-            whileInView={{ opacity: 1, y: 0, transition: { duration: 0.5 } }}
-            viewport={{ once: true }}
-            className="relative flex flex-col gap-4 border border-primary/20 shadow-lg bg-white text-primary rounded-xl p-6 md:p-8 pt-12"
-          >
-            <div className="absolute -top-5 left-1/2 transform -translate-x-1/2 w-[50px] h-[50px] rounded-full border-2 bg-white text-[#505050] flex items-center justify-center font-bold text-md shadow-md z-10">
-              {feature.id}
-            </div>
-            <h4 className="text-lg font-semibold text-center lg:text-left">
-              {feature.title}
-            </h4>
-            <p className="text-base text-center lg:text-left text-secondary/80">
-              {feature.desc}
-            </p>
-          </motion.article>
+              key={feature.id}
+              initial={{ opacity: 0, y: 100 }}
+              whileInView={{ opacity: 1, y: 0, transition: { duration: 0.5 } }}
+              viewport={{ once: true }}
+              className="relative flex flex-col gap-4 border border-primary/20 shadow-lg bg-white text-primary rounded-xl p-6 md:p-8 pt-12"
+            >
+              <div className="absolute -top-5 left-1/2 transform -translate-x-1/2 w-[50px] h-[50px] rounded-full border-2 bg-white text-[#505050] flex items-center justify-center font-bold text-md shadow-md z-10">
+                {feature.id}
+              </div>
+              <h4 className="text-lg font-semibold text-center lg:text-left">
+                {feature.title}
+              </h4>
+              <p className="text-base text-center lg:text-left text-secondary/80">
+                {feature.desc}
+              </p>
+            </motion.article>
           ))}
         </div>
       </article>

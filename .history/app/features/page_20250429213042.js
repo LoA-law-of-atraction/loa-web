@@ -11,7 +11,6 @@ import Feature from "@/components/Features";
 import Analysis from "@/components/Compare";
 import Ready from "@/components/Ready";
 
-
 export default function Features() {
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -41,9 +40,8 @@ export default function Features() {
               transition={{ delay: 0.8, duration: 0.5 }}
               className="text-white max-w-[85%] md:max-w-[70%] lg:max-w-[100%] md:leading-8 text-left"
             >
-              Ever Journal combines AI-powered technology with a user-friendly
-              interface to make journaling effortless, insightful, and deeply
-              personal.
+              LoA combines AI-powered technology with a user-friendly interface
+              to make journaling effortless, insightful, and deeply personal.
             </motion.p>
 
             <div className="mt-8 flex space-x-4">
@@ -60,7 +58,7 @@ export default function Features() {
           >
             <Image
               src="/features/features.png"
-              alt="Ever Journal Mockup"
+              alt="LoA Mockup"
               className="pb-10"
               width={200}
               height={100}

@@ -61,14 +61,14 @@ export default function Home() {
           >
             <Image
               src="/mockups/heroImgDesk.png"
-              alt="Ever Journal Mockup"
+              alt="LoA Mockup"
               className="max-w-[90%] md:hidden p-10"
               width={400}
               height={200}
             />
             <Image
               src="/mockups/heroImgDesk.png"
-              alt="Ever Journal Mockup"
+              alt="LoA Mockup"
               className="hidden md:block p-20"
               width={500}
               height={200}

@@ -8,8 +8,6 @@ import Navbar from "@/components/NavBar";
 import Footer from "@/components/Footer";
 import dynamic from "next/dynamic";
 
-
-
 const Layout = ({ children }) => {
   const router = useRouter();
 
@@ -30,36 +28,30 @@ const Layout = ({ children }) => {
   return (
     <html lang="en">
       <Head>
-        <title>Ever Journal</title>
+        <title>LoA</title>
         <link rel="icon" href="/favicon.png" type="image/png" />
         <link rel="apple-touch-icon" href="/favicon.png"></link>
         <link rel="shortcut icon" href="/favicon.png" type="image/png"></link>
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <meta
           name="description"
-          content="Ever Journal is more than just a journal app—it’s your personal biographer. With the help of Eve, your AI biographer, you’ll embark on a journey of self-reflection, rediscovery, and storytelling"
+          content="LoA is more than just a journal app—it’s your personal biographer. With the help of Eve, your AI biographer, you’ll embark on a journey of self-reflection, rediscovery, and storytelling"
         />
-        <link rel="shortcut icon" href="/ever.svg" />
-        <meta
-          property="og:title"
-          content="Ever Journal | Your Personal Biographer"
-        />
+        <link rel="shortcut icon" href="/loa.svg" />
+        <meta property="og:title" content="LoA | Your Personal Biographer" />
         <meta property="og:type" content="article" />
-        <meta property="og:url" content="https://www.ever-journal.com" />
-        <meta
-          property="og:image"
-          content="hhttps://www.ever-journal.com/ever.svg"
-        />
+        <meta property="og:url" content="https://www.loa.com" />
+        <meta property="og:image" content="hhttps://www.loa.com/loa.svg" />
         <meta
           property="og:description"
-          content="Ever Journal is more than just a journal app—it’s your personal biographer."
+          content="LoA is more than just a journal app—it’s your personal biographer."
         />
         <meta name="twitter:card" content="summary" />
         <meta name="twitter:site" content="" />
         <meta name="twitter:title" content="" />
         <meta name="twitter:description" content="" />
         <meta name="twitter:creator" content="" />
-        <meta name="twitter:image" content="https://www.ever-journal.com" />
+        <meta name="twitter:image" content="https://www.loa.com" />
       </Head>
 
       <body className="bg-secondary text-primary min-h-screen flex flex-col">

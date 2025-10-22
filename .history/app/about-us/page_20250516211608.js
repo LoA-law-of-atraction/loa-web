@@ -24,19 +24,19 @@ const values = [
   {
     id: 1,
     title: "Reflect on What Truly Matters",
-    desc: "Your music, photos, and posts aren’t just data — they’re memory triggers. Ever Journal helps you turn these scattered digital moments into meaningful reflections, all within one private timeline.",
+    desc: "Your music, photos, and posts aren’t just data — they’re memory triggers. LoA helps you turn these scattered digital moments into meaningful reflections, all within one private timeline.",
     icon: <RiSecurePaymentFill className="w-8 h-8 text-[#505050]" />,
   },
   {
     id: 2,
     title: "Reconnect with Your Story",
-    desc: "Explore your life through journaling powered by AI. Whether you write, speak, or reflect through a song or photo, Ever Journal helps you uncover patterns, emotions, and deeper insight over time.",
+    desc: "Explore your life through journaling powered by AI. Whether you write, speak, or reflect through a song or photo, LoA helps you uncover patterns, emotions, and deeper insight over time.",
     icon: <MdOutlineWifiFind className="w-8 h-8 text-[#505050]" />,
   },
   {
     id: 3,
     title: "Your Life, Organized as a Biography",
-    desc: "Every journal entry you create — whether prompted by a photo, a memory, or a moment — contributes to your evolving life story. Ever Journal turns reflection into a private, structured biography.",
+    desc: "Every journal entry you create — whether prompted by a photo, a memory, or a moment — contributes to your evolving life story. LoA turns reflection into a private, structured biography.",
     icon: <TbClockRecord className="w-8 h-8 text-[#505050]" />,
   },
 ];
@@ -71,9 +71,8 @@ export default function About() {
               className="my-4 mb-6 text-white w-[80%] md:w-[60%] md:leading-8 text-center"
             >
               We believe your thoughts, emotions, and everyday moments deserve
-              more than a scroll and a like. Ever Journal is your private space
-              to make sense of your life — not for followers, but for your
-              future self
+              more than a scroll and a like. LoA is your private space to make
+              sense of your life — not for followers, but for your future self
             </motion.p>
 
             <div className="mt-8 flex space-x-4">
@@ -90,14 +89,14 @@ export default function About() {
           >
             <Image
               src="/mockups/heroImgDesk.png"
-              alt="Ever Journal Mockup"
+              alt="LoA Mockup"
               className="max-w-[90%] md:hidden p-10"
               width={400}
               height={200}
             />
             <Image
               src="/mockups/heroImgDesk.png"
-              alt="Ever Journal Mockup"
+              alt="LoA Mockup"
               className="hidden md:block p-32"
               width={500}
               height={200}
@@ -130,9 +129,9 @@ export default function About() {
               </h3>
               <p>
                 Instead of curating for others, you collect memories for
-                yourself. Ever Journal helps you organize the thoughts, images,
-                and emotions that actually matter — and keeps them safe in a
-                private timeline you control.
+                yourself. LoA helps you organize the thoughts, images, and
+                emotions that actually matter — and keeps them safe in a private
+                timeline you control.
               </p>
             </div>
             <div>
@@ -141,8 +140,8 @@ export default function About() {
               </h3>
               <p>
                 You don’t need to write a memoir all at once. Just journal — and
-                Ever Journal gently shapes your life into chapters over time.
-                Because your story isn’t a highlight reel.
+                LoA gently shapes your life into chapters over time. Because
+                your story isn’t a highlight reel.
               </p>
               <p className="mt-2 font-semibold">
                 It’s everything you’ve lived through — and it deserves to be
@@ -152,7 +151,7 @@ export default function About() {
           </div>
           <Image
             src="/mockups/mockupJournal.png"
-            alt="Ever Journal Mockup"
+            alt="LoA Mockup"
             className="w-[30%] hidden md:block p-28"
             width={200}
             height={200}

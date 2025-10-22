@@ -24,19 +24,19 @@ const values = [
   {
     id: 1,
     title: "Reflect on What Truly Matters",
-    desc: "Your music, photos, and posts aren’t just data — they’re memory triggers. Ever Journal helps you turn these scattered digital moments into meaningful reflections, all within one private timeline.",
+    desc: "Your music, photos, and posts aren’t just data — they’re memory triggers. LoA helps you turn these scattered digital moments into meaningful reflections, all within one private timeline.",
     icon: <RiSecurePaymentFill className="w-8 h-8 text-[#505050]" />,
   },
   {
     id: 2,
     title: "Reconnect with Your Story",
-    desc: "Explore your life through journaling powered by AI. Whether you write, speak, or reflect through a song or photo, Ever Journal helps you uncover patterns, emotions, and deeper insight over time.",
+    desc: "Explore your life through journaling powered by AI. Whether you write, speak, or reflect through a song or photo, LoA helps you uncover patterns, emotions, and deeper insight over time.",
     icon: <MdOutlineWifiFind className="w-8 h-8 text-[#505050]" />,
   },
   {
     id: 3,
     title: "Your Life, Organized as a Biography",
-    desc: "Every journal entry you create — whether prompted by a photo, a memory, or a moment — contributes to your evolving life story. Ever Journal turns reflection into a private, structured biography.",
+    desc: "Every journal entry you create — whether prompted by a photo, a memory, or a moment — contributes to your evolving life story. LoA turns reflection into a private, structured biography.",
     icon: <TbClockRecord className="w-8 h-8 text-[#505050]" />,
   },
 ];
@@ -71,9 +71,9 @@ export default function About() {
               className="my-4 mb-6 text-white w-[80%] md:w-[60%] md:leading-8 text-center"
             >
               We believe your thoughts, photos, songs, and digital moments all
-              tell a deeper story. Ever Journal was created to help you capture,
-              connect, and reflect on what truly matters — so you can build a
-              life story only you could live.
+              tell a deeper story. LoA was created to help you capture, connect,
+              and reflect on what truly matters — so you can build a life story
+              only you could live.
             </motion.p>
 
             <div className="mt-8 flex space-x-4">
@@ -90,14 +90,14 @@ export default function About() {
           >
             <Image
               src="/mockups/heroImgDesk.png"
-              alt="Ever Journal Mockup"
+              alt="LoA Mockup"
               className="max-w-[90%] md:hidden p-10"
               width={400}
               height={200}
             />
             <Image
               src="/mockups/heroImgDesk.png"
-              alt="Ever Journal Mockup"
+              alt="LoA Mockup"
               className="hidden md:block p-32"
               width={500}
               height={200}
@@ -120,7 +120,7 @@ export default function About() {
               <p>
                 Journaling shouldn’t feel like a task. With Eve, your AI
                 companion, you can write, talk, or simply tap how you feel — and
-                Ever Journal helps you make sense of it all.
+                LoA helps you make sense of it all.
               </p>
             </div>
             <div>
@@ -129,13 +129,13 @@ export default function About() {
               </h3>
               <p>
                 From the songs you play to the photos you take and the posts you
-                share, Ever Journal brings together your digital moments to help
-                you reflect, organize, and preserve your story.
+                share, LoA brings together your digital moments to help you
+                reflect, organize, and preserve your story.
               </p>
               <p className="mt-2 italic">
-                Or: Ever Journal connects your music, photos, and social
-                activity — turning scattered digital traces into a structured,
-                personal timeline of your life.
+                Or: LoA connects your music, photos, and social activity —
+                turning scattered digital traces into a structured, personal
+                timeline of your life.
               </p>
             </div>
             <div>
@@ -144,8 +144,8 @@ export default function About() {
               </h3>
               <p>
                 Your biography isn’t something you sit down and write. It’s
-                something you live — and Ever Journal builds it with you, one
-                entry at a time.
+                something you live — and LoA builds it with you, one entry at a
+                time.
               </p>
               <p className="mt-2 font-semibold">
                 Because your life isn’t just a timeline. It’s a story — and it
@@ -155,7 +155,7 @@ export default function About() {
           </div>
           <Image
             src="/mockups/mockupJournal.png"
-            alt="Ever Journal Mockup"
+            alt="LoA Mockup"
             className="w-[30%] hidden md:block p-28"
             width={200}
             height={200}

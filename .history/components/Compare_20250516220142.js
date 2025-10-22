@@ -105,7 +105,7 @@ const Analysis = () => {
       <article className="container mx-auto py-14 p-4 px-5 md:px-[5%] 2xl:px-0 max-w-[1200px] items-center justify-center gap-4">
         <div className="flex flex-col items-center justify-center">
           <h2 className="text-h2 lg:text-h3 font-bold text-center lg:text-left max-w-[80%]">
-            Why choose Ever Journal
+            Why choose LoA
           </h2>
           <span className="w-16 h-1 mt-3 bg-secondary" />
         </div>
@@ -116,7 +116,7 @@ const Analysis = () => {
       <thead className="text-xs uppercase bg-[#1e1e1e] text-white">
         <tr>
           <th className="py-4 px-3 text-left font-semibold">Feature</th>
-          <th className="py-4 px-3 text-center">Ever Journal</th>
+          <th className="py-4 px-3 text-center">LoA</th>
           <th className="py-4 px-3 text-center">Day One</th>
           <th className="py-4 px-3 text-center">Notion</th>
           <th className="py-4 px-3 text-center">ChatGPT & AI Writers</th>
@@ -154,7 +154,7 @@ const Analysis = () => {
       >
         <h3 className="font-bold text-white">{featureItem.feature}</h3>
         <p className="text-sm text-gray-300">
-          <strong>Ever Journal:</strong> {featureItem.everJournal}
+          <strong>LoA:</strong> {featureItem.everJournal}
         </p>
         <p className="text-sm text-gray-300">
           <strong>Day One:</strong> {featureItem.dayOne}

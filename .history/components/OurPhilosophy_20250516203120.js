@@ -51,8 +51,7 @@ const OurPhilosophy = () => {
               >
                 Most platforms are built to show the world who you are.{" "}
                 <strong>
-                  Ever Journal is built to help you understand who you’ve
-                  become.
+                  LoA is built to help you understand who you’ve become.
                 </strong>{" "}
                 Bring together your thoughts, photos, and memories — and reflect
                 on your life in one private, meaningful space.
@@ -62,7 +61,7 @@ const OurPhilosophy = () => {
             </article>
             <Image
               src="/mockups/workImg.webp"
-              alt="Ever Journal Mockup"
+              alt="LoA Mockup"
               className="w-full"
               width={500}
               height={400}

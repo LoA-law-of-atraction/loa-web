@@ -27,7 +27,7 @@ const Updates = () => {
           <Button text="Be the first to know" />
           <Image
             src="/mockups/mockupJournal.png"
-            alt="About Ever Journal"
+            alt="About LoA"
             className="w-[40%]"
             width={300}
             height={300}

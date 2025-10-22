@@ -92,9 +92,8 @@ const Feature = () => {
           <article className="flex flex-col items-center justify-center mt-16">
             <p className="mt-5 text-justify md:max-w-[60%] md:text-center">
               Journaling isn’t about trying to remember everything — it’s about
-              reflecting meaningfully. Ever Journal helps you capture your
-              thoughts, connect your digital life, and build your story
-              effortlessly.
+              reflecting meaningfully. LoA helps you capture your thoughts,
+              connect your digital life, and build your story effortlessly.
             </p>
           </article>
         </div>

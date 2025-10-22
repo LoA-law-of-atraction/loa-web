@@ -44,9 +44,8 @@ export default function Premium() {
               transition={{ delay: 0.8, duration: 0.5 }}
               className="text-white max-w-[85%] md:max-w-[70%] lg:max-w-[100%] md:leading-8 text-left"
             >
-              Ever Journal combines AI-powered technology with a user-friendly
-              interface to make journaling effortless, insightful, and deeply
-              personal.
+              LoA combines AI-powered technology with a user-friendly interface
+              to make journaling effortless, insightful, and deeply personal.
             </motion.p>
 
             <div className="mt-8 flex space-x-4">
@@ -63,7 +62,7 @@ export default function Premium() {
           >
             <Image
               src="/features/integrate.png"
-              alt="Ever Journal Mockup"
+              alt="LoA Mockup"
               className=""
               width={200}
               height={200}

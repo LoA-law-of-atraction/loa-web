@@ -22,19 +22,19 @@ const values = [
   {
     id: 1,
     title: "Preserve Your Legacy",
-    desc: "Your life is a collection of moments, lessons, and experiences that deserve to be remembered. Ever Journal transforms scattered memories into a beautifully structured biography, ensuring your story lives on for future generations.",
+    desc: "Your life is a collection of moments, lessons, and experiences that deserve to be remembered. LoA transforms scattered memories into a beautifully structured biography, ensuring your story lives on for future generations.",
     icon: <RiSecurePaymentFill className="w-8 h-8 text-[#505050]" />,
   },
   {
     id: 2,
     title: "Rediscover Your Purpose",
-    desc: "Reflect on your journey, uncover hidden patterns, and gain new insights. With AI-guided prompts and storytelling, Ever Journal helps you explore your past to better understand your present and future.",
+    desc: "Reflect on your journey, uncover hidden patterns, and gain new insights. With AI-guided prompts and storytelling, LoA helps you explore your past to better understand your present and future.",
     icon: <MdOutlineWifiFind className="w-8 h-8 text-[#505050]" />,
   },
   {
     id: 3,
     title: "Beyond Journaling, A Biography",
-    desc: "More than just a journal—Ever Journal turns your reflections into a meaningful, evolving biography. Whether you keep it private, share it, or publish it, your story is captured, told, and remembered.",
+    desc: "More than just a journal—LoA turns your reflections into a meaningful, evolving biography. Whether you keep it private, share it, or publish it, your story is captured, told, and remembered.",
     icon: <TbClockRecord className="w-8 h-8 text-[#505050]" />,
   },
 ];
@@ -68,9 +68,9 @@ export default function About() {
               transition={{ delay: 0.8, duration: 0.5 }}
               className="my-4 mb-6 text-white w-[80%] md:w-[60%] md:leading-8 text-center"
             >
-              We believe that every life is a story worth telling. Ever Journal
-              was born from a passion to make journaling effortless, insightful,
-              and accessible to everyone.
+              We believe that every life is a story worth telling. LoA was born
+              from a passion to make journaling effortless, insightful, and
+              accessible to everyone.
             </motion.p>
 
             <Button text="Join the Waitlist" />
@@ -82,14 +82,14 @@ export default function About() {
           >
             <Image
               src="/mockups/heroImgDesk.png"
-              alt="Ever Journal Mockup"
+              alt="LoA Mockup"
               className=""
               width={300}
               height={100}
             />
             <Image
               src="/mockups/aboutMob.svg"
-              alt="Ever Journal Mockup"
+              alt="LoA Mockup"
               className="max-w-[90%] md:hidden"
               width={500}
               height={200}
@@ -133,16 +133,15 @@ export default function About() {
                 viewport={{ once: true }}
                 className="mt-8"
               >
-                At Ever Journal, we believe that journaling should be more than
-                just writing down thoughts—it should be a journey of
-                self-discovery, storytelling, and legacy-building. That’s why
-                Ever Journal is not just a journaling app—it’s your personal
-                biographer.
+                At LoA, we believe that journaling should be more than just
+                writing down thoughts—it should be a journey of self-discovery,
+                storytelling, and legacy-building. That’s why LoA is not just a
+                journaling app—it’s your personal biographer.
               </motion.p>
             </article>
             <Image
               src="/mockups/mockupJournal.png"
-              alt="Ever Journal Mockup"
+              alt="LoA Mockup"
               className="w-[20%] hidden md:block p-28"
               width={100}
               height={100}

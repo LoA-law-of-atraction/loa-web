@@ -24,19 +24,19 @@ const values = [
   {
     id: 1,
     title: "Preserve Your Legacy",
-    desc: "Your life is a collection of moments, lessons, and experiences that deserve to be remembered. Ever Journal transforms scattered memories into a beautifully structured biography, ensuring your story lives on for future generations.",
+    desc: "Your life is a collection of moments, lessons, and experiences that deserve to be remembered. LoA transforms scattered memories into a beautifully structured biography, ensuring your story lives on for future generations.",
     icon: <RiSecurePaymentFill className="w-8 h-8 text-[#505050]" />,
   },
   {
     id: 2,
     title: "Rediscover Your Purpose",
-    desc: "Reflect on your journey, uncover hidden patterns, and gain new insights. With AI-guided prompts and storytelling, Ever Journal helps you explore your past to better understand your present and future.",
+    desc: "Reflect on your journey, uncover hidden patterns, and gain new insights. With AI-guided prompts and storytelling, LoA helps you explore your past to better understand your present and future.",
     icon: <MdOutlineWifiFind className="w-8 h-8 text-[#505050]" />,
   },
   {
     id: 3,
     title: "Beyond Journaling, A Biography",
-    desc: "More than just a journal—Ever Journal turns your reflections into a meaningful, evolving biography. Whether you keep it private, share it, or publish it, your story is captured, told, and remembered.",
+    desc: "More than just a journal—LoA turns your reflections into a meaningful, evolving biography. Whether you keep it private, share it, or publish it, your story is captured, told, and remembered.",
     icon: <TbClockRecord className="w-8 h-8 text-[#505050]" />,
   },
 ];
@@ -71,9 +71,9 @@ export default function About() {
               className="my-4 mb-6 text-white w-[80%] md:w-[60%] md:leading-8 text-center"
             >
               We believe your thoughts, photos, songs, and digital moments all
-              tell a deeper story. Ever Journal was created to help you capture,
-              connect, and reflect on what truly matters — so you can build a
-              life story only you could live.
+              tell a deeper story. LoA was created to help you capture, connect,
+              and reflect on what truly matters — so you can build a life story
+              only you could live.
             </motion.p>
 
             <div className="mt-8 flex space-x-4">
@@ -88,30 +88,30 @@ export default function About() {
             animate={{ opacity: 1, transition: { duration: 0.5 } }}
             className="flex items-center w-full justify-center"
           >
-                       <Image
-                          src="/mockups/heroImgDesk.png"
-                          alt="Ever Journal Mockup"
-                          className="max-w-[90%] md:hidden p-10"
-                          width={400}
-                          height={200}
-                        />
-                        <Image
-                          src="/mockups/heroImgDesk.png"
-                          alt="Ever Journal Mockup"
-                          className="hidden md:block p-20"
-                          width={500}
-                          height={200}
-                        />
             <Image
               src="/mockups/heroImgDesk.png"
-              alt="Ever Journal Mockup"
+              alt="LoA Mockup"
+              className="max-w-[90%] md:hidden p-10"
+              width={400}
+              height={200}
+            />
+            <Image
+              src="/mockups/heroImgDesk.png"
+              alt="LoA Mockup"
+              className="hidden md:block p-20"
+              width={500}
+              height={200}
+            />
+            <Image
+              src="/mockups/heroImgDesk.png"
+              alt="LoA Mockup"
               className="hidden md:block"
               width={200}
               height={200}
             />
             <Image
               src="/mockups/mockupJournal.png"
-              alt="Ever Journal Mockup"
+              alt="LoA Mockup"
               className="max-w-[30%] md:hidden pb-32"
               width={200}
               height={200}
@@ -143,7 +143,7 @@ export default function About() {
                 We believe life isn’t just about what you do, but what you feel,
                 observe, and carry with you. Your music, photos, thoughts, and
                 digital moments all hold meaning — but they’re often scattered
-                across apps and forgotten. **Ever Journal exists to bring them
+                across apps and forgotten. **LoA exists to bring them
                 together.** It’s your journal, your memory hub, and your story —
                 powered by AI, guided by reflection, and built entirely on your
                 terms.
@@ -158,16 +158,15 @@ export default function About() {
                 viewport={{ once: true }}
                 className="mt-8"
               >
-                At Ever Journal, we believe that journaling should be more than
-                just writing down thoughts—it should be a journey of
-                self-discovery, storytelling, and legacy-building. That’s why
-                Ever Journal is not just a journaling app—it’s your personal
-                biographer.
+                At LoA, we believe that journaling should be more than just
+                writing down thoughts—it should be a journey of self-discovery,
+                storytelling, and legacy-building. That’s why LoA is not just a
+                journaling app—it’s your personal biographer.
               </motion.p>
             </article>
             <Image
               src="/mockups/mockupJournal.png"
-              alt="Ever Journal Mockup"
+              alt="LoA Mockup"
               className="w-[30%] hidden md:block p-28"
               width={200}
               height={200}

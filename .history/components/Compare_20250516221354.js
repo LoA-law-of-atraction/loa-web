@@ -5,7 +5,8 @@ import { MdClose } from "react-icons/md";
 import { CgDanger } from "react-icons/cg";
 
 const renderStatusIcon = (value: string) => {
-  if (value === "Yes") return <GiCheckMark className="text-green-400 mx-auto" />;
+  if (value === "Yes")
+    return <GiCheckMark className="text-green-400 mx-auto" />;
   if (value === "No") return <MdClose className="text-red-400 mx-auto" />;
   return <CgDanger className="text-yellow-400 mx-auto" />;
 };
@@ -131,7 +132,7 @@ const Analysis = () => {
       <article className="container mx-auto py-14 p-4 px-5 md:px-[5%] 2xl:px-0 max-w-[1200px]">
         <div className="flex flex-col items-center justify-center">
           <h2 className="text-h2 lg:text-h3 font-bold text-center">
-            Why choose Ever Journal
+            Why choose LoA
           </h2>
           <span className="w-16 h-1 mt-3 bg-secondary" />
         </div>
@@ -143,7 +144,7 @@ const Analysis = () => {
               <thead className="text-xs uppercase bg-[#1e1e1e] text-white">
                 <tr>
                   <th className="py-4 px-3 text-left font-semibold">Feature</th>
-                  <th className="py-4 px-3 text-center">Ever Journal</th>
+                  <th className="py-4 px-3 text-center">LoA</th>
                   <th className="py-4 px-3 text-center">Instagram</th>
                   <th className="py-4 px-3 text-center">Day One</th>
                   <th className="py-4 px-3 text-center">Notion</th>
@@ -160,12 +161,24 @@ const Analysis = () => {
                     } border-b border-gray-700`}
                   >
                     <td className="py-4 px-3 font-medium">{item.feature}</td>
-                    <td className="py-4 px-3 text-center">{renderStatusIcon(item.everJournal)}</td>
-                    <td className="py-4 px-3 text-center">{renderStatusIcon(item.instagram)}</td>
-                    <td className="py-4 px-3 text-center">{renderStatusIcon(item.dayOne)}</td>
-                    <td className="py-4 px-3 text-center">{renderStatusIcon(item.notion)}</td>
-                    <td className="py-4 px-3 text-center">{renderStatusIcon(item.chatGPT)}</td>
-                    <td className="py-4 px-3 text-center">{renderStatusIcon(item.memoirServices)}</td>
+                    <td className="py-4 px-3 text-center">
+                      {renderStatusIcon(item.everJournal)}
+                    </td>
+                    <td className="py-4 px-3 text-center">
+                      {renderStatusIcon(item.instagram)}
+                    </td>
+                    <td className="py-4 px-3 text-center">
+                      {renderStatusIcon(item.dayOne)}
+                    </td>
+                    <td className="py-4 px-3 text-center">
+                      {renderStatusIcon(item.notion)}
+                    </td>
+                    <td className="py-4 px-3 text-center">
+                      {renderStatusIcon(item.chatGPT)}
+                    </td>
+                    <td className="py-4 px-3 text-center">
+                      {renderStatusIcon(item.memoirServices)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -182,12 +195,24 @@ const Analysis = () => {
                 }`}
               >
                 <h3 className="font-bold text-white mb-2">{item.feature}</h3>
-                <p className="text-sm text-gray-300"><strong>Ever Journal:</strong> {item.everJournal}</p>
-                <p className="text-sm text-gray-300"><strong>Instagram:</strong> {item.instagram}</p>
-                <p className="text-sm text-gray-300"><strong>Day One:</strong> {item.dayOne}</p>
-                <p className="text-sm text-gray-300"><strong>Notion:</strong> {item.notion}</p>
-                <p className="text-sm text-gray-300"><strong>ChatGPT & AI:</strong> {item.chatGPT}</p>
-                <p className="text-sm text-gray-300"><strong>Memoir Services:</strong> {item.memoirServices}</p>
+                <p className="text-sm text-gray-300">
+                  <strong>LoA:</strong> {item.everJournal}
+                </p>
+                <p className="text-sm text-gray-300">
+                  <strong>Instagram:</strong> {item.instagram}
+                </p>
+                <p className="text-sm text-gray-300">
+                  <strong>Day One:</strong> {item.dayOne}
+                </p>
+                <p className="text-sm text-gray-300">
+                  <strong>Notion:</strong> {item.notion}
+                </p>
+                <p className="text-sm text-gray-300">
+                  <strong>ChatGPT & AI:</strong> {item.chatGPT}
+                </p>
+                <p className="text-sm text-gray-300">
+                  <strong>Memoir Services:</strong> {item.memoirServices}
+                </p>
               </div>
             ))}
           </div>

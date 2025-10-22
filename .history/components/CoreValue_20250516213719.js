@@ -5,7 +5,7 @@ const values = [
   {
     id: "01",
     title: "Reflection Should Feel Natural",
-    desc: `You don’t need to perform or overthink — you just need to show up. Whether it begins with a feeling, a photo, or a quiet moment, Ever Journal meets you where you are and helps you reflect with ease.<br /><span class="italic text-black/70">💡 Your story starts with your truth — not perfection.</span>`,
+    desc: `You don’t need to perform or overthink — you just need to show up. Whether it begins with a feeling, a photo, or a quiet moment, LoA meets you where you are and helps you reflect with ease.<br /><span class="italic text-black/70">💡 Your story starts with your truth — not perfection.</span>`,
   },
   {
     id: "02",
@@ -15,7 +15,7 @@ const values = [
   {
     id: "03",
     title: "Your Story Builds Over Time",
-    desc: `You don’t need to plan your legacy. You just need to write your next entry. With every journal, Ever Journal begins to assemble your biography — quietly, beautifully, and in the background.<br /><span class="italic text-black/70">💡 Let your life tell the story, one reflection at a time.</span>`,
+    desc: `You don’t need to plan your legacy. You just need to write your next entry. With every journal, LoA begins to assemble your biography — quietly, beautifully, and in the background.<br /><span class="italic text-black/70">💡 Let your life tell the story, one reflection at a time.</span>`,
   },
   {
     id: "04",
@@ -25,7 +25,7 @@ const values = [
   {
     id: "05",
     title: "A Culture of Reflection, Not Just Recording",
-    desc: `We’re not building another feed. We’re building a home for memory. Ever Journal invites people to slow down, reflect more often, and grow through self-awareness — not performance.<br /><span class="italic text-black/70">💡 Because your life deserves more than likes — it deserves meaning.</span>`,
+    desc: `We’re not building another feed. We’re building a home for memory. LoA invites people to slow down, reflect more often, and grow through self-awareness — not performance.<br /><span class="italic text-black/70">💡 Because your life deserves more than likes — it deserves meaning.</span>`,
   },
 ];
 
@@ -39,12 +39,12 @@ const CoreValues = () => {
       <article className="container mx-auto py-14 p-4 px-5 md:px-[5%] 2xl:px-0 max-w-[1200px] flex flex-col items-center justify-center gap-10">
         <div className="flex flex-col items-center justify-center text-center">
           <h2 className="text-h2 lg:text-h3 font-bold max-w-[80%]">
-            Ever Journal – Our Core Values
+            LoA – Our Core Values
           </h2>
           <span className="w-16 h-1 mt-3 bg-bg" />
           <p className="mt-5 text-justify md:max-w-[60%] md:text-center">
-            At <strong>Ever Journal</strong>, we believe your life isn’t meant
-            to be curated for others — it’s meant to be understood by{" "}
+            At <strong>LoA</strong>, we believe your life isn’t meant to be
+            curated for others — it’s meant to be understood by{" "}
             <strong>you</strong>. Our values reflect our commitment to helping
             you{" "}
             <strong>

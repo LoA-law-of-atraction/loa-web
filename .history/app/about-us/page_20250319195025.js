@@ -21,23 +21,23 @@ import Values from "@/components/CoreValue";
 const values = [
   {
     id: 1,
-    title: 'Preserve Your Legacy',
-    desc: 'Your life is a collection of moments, lessons, and experiences that deserve to be remembered. Ever Journal transforms scattered memories into a beautifully structured biography, ensuring your story lives on for future generations.',
-    icon: <RiSecurePaymentFill className="w-8 h-8 text-[#505050]" />
+    title: "Preserve Your Legacy",
+    desc: "Your life is a collection of moments, lessons, and experiences that deserve to be remembered. LoA transforms scattered memories into a beautifully structured biography, ensuring your story lives on for future generations.",
+    icon: <RiSecurePaymentFill className="w-8 h-8 text-[#505050]" />,
   },
   {
     id: 2,
-    title: 'Rediscover Your Purpose',
-    desc: 'Reflect on your journey, uncover hidden patterns, and gain new insights. With AI-guided prompts and storytelling, Ever Journal helps you explore your past to better understand your present and future.',
-    icon: <MdOutlineWifiFind className="w-8 h-8 text-[#505050]" />
+    title: "Rediscover Your Purpose",
+    desc: "Reflect on your journey, uncover hidden patterns, and gain new insights. With AI-guided prompts and storytelling, LoA helps you explore your past to better understand your present and future.",
+    icon: <MdOutlineWifiFind className="w-8 h-8 text-[#505050]" />,
   },
   {
     id: 3,
-    title: 'Beyond Journaling, A Biography',
-    desc: 'More than just a journal—Ever Journal turns your reflections into a meaningful, evolving biography. Whether you keep it private, share it, or publish it, your story is captured, told, and remembered.',
-    icon: <TbClockRecord className="w-8 h-8 text-[#505050]" />
-  }
-]
+    title: "Beyond Journaling, A Biography",
+    desc: "More than just a journal—LoA turns your reflections into a meaningful, evolving biography. Whether you keep it private, share it, or publish it, your story is captured, told, and remembered.",
+    icon: <TbClockRecord className="w-8 h-8 text-[#505050]" />,
+  },
+];
 
 export default function About() {
   useEffect(() => {
@@ -68,8 +68,9 @@ export default function About() {
               transition={{ delay: 0.8, duration: 0.5 }}
               className="my-4 mb-6 text-white w-[80%] md:w-[60%] md:leading-8 text-center"
             >
-              We believe that every life is a story worth telling. Ever Journal was born from a passion
-              to make journaling effortless, insightful, and accessible to everyone.
+              We believe that every life is a story worth telling. LoA was born
+              from a passion to make journaling effortless, insightful, and
+              accessible to everyone.
             </motion.p>
 
             <Button text="Join the Waitlist" />
@@ -79,8 +80,20 @@ export default function About() {
             animate={{ opacity: 1, transition: { duration: 0.5 } }}
             className="flex items-center w-full justify-center"
           >
-            <Image src="/mockups/heroImgDesk.svg" alt="Ever Journal Mockup" className="w-full hidden md:block" width={500} height={200} />
-            <Image src="/mockups/aboutMob.svg" alt="Ever Journal Mockup" className="max-w-[90%] md:hidden" width={500} height={200} />
+            <Image
+              src="/mockups/heroImgDesk.svg"
+              alt="LoA Mockup"
+              className="w-full hidden md:block"
+              width={500}
+              height={200}
+            />
+            <Image
+              src="/mockups/aboutMob.svg"
+              alt="LoA Mockup"
+              className="max-w-[90%] md:hidden"
+              width={500}
+              height={200}
+            />
           </motion.article>
         </section>
       </motion.article>
@@ -88,32 +101,51 @@ export default function About() {
       <motion.article className="mt-[-100px] bg-secondary text-primary overflow-hidden">
         <article className="container mx-auto py-14 pb-32 p-4 px-5 md:px-[5%] 2xl:px-0 max-w-[1200px] flex flex-col items-center justify-center gap-12">
           <div className="flex flex-col items-center md:items-start md:self-start">
-            <h2 className="text-h2 lg:text-h3 font-bold text-center">Our Mission</h2>
+            <h2 className="text-h2 lg:text-h3 font-bold text-center">
+              Our Mission
+            </h2>
             <span className="w-16 h-1 mt-3 bg-bg" />
           </div>
           <div className="mt-4 flex flex-col md:flex-row justify-between gap-14">
             <article className="flex flex-col items-center justify-center">
               <motion.p
                 initial={{ opacity: 0, y: 100 }}
-                whileInView={{ opacity: 1, y: 0, transition: { duration: 0.5 } }}
+                whileInView={{
+                  opacity: 1,
+                  y: 0,
+                  transition: { duration: 0.5 },
+                }}
                 viewport={{ once: true }}
                 className="mt-2"
               >
-                Life is more than just a series of moments—it’s a story waiting to be told. Yet, too often, our experiences,
-                wisdom, and emotions fade into forgotten memories, never fully captured or shared.
+                Life is more than just a series of moments—it’s a story waiting
+                to be told. Yet, too often, our experiences, wisdom, and
+                emotions fade into forgotten memories, never fully captured or
+                shared.
               </motion.p>
               <motion.p
                 initial={{ opacity: 0, y: 100 }}
-                whileInView={{ opacity: 1, y: 0, transition: { duration: 0.5 } }}
+                whileInView={{
+                  opacity: 1,
+                  y: 0,
+                  transition: { duration: 0.5 },
+                }}
                 viewport={{ once: true }}
                 className="mt-8"
               >
-                At Ever Journal, we believe that journaling should be more than just writing down thoughts—it should be a
-                journey of self-discovery, storytelling, and legacy-building. That’s why Ever Journal is not just a
+                At LoA, we believe that journaling should be more than just
+                writing down thoughts—it should be a journey of self-discovery,
+                storytelling, and legacy-building. That’s why LoA is not just a
                 journaling app—it’s your personal biographer.
               </motion.p>
             </article>
-            <Image src="/mockups/aiPad.webp" alt="Ever Journal Mockup" className="w-[30%] hidden md:block" width={500} height={400} />
+            <Image
+              src="/mockups/aiPad.webp"
+              alt="LoA Mockup"
+              className="w-[30%] hidden md:block"
+              width={500}
+              height={400}
+            />
           </div>
           <article className="grid grid-cols-1 items-center justify-center lg:grid-cols-3 gap-4 mt-10 lg:pb-0 px-6 pb-10 lg:rounded-2xl text-black lg:shadow-xl lg:w-full">
             {values.map((hook) => (
@@ -129,7 +161,9 @@ export default function About() {
                   {hook.icon}
                 </div>
                 <h4 className="font-bold text-center">{hook.title}</h4>
-                <p className="text-center lg:text-base text-black lg:max-w-80">{hook.desc}</p>
+                <p className="text-center lg:text-base text-black lg:max-w-80">
+                  {hook.desc}
+                </p>
               </motion.div>
             ))}
           </article>
@@ -139,7 +173,7 @@ export default function About() {
       <Values />
       <Legacy />
       <Testimonial />
-      <div className="relative top-[500px] mb-[500px]">	
+      <div className="relative top-[500px] mb-[500px]">
         <Faqs />
       </div>
     </>

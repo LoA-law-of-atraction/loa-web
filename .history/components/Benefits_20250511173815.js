@@ -29,7 +29,8 @@ const features = [
   },
   {
     id: "06",
-    title: "Keep everything private or transform your biography into a timeline, memory book, or legacy ",
+    title:
+      "Keep everything private or transform your biography into a timeline, memory book, or legacy ",
     desc: "share your story with loved ones or even sell it as a digital book.",
   },
 ];
@@ -69,9 +70,8 @@ const Benefits = () => {
             </h3>
             <p className="mt-5 text-justify md:max-w-[60%] md:text-center">
               Journaling isn’t about trying to remember everything — it’s about
-              reflecting meaningfully. Ever Journal helps you capture your
-              thoughts, connect your digital life, and build your story
-              effortlessly.
+              reflecting meaningfully. LoA helps you capture your thoughts,
+              connect your digital life, and build your story effortlessly.
             </p>
           </article>
         </div>

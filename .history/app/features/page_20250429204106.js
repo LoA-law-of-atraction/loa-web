@@ -40,9 +40,8 @@ export default function Features() {
               transition={{ delay: 0.8, duration: 0.5 }}
               className="text-white max-w-[85%] md:max-w-[70%] lg:max-w-[100%] md:leading-8 text-left"
             >
-              Ever Journal combines AI-powered technology with a user-friendly
-              interface to make journaling effortless, insightful, and deeply
-              personal.
+              LoA combines AI-powered technology with a user-friendly interface
+              to make journaling effortless, insightful, and deeply personal.
             </motion.p>
 
             <Button text="Join the Waitlist" />
@@ -54,14 +53,14 @@ export default function Features() {
           >
             <Image
               src="/features/features.png"
-              alt="Ever Journal Mockup"
+              alt="LoA Mockup"
               className="max-w-[50%] mt-[-80px] md:hidden"
               width={200}
               height={200}
             />
             <Image
               src="/features/features.png"
-              alt="Ever Journal Mockup"
+              alt="LoA Mockup"
               className="hidden mt-[-80px] md:block"
               width={200}
               height={100}

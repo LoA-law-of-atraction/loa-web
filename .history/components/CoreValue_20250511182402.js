@@ -5,13 +5,13 @@ const values = [
   {
     id: "01",
     title: "Create Your Legacy & Share it",
-    desc: "Your experiences, wisdom, and memories are valuable. Ever Journal helps you preserve your story for future generations—whether for your children, friends, or loved ones.",
+    desc: "Your experiences, wisdom, and memories are valuable. LoA helps you preserve your story for future generations—whether for your children, friends, or loved ones.",
     img: "/icons/create.svg",
   },
   {
     id: "02",
     title: "Rediscover Your Life’s Purpose",
-    desc: "Life’s meaning often becomes clearer when we reflect on where we’ve been. Through guided journaling and AI-assisted storytelling, Ever Journal helps you uncover patterns, lessons, and the deeper purpose behind your journey.",
+    desc: "Life’s meaning often becomes clearer when we reflect on where we’ve been. Through guided journaling and AI-assisted storytelling, LoA helps you uncover patterns, lessons, and the deeper purpose behind your journey.",
     img: "/icons/discover.svg",
   },
   {
@@ -50,9 +50,9 @@ const CoreValues = () => {
 
           <article className="flex flex-col items-center justify-center mt-16">
             <p className="mt-5 text-justify md:max-w-[60%] md:text-center">
-              At Ever Journal, we believe that every life is a story worth
-              telling. Our values reflect our commitment to helping youdocument,
-              rediscover, and share your journey in a meaningful way.
+              At LoA, we believe that every life is a story worth telling. Our
+              values reflect our commitment to helping youdocument, rediscover,
+              and share your journey in a meaningful way.
             </p>
           </article>
         </div>

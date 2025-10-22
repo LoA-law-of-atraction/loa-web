@@ -14,7 +14,6 @@ import PricingPlans from "@/components/PricingPolicy";
 import Benefits from "@/components/Benefits";
 
 export default function Premium() {
-
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
@@ -43,7 +42,8 @@ export default function Premium() {
               transition={{ delay: 0.8, duration: 0.5 }}
               className="text-white max-w-[85%] md:max-w-[70%] lg:max-w-[100%] md:leading-8 text-left"
             >
-              Ever Journal combines AI-powered technology with a user-friendly interface to make journaling effortless, insightful, and deeply personal.
+              LoA combines AI-powered technology with a user-friendly interface
+              to make journaling effortless, insightful, and deeply personal.
             </motion.p>
 
             <Button text="Join the Waitlist" />
@@ -53,8 +53,13 @@ export default function Premium() {
             animate={{ opacity: 1, transition: { duration: 0.5 } }}
             className="flex py-4 mx-auto items-center w-full justify-center"
           >
-
-            <Image src="/features/features.svg" alt="Ever Journal Mockup" className="w-full hidden mt-[-80px] md:block" width={200} height={400} />
+            <Image
+              src="/features/features.svg"
+              alt="LoA Mockup"
+              className="w-full hidden mt-[-80px] md:block"
+              width={200}
+              height={400}
+            />
           </motion.article>
         </section>
       </motion.article>

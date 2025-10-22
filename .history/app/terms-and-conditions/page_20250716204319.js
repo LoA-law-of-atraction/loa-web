@@ -42,15 +42,15 @@ const TermsAndConditions = () => {
             paying for.
           </p>
           <p className="text-base">
-            The Ever Journal app stores and processes personal data that you
-            have provided to us, in order to provide our Service. It’s your
+            The LoA app stores and processes personal data that you have
+            provided to us, in order to provide our Service. It’s your
             responsibility to keep your phone and access to the app secure. We
             therefore recommend that you do not jailbreak or root your phone,
             which is the process of removing software restrictions and
             limitations imposed by the official operating system of your device.
             It could make your phone vulnerable to malware/viruses/malicious
             programs, compromise your phone’s security features, and it could
-            mean that the Ever Journal app won’t work properly or at all.
+            mean that the LoA app won’t work properly or at all.
           </p>
           <p className="text-base">
             The app does use third-party services that declare their Terms and

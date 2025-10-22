@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import "./globals.css";
 import { motion } from "framer-motion";
@@ -32,20 +32,29 @@ const Layout = ({ children }) => {
   return (
     <>
       <Head>
-        <title>Ever Journal</title>
+        <title>LoA</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <meta name="description" content="Ever Journal is more than just a journal app—it’s your personal biographer. With the help of Eve, your AI biographer, you’ll embark on a journey of self-reflection, rediscovery, and storytelling" />
+        <meta
+          name="description"
+          content="LoA is more than just a journal app—it’s your personal biographer. With the help of Eve, your AI biographer, you’ll embark on a journey of self-reflection, rediscovery, and storytelling"
+        />
         <link rel="icon" href="/favicon.png" type="image/png" />
-        <meta property="og:title" content="Ever Journal | Your Personal Biographer" />
+        <meta property="og:title" content="LoA | Your Personal Biographer" />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://www.ever-journal.com" />
-        <meta property="og:image" content="https://www.ever-journal.com/ever.svg" />
-        <meta property="og:description" content="Ever Journal helps you preserve your memories and turn them into a structured biography." />
+        <meta property="og:url" content="https://www.loa.com" />
+        <meta property="og:image" content="https://www.loa.com/loa.svg" />
+        <meta
+          property="og:description"
+          content="LoA helps you preserve your memories and turn them into a structured biography."
+        />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:site" content="@EverJournal" />
-        <meta name="twitter:title" content="Ever Journal | Your Personal Biographer" />
-        <meta name="twitter:description" content="Ever Journal helps you preserve your memories and turn them into a structured biography." />
-        <meta name="twitter:image" content="https://www.ever-journal.com/ever.svg" />
+        <meta name="twitter:title" content="LoA | Your Personal Biographer" />
+        <meta
+          name="twitter:description"
+          content="LoA helps you preserve your memories and turn them into a structured biography."
+        />
+        <meta name="twitter:image" content="https://www.loa.com/loa.svg" />
       </Head>
 
       <body className="bg-secondary text-primary min-h-screen flex flex-col">

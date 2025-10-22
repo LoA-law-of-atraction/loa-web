@@ -57,14 +57,14 @@ export default function Home() {
           >
             <Image
               src="/mockups/heroImgMob.svg"
-              alt="Ever Journal Mockup"
+              alt="LoA Mockup"
               className="max-w-[90%] md:hidden"
               width={500}
               height={200}
             />
             <Image
               src="/mockups/heroImgDesk.svg"
-              alt="Ever Journal Mockup"
+              alt="LoA Mockup"
               className="hidden w-full md:block"
               width={100}
               height={200}

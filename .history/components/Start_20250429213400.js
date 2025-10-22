@@ -14,7 +14,7 @@ const Start = () => {
         <div className="flex flex-col gap-12 items-center md:items-start justify-center">
           <h2 className="text-h3 lg:text-h4 font-bold text-center md:text-left max-w-[80%] leading-relaxed">
             Start Your Journey Today. <br />
-            Your Legacy Begins with Ever Journal
+            Your Legacy Begins with LoA
           </h2>
           <div className="mt-8 flex space-x-4">
             <div className="flex flex-col md:flex-row gap-4">
@@ -25,7 +25,7 @@ const Start = () => {
         </div>
         <Image
           src="/mockups/mockupJournal.png"
-          alt="Ever Journal Mockup"
+          alt="LoA Mockup"
           className="max-w-[50%] md:max-w-[40%]"
           width={500}
           height={500}

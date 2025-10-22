@@ -6,7 +6,7 @@ const values = [
     id: "01",
     title: "Reflection Should Be Effortless",
     desc: "You don’t need the perfect words to start journaling — you just need a moment.
-Whether it begins with a thought, a song, or a photo, Ever Journal helps you reflect in ways that feel natural and intuitive.
+Whether it begins with a thought, a song, or a photo, LoA helps you reflect in ways that feel natural and intuitive.
 
 💡 *Start from anywhere. Everything meaningful begins somewhere.*",
     img: "/icons/create.svg",
@@ -14,7 +14,7 @@ Whether it begins with a thought, a song, or a photo, Ever Journal helps you ref
   {
     id: "02",
     title: "Rediscover Your Life’s Purpose",
-    desc: "Life’s meaning often becomes clearer when we reflect on where we’ve been. Through guided journaling and AI-assisted storytelling, Ever Journal helps you uncover patterns, lessons, and the deeper purpose behind your journey.",
+    desc: "Life’s meaning often becomes clearer when we reflect on where we’ve been. Through guided journaling and AI-assisted storytelling, LoA helps you uncover patterns, lessons, and the deeper purpose behind your journey.",
     img: "/icons/discover.svg",
   },
   {
@@ -47,13 +47,13 @@ const CoreValues = () => {
       <article className="container mx-auto py-14 p-4 px-5 md:px-[5%] 2xl:px-0 max-w-[1200px] gap-4flex flex-col items-center justify-center gap-4">
         <div className="flex flex-col items-center justify-center">
           <h2 className="text-h2 lg:text-h3 font-bold text-center max-w-[80%]">
-            Ever Journal – Our Core Values
+            LoA – Our Core Values
           </h2>
           <span className="w-16 h-1 mt-3 bg-bg" />
 
           <article className="flex flex-col items-center justify-center mt-16">
             <p className="mt-5 text-justify md:max-w-[60%] md:text-center">
-              At Ever Journal, we believe your life isn’t just a series of
+              At LoA, we believe your life isn’t just a series of
               moments — it’s a story that deserves to be remembered. Our values
               reflect our commitment to helping you reflect, remember, and
               reconnect with who you are**, one journal at a time.

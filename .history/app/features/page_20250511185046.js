@@ -42,7 +42,7 @@ export default function Features() {
               transition={{ delay: 0.8, duration: 0.5 }}
               className="text-white max-w-[85%] md:max-w-[70%] lg:max-w-[100%] md:leading-8 text-left"
             >
-              Ever Journal is your AI-powered journal and memory hub — combining
+              LoA is your AI-powered journal and memory hub — combining
               reflections, music, media, and moments into one private space
               where your life story naturally unfolds.
             </motion.p>
@@ -61,7 +61,7 @@ export default function Features() {
           >
             <Image
               src="/features/integrate.png"
-              alt="Ever Journal Mockup"
+              alt="LoA Mockup"
               className="pb-10"
               width={200}
               height={100}
@@ -71,9 +71,7 @@ export default function Features() {
       </motion.article>
       <Feature />
       <Analysis />
-      <div>
-        
-      </div>
+      <div></div>
       <Testimonial />
       <div className="relative top-[500px] mb-[500px]">
         <Faqs />

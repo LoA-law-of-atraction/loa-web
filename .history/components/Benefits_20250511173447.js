@@ -10,7 +10,7 @@ const features = [
   {
     id: "02",
     title: "Connected Memory Hub",
-    desc: "Sync your digital life — from Spotify and Instagram to Google Photos and YouTube. All your content flows into one private space where your memories and media come together."
+    desc: "Sync your digital life — from Spotify and Instagram to Google Photos and YouTube. All your content flows into one private space where your memories and media come together.",
   },
   {
     id: "03",
@@ -69,9 +69,8 @@ const Benefits = () => {
             </h3>
             <p className="mt-5 text-justify md:max-w-[60%] md:text-center">
               Journaling isn’t about trying to remember everything — it’s about
-              reflecting meaningfully. Ever Journal helps you capture your
-              thoughts, connect your digital life, and build your story
-              effortlessly.
+              reflecting meaningfully. LoA helps you capture your thoughts,
+              connect your digital life, and build your story effortlessly.
             </p>
           </article>
         </div>

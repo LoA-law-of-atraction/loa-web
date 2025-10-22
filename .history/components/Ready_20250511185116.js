@@ -15,7 +15,7 @@ const ReadyToStart = () => {
             Ready to Start Your Story?
           </h2>
           <p className="text-left max-w-[80%] leading-8">
-            Start your journey today—your legacy begins with Ever Journal!
+            Start your journey today—your legacy begins with LoA!
           </p>
         </div>
         <div className="self-start md:self-end">

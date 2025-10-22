@@ -105,7 +105,7 @@ const Analysis = () => {
       <article className="container mx-auto py-14 p-4 px-5 md:px-[5%] 2xl:px-0 max-w-[1200px] items-center justify-center gap-4">
         <div className="flex flex-col items-center justify-center">
           <h2 className="text-h2 lg:text-h3 font-bold text-center lg:text-left max-w-[80%]">
-            Why choose Ever Journal
+            Why choose LoA
           </h2>
           <span className="w-16 h-1 mt-3 bg-secondary" />
         </div>
@@ -132,7 +132,7 @@ const Analysis = () => {
                         scope="row"
                         className="py-2 px-3 font-medium text-primary whitespace-nowrap"
                       >
-                        Ever Journal
+                        LoA
                       </th>
                       <td className="py-2 px-3 flex gap-2 items-center">
                         {featureItem.everJournal === "Yes" && <GiCheckMark />}
@@ -226,7 +226,7 @@ const Analysis = () => {
               <thead className="text-xs uppercase bg-[#505050]">
                 <tr className="">
                   <th className="py-5 px-3">Feature</th>
-                  <th className="py-5 px-3">Ever Journal</th>
+                  <th className="py-5 px-3">LoA</th>
                   <th className="py-5 px-3">Day One</th>
                   <th className="py-5 px-3">Notion</th>
                   <th className="py-5 px-3">ChatGPT & AI Writers</th>

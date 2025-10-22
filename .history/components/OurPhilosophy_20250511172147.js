@@ -37,7 +37,7 @@ const OurPhilosophy = () => {
                 viewport={{ once: true }}
                 className="mt-12 text-h3"
               >
-               🌱 Every Life Deserves to Be Remembered
+                🌱 Every Life Deserves to Be Remembered
               </motion.h3>
               <motion.p
                 initial={{ opacity: 0, y: 100 }}
@@ -56,7 +56,7 @@ const OurPhilosophy = () => {
             </article>
             <Image
               src="/mockups/workImg.webp"
-              alt="Ever Journal Mockup"
+              alt="LoA Mockup"
               className="w-full"
               width={500}
               height={400}
