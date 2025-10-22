@@ -152,10 +152,10 @@ export default function About() {
             <div>
               <h3 className="text-xl font-bold">📊 Insights Without Shame</h3>
               <p>
-                Knowledge is power, but only when it&apos;s used with
-                compassion. LoA provides clear insights into your digital energy
-                patterns without judgment, helping you make conscious decisions
-                about your digital alignment and manifestation practice.
+                Knowledge is power, but only when it&apos;s used with compassion. LoA
+                provides clear insights into your digital energy patterns
+                without judgment, helping you make conscious decisions about
+                your digital alignment and manifestation practice.
               </p>
               <p className="mt-2 font-semibold">
                 Because awareness is the first step toward conscious

@@ -140,8 +140,8 @@ export default function Home() {
                     Your Daily Affirmation
                   </h3>
                   <p className="text-purple-100 text-sm">
-                    &quot;I am aligned with my highest purpose and attract
-                    abundance in all forms&quot;
+                    &quot;I am aligned with my highest purpose and attract abundance
+                    in all forms&quot;
                   </p>
                 </div>
               </div>

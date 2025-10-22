@@ -140,8 +140,8 @@ export default function Home() {
                     Your Daily Affirmation
                   </h3>
                   <p className="text-purple-100 text-sm">
-                    &quot;I am aligned with my highest purpose and attract
-                    abundance in all forms&quot;
+                    &quot;I am aligned with my highest purpose and attract abundance
+                    in all forms&quot;
                   </p>
                 </div>
               </div>
@@ -190,7 +190,7 @@ export default function Home() {
             transition={{ duration: 0.8 }}
             className="text-4xl md:text-5xl font-bold mb-8 bg-gradient-to-r from-indigo-900 to-purple-900 bg-clip-text text-transparent"
           >
-            &quot;You attract what you think and feel&quot;
+            "You attract what you think and feel"
           </motion.h2>
           <motion.p
             initial={{ opacity: 0, y: 30 }}

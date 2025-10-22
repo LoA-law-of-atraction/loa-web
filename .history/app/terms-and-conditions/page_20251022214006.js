@@ -27,10 +27,9 @@ const TermsAndConditions = () => {
             Last updated: October 22, 2025
           </p>
           <p className="text-base">
-            Welcome to LoA (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;).
-            These Terms and Conditions (&quot;Terms&quot;) govern your use of
-            the LoA mobile application (&quot;App&quot;) and any related
-            services we provide.
+            Welcome to LoA (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;). These Terms and Conditions
+            (&quot;Terms&quot;) govern your use of the LoA mobile application (&quot;App&quot;) and
+            any related services we provide.
           </p>
           <p className="text-base">
             By downloading or using the App, you agree to these Terms. If you do
