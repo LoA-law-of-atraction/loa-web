@@ -111,8 +111,7 @@ const HowItWorks = () => {
                     Manifestation Moment
                   </h4>
                   <p className="text-purple-100 text-sm">
-                    &quot;I attract opportunities that align with my highest
-                    good&quot;
+                    &quot;I attract opportunities that align with my highest good&quot;
                   </p>
                 </div>
                 <div className="space-y-3 mb-6">

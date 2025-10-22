@@ -29,10 +29,10 @@ const Privacy = () => {
             Last updated: October 22, 2025
           </p>
           <p className="text-base">
-            Thank you for using Loa (&quot;we&quot;, &quot;our&quot;, or
-            &quot;us&quot;). Your privacy is important to us. This Privacy
-            Policy explains how we collect, use, and protect your information
-            when you use the Loa mobile application (&quot;App&quot;).
+            Thank you for using Loa (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;). Your privacy is
+            important to us. This Privacy Policy explains how we collect, use,
+            and protect your information when you use the Loa mobile application
+            (&quot;App&quot;).
           </p>
           <LegalDocs mou={privacyPolicy} />
           <p className="text-center mt-6">

@@ -113,8 +113,8 @@ const TermsAndConditions = () => {
             7. Disclaimer of Warranties
           </h3>
           <p className="text-base">
-            LoA is provided on an &quot;as is&quot; and &quot;as available&quot;
-            basis. We make no warranties, express or implied, regarding:
+            LoA is provided on an "as is" and "as available" basis. We make no
+            warranties, express or implied, regarding:
           </p>
           <ul className="list-disc list-inside text-base ml-4">
             <li>The accuracy or reliability of affirmations or prompts</li>

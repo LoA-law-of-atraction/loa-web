@@ -59,7 +59,7 @@ function LeadForm({ handleClose }) {
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, [formik.errors]);
+  }, [formik, formik.errors]);
 
   if (isLoading) {
     return (
@@ -72,7 +72,7 @@ function LeadForm({ handleClose }) {
         <InfinitySpin visible width="200" color="#505050" ariaLabel="infinity-spin-loading" />
       </motion.section>
     )
-  }
+}
 
   return (
     <motion.div
@@ -85,7 +85,8 @@ function LeadForm({ handleClose }) {
       <MdCancel className="absolute left-5 top-10 lg:top-14 lg:left-14 text-2xl cursor-pointer text-white" onClick={() => handleClose()} />
 
       <form onSubmit={
-        formik.handleSubmit} onClick={(e) => e.stopPropagation()} className="relative flex flex-col items-center py-14 gap-4 bg-primary text-white w-[90%] max-w-[500px] p-6 rounded-lg">
+        formik.handleSubmit
+        } onClick={(e) => e.stopPropagation()} className="relative flex flex-col items-center py-14 gap-4 bg-primary text-white w-[90%] max-w-[500px] p-6 rounded-lg">
         <h2 className="text-xl font-semibold">Join Our Waitlist</h2>
         <p className="text-sm text-center md:max-w-[85%] lg:max-w-[60%] text-silver mb-2">Enter your valid email to get a special discount when we go live!</p>
         <input
