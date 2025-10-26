@@ -271,85 +271,31 @@ const Contact = () => {
 
       {showTray && (
         <motion.section
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.3 }}
+          initial={{ opacity: 0, x: "-100%" }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5 }}
           onClick={() => setShowTray(false)}
           className="fixed top-0 left-0 z-[500000] w-full h-full bg-black bg-opacity-85 flex items-center justify-center cursor-pointer"
         >
           <MdCancel
-            className="absolute left-5 top-10 lg:top-14 lg:left-14 text-2xl cursor-pointer text-white hover:scale-110 transition-transform"
+            className="absolute left-5 top-10 lg:top-14 lg:left-14 text-2xl cursor-pointer text-white"
             onClick={() => setShowTray(false)}
           />
-          <motion.div
-            initial={{ scale: 0, rotate: -180 }}
-            animate={{ scale: 1, rotate: 0 }}
-            transition={{
-              type: "spring",
-              stiffness: 260,
-              damping: 20,
-              delay: 0.1,
-            }}
+          <div
             onClick={(e) => e.stopPropagation()}
-            className="text-center bg-gradient-to-br from-purple-900 to-indigo-900 rounded-[20px] p-8 lg:p-16 py-12 flex flex-col items-center justify-center gap-6 max-w-md mx-4"
+            className="text-center bg-primary rounded-[20px] p-4 lg:p-16 py-12 flex flex-col items-center justify-center gap-8"
           >
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{
-                type: "spring",
-                stiffness: 500,
-                damping: 25,
-                delay: 0.3,
-              }}
-              className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center"
-            >
-              <motion.svg
-                initial={{ pathLength: 0 }}
-                animate={{ pathLength: 1 }}
-                transition={{ duration: 0.5, delay: 0.5 }}
-                className="w-12 h-12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="white"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <motion.path
-                  d="M20 6L9 17l-5-5"
-                  initial={{ pathLength: 0 }}
-                  animate={{ pathLength: 1 }}
-                  transition={{ duration: 0.5, delay: 0.5 }}
-                />
-              </motion.svg>
-            </motion.div>
-            <motion.h3
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
-              className="text-2xl font-bold text-white"
-            >
-              Message Sent!
-            </motion.h3>
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.7 }}
-              className="text-lg text-purple-100"
-            >
-              We got your message! We&apos;ll get back to you soon.
-            </motion.p>
-            <motion.button
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.8 }}
-              onClick={() => setShowTray(false)}
-              className="mt-4 px-6 py-2 bg-white text-purple-900 font-semibold rounded-full hover:bg-purple-100 transition-colors"
-            >
-              Close
-            </motion.button>
-          </motion.div>
+            <Image
+              src="/success.gif"
+              alt="Success"
+              className="w-[40%]"
+              width={100}
+              height={100}
+            />
+            <p className="text-xl text-white font-semibold">
+              We got your message! See you soon.
+            </p>
+          </div>
         </motion.section>
       )}
     </>

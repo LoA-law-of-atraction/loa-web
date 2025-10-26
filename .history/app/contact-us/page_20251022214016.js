@@ -27,7 +27,7 @@ const Contact = () => {
       phone: "",
       comment: "",
       areaOfInterest: {
-        everJournalUsage: false,
+        loaUsage: false,
         adsSponsorship: false,
         partnership: false,
         others: false,
@@ -51,7 +51,7 @@ const Contact = () => {
           phone: values.phone,
           comment: values.comment,
           areaOfInterest: {
-            everJournalUsage: values.areaOfInterest.everJournalUsage,
+            loaUsage: values.areaOfInterest.loaUsage,
             adsSponsorship: values.areaOfInterest.adsSponsorship,
             partnership: values.areaOfInterest.partnership,
             others: values.areaOfInterest.others,
@@ -213,10 +213,10 @@ const Contact = () => {
                 <input
                   type="checkbox"
                   className="form-checkbox h-5 w-5 text-gray-600"
-                  name="areaOfInterest.everJournalUsage"
+                  name="areaOfInterest.loaUsage"
                   onChange={formik.handleChange}
                   onBlur={formik.handleBlur}
-                  value={formik.values.areaOfInterest.everJournalUsage}
+                  value={formik.values.areaOfInterest.loaUsage}
                 />
                 <span className="ml-2">LoA Usage</span>
               </label>

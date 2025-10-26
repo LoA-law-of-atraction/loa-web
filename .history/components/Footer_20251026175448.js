@@ -21,13 +21,9 @@ const Footer = () => {
               href="/"
               className="flex items-center cursor-pointer font-ubuntu text-white md:text-xl font-bold"
             >
-              <Image
-                src="/app_logo.svg"
-                alt="LoA Logo"
-                width={32}
-                height={32}
-                className="mr-2"
-              />
+              <div className="w-8 h-8 bg-gradient-to-br from-purple-400 to-indigo-500 rounded-full flex items-center justify-center mr-2">
+                <span className="text-white text-lg">✨</span>
+              </div>
               LoA
             </Link>
             <small className="max-w-[80%] text-[#fff] text-[15] leading-[20.46px] lg:max-w-[50%]">

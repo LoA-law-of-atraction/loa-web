@@ -284,11 +284,11 @@ const Contact = () => {
           <motion.div
             initial={{ scale: 0, rotate: -180 }}
             animate={{ scale: 1, rotate: 0 }}
-            transition={{
+            transition={{ 
               type: "spring",
               stiffness: 260,
               damping: 20,
-              delay: 0.1,
+              delay: 0.1
             }}
             onClick={(e) => e.stopPropagation()}
             className="text-center bg-gradient-to-br from-purple-900 to-indigo-900 rounded-[20px] p-8 lg:p-16 py-12 flex flex-col items-center justify-center gap-6 max-w-md mx-4"
@@ -296,11 +296,11 @@ const Contact = () => {
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
-              transition={{
+              transition={{ 
                 type: "spring",
                 stiffness: 500,
                 damping: 25,
-                delay: 0.3,
+                delay: 0.3
               }}
               className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center"
             >

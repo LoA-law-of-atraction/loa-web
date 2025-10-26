@@ -76,34 +76,32 @@ const Contact = () => {
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, [formik.errors]);
-
-  if (isLoading) {
-    return (
-      <motion.section
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        onClick={() => setIsLoading(false)}
-        className="min-h-screen flex w-full z-[100] items-center justify-center fixed top-0 left-0 bg-opacity-85 bg-primary"
-      >
-        <InfinitySpin
-          visible
-          width="200"
-          color="#505050"
-          ariaLabel="infinity-spin-loading"
-        />
-      </motion.section>
-    );
-  }
+  }, [formik, formik.errors]);
 
   return (
-    <motion.section
-      initial={{ opacity: 0, x: "-100%" }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: "100%" }}
-      transition={{ delay: 0.5 }}
-      className="min-h-screen w-full"
-    >
+    <>
+      {isLoading && (
+        <motion.section
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="min-h-screen flex w-full z-[100] items-center justify-center fixed top-0 left-0 bg-opacity-85 bg-primary"
+        >
+          <InfinitySpin
+            visible
+            width="200"
+            color="#505050"
+            ariaLabel="infinity-spin-loading"
+          />
+        </motion.section>
+      )}
+
+      <motion.section
+        initial={{ opacity: 0, x: "-100%" }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: "100%" }}
+        transition={{ delay: 0.5 }}
+        className="min-h-screen w-full"
+      >
       <h2 className="text-h2 bg-bg pt-36 pb-20 lg:text-h3 text-white w-full text-center mb-14">
         Contact Us
       </h2>
@@ -216,9 +214,9 @@ const Contact = () => {
                   name="areaOfInterest.loaUsage"
                   onChange={formik.handleChange}
                   onBlur={formik.handleBlur}
-                  value={formik.values.areaOfInterest.loaUsage}
+                  checked={formik.values.areaOfInterest.loaUsage}
                 />
-                <span className="ml-2">Ever Journal Usage</span>
+                <span className="ml-2">LoA Usage</span>
               </label>
               <label className="inline-flex items-center">
                 <input
@@ -227,7 +225,7 @@ const Contact = () => {
                   name="areaOfInterest.adsSponsorship"
                   onChange={formik.handleChange}
                   onBlur={formik.handleBlur}
-                  value={formik.values.areaOfInterest.adsSponsorship}
+                  checked={formik.values.areaOfInterest.adsSponsorship}
                 />
                 <span className="ml-2">Ads Sponsorship</span>
               </label>
@@ -238,7 +236,7 @@ const Contact = () => {
                   name="areaOfInterest.partnership"
                   onChange={formik.handleChange}
                   onBlur={formik.handleBlur}
-                  value={formik.values.areaOfInterest.partnership}
+                  checked={formik.values.areaOfInterest.partnership}
                 />
                 <span className="ml-2">Partnership</span>
               </label>
@@ -249,7 +247,7 @@ const Contact = () => {
                   name="areaOfInterest.others"
                   onChange={formik.handleChange}
                   onBlur={formik.handleBlur}
-                  value={formik.values.areaOfInterest.others}
+                  checked={formik.values.areaOfInterest.others}
                 />
                 <span className="ml-2">Others</span>
               </label>
@@ -265,13 +263,7 @@ const Contact = () => {
         </motion.form>
 
         <p className="mt-7 text-gray-600 text-center">
-          Prefer email?
-          <a
-            href="mailto:hawk006@gmail.com"
-            className="text-black pl-1 hover:underline font-bold"
-          >
-            hawk006@gmail.com
-          </a>
+          For any inquiries, please use the form above to get in touch with us.
         </p>
       </div>
       {showTray && (

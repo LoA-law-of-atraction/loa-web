@@ -50,7 +50,7 @@ export const privacyPolicy = [
   {
     id: uuid(),
     title: "Data Retention and Deletion",
-    text: "We retain collected data only as long as necessary to fulfill the purposes described in this policy. If you wish to delete your personal data, you may request it through our contact form.",
+    text: "We only retain anonymous diagnostic data as long as needed to improve the app. If you've provided any identifiable information (e.g., through optional cloud sync), you can request deletion at any time by contacting us through our contact form.",
   },
   {
     id: uuid(),
@@ -82,6 +82,7 @@ export const privacyPolicy = [
   {
     id: uuid(),
     title: "Contact Us",
-    text: "If you have any questions or concerns about this Privacy Policy or how Loa handles your data, please reach out through our contact form.",
+    text: "If you have any questions or concerns about this Privacy Policy or how Loa handles your data, please reach out to:",
+    list: ["Loa Support Team 📧 hawk20605@gmail.com"],
   },
 ];
