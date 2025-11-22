@@ -3,9 +3,9 @@ import Image from "next/image"; // If using Next.js
 
 const GooglePlayDownloadButton = () => {
   const androidUrl =
-    "https://play.google.com/store/apps/details?id=com.ever.journal";
-  const iosAppId = "6740745547";
-  const androidPackageName = "com.ever.journal";
+    "https://play.google.com/store/apps/details?id=com.loa.lawofattraction.prod";
+  const iosAppId = "6754241860";
+  const androidPackageName = "com.loa.lawofattraction.prod";
 
   const handleClick = () => {
     if (typeof window !== "undefined") {
@@ -32,7 +32,7 @@ const GooglePlayDownloadButton = () => {
       window.open(`https://apps.apple.com/app/id${iosAppId}`, "_blank");
     } else {
       // Fallback to a landing page or website
-      window.open(a, "_blank");
+      window.open(androidUrl, "_blank");
     }
   };
 

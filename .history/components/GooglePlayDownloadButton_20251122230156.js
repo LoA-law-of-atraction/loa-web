@@ -3,7 +3,7 @@ import Image from "next/image"; // If using Next.js
 
 const GooglePlayDownloadButton = () => {
   const androidUrl =
-    "https://play.google.com/store/apps/details?id=com.ever.journal";
+    "https://play.google.com/store/apps/details?id=com.loa.lawofattraction.prod";
   const iosAppId = "6740745547";
   const androidPackageName = "com.ever.journal";
 
@@ -22,14 +22,17 @@ const GooglePlayDownloadButton = () => {
     const userAgent = navigator.userAgent || navigator.vendor || window.opera;
 
     if (/android/i.test(userAgent)) {
-      // Redirect to Google Play Store
-      window.location.href = `market://details?id=${androidPackageName}`;
+      // Open Google Play Store in a new tab
+      window.open(
+        `https://play.google.com/store/apps/details?id=${androidPackageName}`,
+        "_blank"
+      );
     } else if (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream) {
-      // Redirect to Apple App Store
-      window.location.href = `itms-apps://itunes.apple.com/app/id${iosAppId}`;
+      // Open Apple App Store in a new tab
+      window.open(`https://apps.apple.com/app/id${iosAppId}`, "_blank");
     } else {
       // Fallback to a landing page or website
-      window.location.href = "https://www.yourwebsite.com";
+      window.open(androidUrl, "_blank");
     }
   };
 
