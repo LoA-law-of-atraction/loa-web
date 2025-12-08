@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { motion } from "framer-motion";
+import SolarSystemBackground from "@/components/SolarSystemBackground";
 
 const TermsAndConditions = () => {
   useEffect(() => {
@@ -9,18 +10,20 @@ const TermsAndConditions = () => {
   }, []);
 
   return (
-    <motion.section
-      initial={{ opacity: 0, x: "-100%" }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: "100%" }}
-      transition={{ delay: 0.5 }}
-      className="min-h-screen flex items-center flex-col justify-center"
-    >
-      <h2 className="text-h2 bg-bg pt-36 pb-20 lg:text-h3 text-white w-full text-center mb-14">
-        Terms & Conditions
-      </h2>
-      <div className="mx-auto px-5 md:px-[5%] 2xl:px-0 pb-20 container max-w-[1200px]">
-        <article className="flex flex-col gap-5">
+    <>
+      <SolarSystemBackground />
+      <motion.section
+        initial={{ opacity: 0, x: "-100%" }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: "100%" }}
+        transition={{ delay: 0.5 }}
+        className="relative z-10 min-h-screen flex items-center flex-col justify-center bg-transparent"
+      >
+        <h2 className="text-h2 pt-36 pb-20 lg:text-h3 text-white w-full text-center mb-14">
+          Terms & Conditions
+        </h2>
+        <div className="mx-auto px-5 md:px-[5%] 2xl:px-0 pb-20 container max-w-[1200px]">
+          <article className="flex flex-col gap-5 text-white">
           <p className="py-5">
             <strong>Terms and Conditions — LoA</strong>
             <br />

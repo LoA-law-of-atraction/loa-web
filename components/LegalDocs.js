@@ -4,8 +4,8 @@ import PropTypes from "prop-types";
 
 const LegalDocs = ({ mou }) => {
   return (
-    <article className="flex flex-col self-start my-6">
-      <ol className="list-decimal list-inside flex flex-col gap-6">
+    <article className="flex flex-col self-start my-6 text-white">
+      <ol className="list-decimal list-inside flex flex-col gap-6 text-white/90">
         {mou.map((item) => (
           <li key={item.id} className="space-y-3">
             {item.title && (
