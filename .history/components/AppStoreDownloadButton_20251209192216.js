@@ -2,7 +2,7 @@ import React from "react";
 import Image from "next/image"; // If using Next.js
 
 const AppStoreDownloadButton = () => {
-  const iosUrl = "https://apps.apple.com/app/6754241860";
+  const iosUrl = "https://apps.apple.com/app/6740745547";
   const iosAppId = "6754241860";
   const androidPackageName = "com.ever.journal";
 

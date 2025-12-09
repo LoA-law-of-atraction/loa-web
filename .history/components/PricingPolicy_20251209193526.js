@@ -31,8 +31,8 @@ const PricingPlans = () => {
       <article className="container mx-auto py-14 p-4 px-5 md:px-[5%] 2xl:px-0 max-w-[1200px] gap-4flex flex-col items-center justify-center gap-4">
         <div className="flex flex-col items-center justify-center">
           <h2 className="text-h2 lg:text-h3 font-bold text-center tracking-tight w-full px-4">
-            <span className="block sm:inline">Affordable</span>
-            <span className="relative text-[#505050] inline-block">
+            Affordable
+            <span className="relative whitespace-nowrap text-[#505050]">
               <svg
                 aria-hidden="true"
                 viewBox="0 0 418 42"

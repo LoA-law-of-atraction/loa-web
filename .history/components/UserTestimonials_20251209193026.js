@@ -146,19 +146,14 @@ const UserTestimonials = () => {
               alignment with your highest self.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button
-                onClick={() =>
-                  window.open(
-                    "https://play.google.com/store/apps/details?id=com.loa.lawofattraction.prod",
-                    "_blank"
-                  )
-                }
+              <button 
+                onClick={() => window.open('https://play.google.com/store/apps/details?id=com.loa.lawofattraction.prod', '_blank')}
                 className="bg-white text-purple-900 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors cursor-pointer"
               >
                 Start Manifesting
               </button>
-              <button
-                onClick={() => (window.location.href = "/about-us")}
+              <button 
+                onClick={() => window.location.href = '/about-us'}
                 className="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-purple-900 transition-colors cursor-pointer"
               >
                 Learn the Method

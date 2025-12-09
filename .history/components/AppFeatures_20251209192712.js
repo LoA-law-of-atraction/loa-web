@@ -127,21 +127,14 @@ const AppFeatures = () => {
               truly desire.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button
-                onClick={() =>
-                  window.open("https://apps.apple.com/app/6754241860", "_blank")
-                }
+              <button 
+                onClick={() => window.open('https://apps.apple.com/app/6754241860', '_blank')}
                 className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-8 py-3 rounded-lg font-semibold hover:from-indigo-700 hover:to-purple-700 transition-all duration-300 cursor-pointer"
               >
                 Download for iOS
               </button>
-              <button
-                onClick={() =>
-                  window.open(
-                    "https://play.google.com/store/apps/details?id=com.loa.lawofattraction.prod",
-                    "_blank"
-                  )
-                }
+              <button 
+                onClick={() => window.open('https://play.google.com/store/apps/details?id=com.loa.lawofattraction.prod', '_blank')}
                 className="bg-gradient-to-r from-purple-800 to-black text-white px-8 py-3 rounded-lg font-semibold hover:from-purple-900 hover:to-gray-900 transition-all duration-300 cursor-pointer"
               >
                 Download for Android
