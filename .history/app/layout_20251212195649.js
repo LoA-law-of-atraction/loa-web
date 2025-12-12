@@ -43,10 +43,7 @@ const Layout = ({ children }) => {
         />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://loa-web-landing.vercel.app" />
-        <meta
-          property="og:image"
-          content="https://loa-web-landing.vercel.app/og.png"
-        />
+        <meta property="og:image" content="https://loa-web-landing.vercel.app//og.png" />
         <meta
           property="og:description"
           content="Transform digital distractions into moments of conscious awareness. Align your technology use with the Law of Attraction."
@@ -61,10 +58,7 @@ const Layout = ({ children }) => {
           name="twitter:description"
           content="Transform digital distractions into moments of conscious awareness. Align your technology use with the Law of Attraction."
         />
-        <meta
-          name="twitter:image"
-          content="https://loa-web-landing.vercel.app//og.png"
-        />
+        <meta name="twitter:image" content="https://loa-web-landing.vercel.app//og.png" />
       </head>
       <body className="text-gray-900 min-h-screen flex flex-col bg-black">
         {/* ✅ Ensure Meta Pixel loads only on the client */}
