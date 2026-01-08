@@ -1,5 +1,3 @@
-"use client";
-
 import "./globals.css";
 import { motion } from "framer-motion";
 import Navbar from "@/components/NavBar";
@@ -11,6 +9,49 @@ import { Suspense } from "react";
 const MetaPixelNoSSR = dynamic(() => import("@/components/MetaPixelEvents"), {
   ssr: false,
 });
+
+export const metadata = {
+  title: "LoA - Law of Attraction for the Digital Age",
+  description:
+    "LoA transforms your phone into a tool for conscious living. Practice the Law of Attraction with affirmation screens, digital mindfulness, and intentional awareness in every interaction.",
+  icons: {
+    icon: [
+      { url: "/favicon/favicon.ico" },
+      { url: "/favicon/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+    ],
+    apple: [
+      {
+        url: "/favicon/apple-touch-icon.png",
+        sizes: "180x180",
+        type: "image/png",
+      },
+    ],
+  },
+  manifest: "/favicon/site.webmanifest",
+  openGraph: {
+    title: "LoA - Law of Attraction for the Digital Age",
+    description:
+      "Transform digital distractions into moments of conscious awareness. Align your technology use with the Law of Attraction.",
+    url: "https://loa-web-landing.vercel.app",
+    siteName: "LoA App",
+    images: [
+      {
+        url: "https://loa-web-landing.vercel.app/og.png",
+        alt: "LoA App",
+      },
+    ],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    site: "@LoAApp",
+    title: "LoA - Law of Attraction for the Digital Age",
+    description:
+      "Transform digital distractions into moments of conscious awareness. Align your technology use with the Law of Attraction.",
+    images: ["https://loa-web-landing.vercel.app/og.png"],
+  },
+};
 
 const Layout = ({ children }) => {
   const pageVariants = {
@@ -30,60 +71,6 @@ const Layout = ({ children }) => {
   return (
     <html lang="en">
       <head>
-        <title>LoA - Law of Attraction for the Digital Age</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <meta
-          name="description"
-          content="LoA transforms your phone into a tool for conscious living. Practice the Law of Attraction with affirmation screens, digital mindfulness, and intentional awareness in every interaction."
-        />
-        <link rel="icon" href="/favicon/favicon.ico" />
-        <link
-          rel="icon"
-          type="image/png"
-          sizes="32x32"
-          href="/favicon/favicon-32x32.png"
-        />
-        <link
-          rel="icon"
-          type="image/png"
-          sizes="16x16"
-          href="/favicon/favicon-16x16.png"
-        />
-        <link
-          rel="apple-touch-icon"
-          sizes="180x180"
-          href="/favicon/apple-touch-icon.png"
-        />
-        <link rel="manifest" href="/favicon/site.webmanifest" />
-        <meta
-          property="og:title"
-          content="LoA - Law of Attraction for the Digital Age"
-        />
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://loa-web-landing.vercel.app" />
-        <meta
-          property="og:image"
-          content="https://loa-web-landing.vercel.app/og.png"
-        />
-        <meta
-          property="og:description"
-          content="Transform digital distractions into moments of conscious awareness. Align your technology use with the Law of Attraction."
-        />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:site" content="@LoAApp" />
-        <meta
-          name="twitter:title"
-          content="LoA - Law of Attraction for the Digital Age"
-        />
-        <meta
-          name="twitter:description"
-          content="Transform digital distractions into moments of conscious awareness. Align your technology use with the Law of Attraction."
-        />
-        <meta
-          name="twitter:image"
-          content="https://loa-web-landing.vercel.app//og.png"
-        />
-
         {/* JSON-LD Structured Data for Google */}
         <script
           type="application/ld+json"
@@ -126,7 +113,10 @@ const Layout = ({ children }) => {
           }}
         />
       </head>
-      <body className="text-gray-900 min-h-screen flex flex-col bg-black">
+      <body
+        className="text-gray-900 min-h-screen flex flex-col bg-black"
+        suppressHydrationWarning
+      >
         {/* ✅ Ensure Meta Pixel loads only on the client */}
         <Suspense fallback={null}>
           <MetaPixelNoSSR />
