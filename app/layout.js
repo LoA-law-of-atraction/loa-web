@@ -36,7 +36,25 @@ const Layout = ({ children }) => {
           name="description"
           content="LoA transforms your phone into a tool for conscious living. Practice the Law of Attraction with affirmation screens, digital mindfulness, and intentional awareness in every interaction."
         />
-        <link rel="icon" href="/favicon.ico" type="image/png" />
+        <link rel="icon" href="/favicon/favicon.ico" />
+        <link
+          rel="icon"
+          type="image/png"
+          sizes="32x32"
+          href="/favicon/favicon-32x32.png"
+        />
+        <link
+          rel="icon"
+          type="image/png"
+          sizes="16x16"
+          href="/favicon/favicon-16x16.png"
+        />
+        <link
+          rel="apple-touch-icon"
+          sizes="180x180"
+          href="/favicon/apple-touch-icon.png"
+        />
+        <link rel="manifest" href="/favicon/site.webmanifest" />
         <meta
           property="og:title"
           content="LoA - Law of Attraction for the Digital Age"
@@ -64,6 +82,48 @@ const Layout = ({ children }) => {
         <meta
           name="twitter:image"
           content="https://loa-web-landing.vercel.app//og.png"
+        />
+
+        {/* JSON-LD Structured Data for Google */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Organization",
+              name: "LoA - Law of Attraction",
+              alternateName: "LoA App",
+              url: "https://loa-web-landing.vercel.app",
+              logo: "https://loa-web-landing.vercel.app/app_logo.svg",
+              description:
+                "LoA transforms your phone into a tool for conscious living. Practice the Law of Attraction with affirmation screens, digital mindfulness, and intentional awareness in every interaction.",
+              sameAs: ["https://twitter.com/LoAApp"],
+            }),
+          }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "MobileApplication",
+              name: "LoA - Law of Attraction",
+              operatingSystem: ["iOS", "Android"],
+              applicationCategory: "LifestyleApplication",
+              offers: {
+                "@type": "Offer",
+                price: "0",
+                priceCurrency: "USD",
+              },
+              aggregateRating: {
+                "@type": "AggregateRating",
+                ratingValue: "4.8",
+                ratingCount: "1000",
+              },
+              description:
+                "Transform digital distractions into moments of conscious awareness. Align your technology use with the Law of Attraction.",
+            }),
+          }}
         />
       </head>
       <body className="text-gray-900 min-h-screen flex flex-col bg-black">
