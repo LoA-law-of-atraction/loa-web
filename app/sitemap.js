@@ -1,5 +1,5 @@
 export default function sitemap() {
-  const baseUrl = "https://loa-web-landing.vercel.app";
+  const baseUrl = "https://www.loa-lawofattraction.co";
 
   return [
     {
