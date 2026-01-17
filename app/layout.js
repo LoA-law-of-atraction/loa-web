@@ -6,13 +6,13 @@ export const metadata = {
   title: "LoA - Law of Attraction for the Digital Age",
   description:
     "LoA transforms your phone into a tool for conscious living. Practice the Law of Attraction with affirmation screens, digital mindfulness, and intentional awareness in every interaction.",
-  metadataBase: new URL("https://loa-web-landing.vercel.app"),
+  metadataBase: new URL("https://www.loa-lawofattraction.co"),
   alternates: {
     canonical: "/",
   },
   icons: {
     icon: [
-      { url: "/favicon/favicon.ico" },
+      { url: "/favicon.ico", sizes: "48x48" },
       { url: "/favicon/favicon-16x16.png", sizes: "16x16", type: "image/png" },
       { url: "/favicon/favicon-32x32.png", sizes: "32x32", type: "image/png" },
       {
@@ -26,6 +26,7 @@ export const metadata = {
         type: "image/png",
       },
     ],
+    shortcut: "/favicon.ico",
     apple: [
       {
         url: "/favicon/apple-touch-icon.png",
@@ -39,11 +40,11 @@ export const metadata = {
     title: "LoA - Law of Attraction for the Digital Age",
     description:
       "Transform digital distractions into moments of conscious awareness. Align your technology use with the Law of Attraction.",
-    url: "https://loa-web-landing.vercel.app",
+    url: "https://www.loa-lawofattraction.co",
     siteName: "LoA App",
     images: [
       {
-        url: "https://loa-web-landing.vercel.app/og.png",
+        url: "https://www.loa-lawofattraction.co/og.png",
         alt: "LoA App",
       },
     ],
@@ -55,7 +56,7 @@ export const metadata = {
     title: "LoA - Law of Attraction for the Digital Age",
     description:
       "Transform digital distractions into moments of conscious awareness. Align your technology use with the Law of Attraction.",
-    images: ["https://loa-web-landing.vercel.app/og.png"],
+    images: ["https://www.loa-lawofattraction.co/og.png"],
   },
   robots: {
     index: true,
