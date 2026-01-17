@@ -2,5 +2,9 @@
 User-agent: *
 Allow: /
 
+# Allow Googlebot to crawl favicon
+User-agent: Googlebot-Image
+Allow: /favicon/
+
 # Sitemap location
-Sitemap: https://loa-web-landing.vercel.app/sitemap.xml
+Sitemap: https://www.loa-lawofattraction.co/sitemap.xml
