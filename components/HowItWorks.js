@@ -72,7 +72,7 @@ const HowItWorks = () => {
               {/* Phone image */}
               <div className="relative">
                 <img
-                  src="/mock/mock1.png"
+                  src="/mock/mock6.png"
                   alt="LoA App Interface"
                   className="w-full max-w-sm lg:max-w-md h-auto drop-shadow-2xl"
                 />

@@ -18,14 +18,28 @@ const Start = () => {
             Your Conscious Journey Begins with LoA
           </h2>
           <div className="mt-8 flex space-x-4">
-            <div className="flex flex-col md:flex-row gap-4">
-              <GooglePlayDownloadButton />
-              <AppStoreDownloadButton />
+            <div className="flex flex-col md:flex-row gap-6">
+              <div className="flex flex-col items-center gap-3">
+                <img
+                  src="/loa_android_qrcode.svg"
+                  alt="Android QR Code"
+                  className="w-24 h-24 p-2 rounded-2xl hidden sm:block"
+                />
+                <GooglePlayDownloadButton />
+              </div>
+              <div className="flex flex-col items-center gap-3">
+                <img
+                  src="/loa_ios._qrcode.svg"
+                  alt="iOS QR Code"
+                  className="w-24 h-24 p-2 rounded-2xl hidden sm:block"
+                />
+                <AppStoreDownloadButton />
+              </div>
             </div>
           </div>
         </div>
         <img
-          src="/mock/mock3.png"
+          src="/mock/mock5.png"
           alt="Manifest Your Dreams"
           className="w-auto h-auto max-w-[280px] md:max-w-[320px]"
         />

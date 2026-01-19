@@ -3,7 +3,7 @@
 import "./globals.css";
 import { useEffect } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, Eye, Heart, Zap } from "lucide-react";
+import { Eye, Heart, Zap } from "lucide-react";
 import AppStoreDownloadButton from "@/components/AppStoreDownloadButton";
 import GooglePlayDownloadButton from "@/components/GooglePlayDownloadButton";
 import HowItWorks from "@/components/HowItWorks";
@@ -40,101 +40,37 @@ export default function Home() {
 
         <div className="relative z-20 max-w-6xl mx-auto px-4 py-20">
           <div className="text-center mb-16">
-            {/* Futuristic badge */}
+            {/* Simple title */}
             <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.3, duration: 0.8 }}
-              className="inline-flex items-center gap-3 mb-8 px-6 py-3 rounded-full bg-gradient-to-r from-purple-500/20 via-pink-500/20 to-indigo-500/20 backdrop-blur-md border border-purple-400/30 shadow-lg shadow-purple-500/20"
-            >
-              <div className="relative">
-                <Sparkles className="w-6 h-6 text-purple-300" />
-                <div className="absolute inset-0 blur-sm">
-                  <Sparkles className="w-6 h-6 text-purple-300" />
-                </div>
-              </div>
-              <span className="text-white font-semibold tracking-wide text-sm md:text-base whitespace-nowrap">
-                Law of Attraction for the Digital Age
-              </span>
-              <div className="relative">
-                <Sparkles className="w-6 h-6 text-purple-300" />
-                <div className="absolute inset-0 blur-sm">
-                  <Sparkles className="w-6 h-6 text-purple-300" />
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Holographic title with glow effects */}
-            <motion.div
-              initial={{ opacity: 0, y: 50 }}
+              initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5, duration: 1 }}
-              className="relative mb-8"
+              transition={{ delay: 0.3, duration: 0.8 }}
+              className="mb-8"
             >
-              {/* Background glow */}
-              <div className="absolute inset-0 blur-3xl opacity-30">
-                <div className="absolute top-0 left-1/4 w-1/2 h-full bg-gradient-to-r from-purple-600 to-pink-600"></div>
-              </div>
-
-              <h1 className="relative text-5xl md:text-7xl lg:text-8xl font-bold mb-4 leading-tight">
-                <span className="block text-white mb-2">Attract What You</span>
-                <span className="relative inline-block">
-                  <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-indigo-400 bg-clip-text text-transparent">
-                    Focus On
-                  </span>
-                  {/* Holographic underline */}
-                  <div className="absolute -bottom-2 left-0 w-full h-1 bg-gradient-to-r from-purple-500 via-pink-500 to-indigo-500 blur-sm opacity-60"></div>
-                  <div className="absolute -bottom-2 left-0 w-full h-0.5 bg-gradient-to-r from-purple-400 via-pink-400 to-indigo-400"></div>
+              <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-4 leading-tight">
+                Attract What You
+                <br />
+                <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-indigo-400 bg-clip-text text-transparent">
+                  Focus On
                 </span>
               </h1>
             </motion.div>
 
-            {/* Futuristic description with glassmorphic container */}
+            {/* Simple description */}
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5, duration: 0.8 }}
+              className="text-lg md:text-xl text-white/80 max-w-2xl mx-auto mb-12 leading-relaxed"
+            >
+              Transform every phone interaction into a moment of conscious
+              awareness with personalized affirmations.
+            </motion.p>
+
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.7, duration: 0.8 }}
-              className="relative max-w-4xl mx-auto mb-12"
-            >
-              {/* Corner accents */}
-              <div className="absolute -top-3 -left-3 w-12 h-12 border-t-2 border-l-2 border-purple-400/40 rounded-tl-xl"></div>
-              <div className="absolute -top-3 -right-3 w-12 h-12 border-t-2 border-r-2 border-pink-400/40 rounded-tr-xl"></div>
-              <div className="absolute -bottom-3 -left-3 w-12 h-12 border-b-2 border-l-2 border-indigo-400/40 rounded-bl-xl"></div>
-              <div className="absolute -bottom-3 -right-3 w-12 h-12 border-b-2 border-r-2 border-purple-400/40 rounded-br-xl"></div>
-
-              <div className="relative bg-white/5 backdrop-blur-lg border border-white/20 rounded-2xl p-8 shadow-2xl">
-                <p className="text-lg md:text-xl text-white/90 leading-relaxed font-medium">
-                  Transform every phone interaction into a moment of{" "}
-                  <span className="bg-gradient-to-r from-purple-300 via-pink-300 to-purple-300 bg-clip-text text-transparent font-bold inline-block">
-                    conscious awareness
-                  </span>
-                  . LoA interrupts digital distractions with personalized
-                  affirmations, helping you align your energy with your highest
-                  intentions.
-                </p>
-
-                {/* Energy indicator */}
-                <div className="mt-6 flex items-center justify-center gap-2">
-                  <div className="flex gap-1">
-                    {[...Array(5)].map((_, i) => (
-                      <div
-                        key={i}
-                        className="w-1 h-8 bg-gradient-to-t from-purple-500/50 to-pink-500 rounded-full animate-pulse"
-                        style={{ animationDelay: `${i * 0.15}s` }}
-                      ></div>
-                    ))}
-                  </div>
-                  <span className="text-purple-300 text-xs font-semibold tracking-wider">
-                    VIBRATIONAL FREQUENCY
-                  </span>
-                </div>
-              </div>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.9, duration: 0.8 }}
               className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16"
             >
               <GooglePlayDownloadButton />
@@ -146,7 +82,7 @@ export default function Home() {
           <motion.div
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1.1, duration: 0.8 }}
+            transition={{ delay: 0.9, duration: 0.8 }}
             className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-20"
           >
             <div className="text-center p-6 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
@@ -187,15 +123,7 @@ export default function Home() {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 1.3, duration: 1 }}
             className="text-center"
-          >
-            <div className="mx-auto max-w-md md:max-w-lg">
-              <img
-                src="/mock/mock2.png"
-                alt="Your Daily Affirmation"
-                className="w-full h-auto rounded-3xl shadow-2xl"
-              />
-            </div>
-          </motion.div>
+          ></motion.div>
         </div>
       </motion.section>
 
@@ -213,7 +141,7 @@ export default function Home() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.8 }}
-            className="text-4xl md:text-5xl font-bold mb-8 bg-gradient-to-r from-indigo-900 to-purple-900 bg-clip-text text-transparent"
+            className="text-4xl md:text-5xl font-bold mb-8 text-black"
           >
             &quot;You attract what you think and feel&quot;
           </motion.h2>

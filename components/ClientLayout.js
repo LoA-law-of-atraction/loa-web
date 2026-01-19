@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { usePathname } from "next/navigation";
 import Navbar from "@/components/NavBar";
 import Footer from "@/components/Footer";
 import dynamic from "next/dynamic";
@@ -12,6 +13,9 @@ const MetaPixelNoSSR = dynamic(() => import("@/components/MetaPixelEvents"), {
 });
 
 export default function ClientLayout({ children }) {
+  const pathname = usePathname();
+  const isAdminPage = pathname?.startsWith("/admin");
+
   const pageVariants = {
     initial: { opacity: 0, x: -100 },
     animate: {
@@ -25,6 +29,11 @@ export default function ClientLayout({ children }) {
       transition: { duration: 0.3, ease: "easeInOut" },
     },
   };
+
+  // Don't show navbar/footer on admin pages
+  if (isAdminPage) {
+    return children;
+  }
 
   return (
     <>

@@ -61,7 +61,7 @@ export default function Premium() {
             className="flex py-4 mx-auto items-center w-full justify-center"
           >
             <img
-              src="/mock/mock3.png"
+              src="/mock/mock5.png"
               alt="LoA App Mockup"
               className="w-auto h-auto max-w-[300px] lg:max-w-[350px]"
             />

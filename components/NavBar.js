@@ -4,17 +4,27 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import Button from "./Button";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
 
-  const isActive = (pathname) => {
-    return router.pathname === pathname
-      ? "text-silver"
-      : "text-white hover:text-gray-300 transition-colors duration-300";
+  // Check if on blog pages (white background)
+  const isBlogPage = pathname?.startsWith("/blog");
+
+  const isActive = (path) => {
+    const baseTextClass = isBlogPage ? "text-gray-900" : "text-white";
+    const hoverClass = isBlogPage
+      ? "hover:text-purple-600"
+      : "hover:text-gray-300";
+    return pathname === path
+      ? isBlogPage
+        ? "text-purple-600"
+        : "text-silver"
+      : `${baseTextClass} ${hoverClass} transition-colors duration-300`;
   };
 
   const toggleMenu = () => {
@@ -28,15 +38,21 @@ const Navbar = () => {
 
   return (
     <motion.nav
-      className="fixed top-0 left-0 w-full min-h-[80px] z-50 bg-black/30 backdrop-blur-lg border-b border-white/10"
+      className={`fixed top-0 left-0 w-full h-[80px] z-50 border-b flex items-center ${
+        isBlogPage
+          ? "bg-white border-gray-200"
+          : "bg-black/30 backdrop-blur-lg border-white/10"
+      }`}
       variants={navbarVariants}
       initial="hidden"
       animate="visible"
     >
-      <article className="p-4 px-5 md:px-[5%] w-full mx-auto flex items-center justify-between">
+      <article className="px-5 md:px-[5%] w-full mx-auto flex items-center justify-between h-full">
         <Link
           href="/"
-          className="flex items-center cursor-pointer font-ubuntu text-white md:text-xl font-bold"
+          className={`flex items-center cursor-pointer font-ubuntu md:text-xl font-bold ${
+            isBlogPage ? "text-gray-900" : "text-white"
+          }`}
           onClick={() => setIsOpen(false)}
         >
           <Image
@@ -65,8 +81,18 @@ const Navbar = () => {
             </Link>
           </li>
           <li>
+            <Link href="/blog" className={isActive("/blog")}>
+              Blog
+            </Link>
+          </li>
+          <li>
             <Link href="/premium" className={isActive("/premium")}>
               Premium
+            </Link>
+          </li>
+          <li>
+            <Link href="/download" className={isActive("/download")}>
+              Download
             </Link>
           </li>
           <li>
@@ -85,7 +111,7 @@ const Navbar = () => {
           >
             {isOpen ? (
               <svg
-                className="w-8 h-8 text-white"
+                className={`w-8 h-8 ${isBlogPage ? "text-gray-900" : "text-white"}`}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -100,7 +126,7 @@ const Navbar = () => {
               </svg>
             ) : (
               <svg
-                className="w-8 h-8 text-white"
+                className={`w-8 h-8 ${isBlogPage ? "text-gray-900" : "text-white"}`}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -122,14 +148,20 @@ const Navbar = () => {
       <motion.article
         className={`md:hidden ${
           isOpen
-            ? "fixed block inset-0 min-h-[100vh] top-[80px] transform translate-y-0 transition-transform duration-300 w-full bg-black/90 backdrop-blur-xl"
+            ? `fixed block inset-0 min-h-[100vh] top-[80px] transform translate-y-0 transition-transform duration-300 w-full ${
+                isBlogPage ? "bg-white/95" : "bg-black/90"
+              } backdrop-blur-xl`
             : "fixed hidden inset-0 transform -translate-y-full transition-transform duration-300"
         }`}
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: isOpen ? 1 : 0, y: isOpen ? 0 : -10 }}
         transition={{ duration: 0.3 }}
       >
-        <ul className="flex text-secondary flex-col items-center pt-28 space-y-14">
+        <ul
+          className={`flex flex-col items-center pt-28 space-y-14 ${
+            isBlogPage ? "text-gray-900" : "text-secondary"
+          }`}
+        >
           <li className="text-3xl">
             <Link
               href="/features"
@@ -150,11 +182,29 @@ const Navbar = () => {
           </li>
           <li className="text-3xl">
             <Link
+              href="/blog"
+              className={isActive("/blog")}
+              onClick={toggleMenu}
+            >
+              Blog
+            </Link>
+          </li>
+          <li className="text-3xl">
+            <Link
               href="/premium"
               className={isActive("/premium")}
               onClick={toggleMenu}
             >
               Premium
+            </Link>
+          </li>
+          <li className="text-3xl">
+            <Link
+              href="/download"
+              className={isActive("/download")}
+              onClick={toggleMenu}
+            >
+              Download
             </Link>
           </li>
           <li className="text-3xl">
