@@ -14,6 +14,7 @@ import { BLOG_CONFIG, BLOG_CATEGORIES } from "@/lib/constants/blogConfig";
 import BlogPostContent from "@/components/blog/BlogPostContent";
 import RelatedPosts from "@/components/blog/RelatedPosts";
 import { notFound } from "next/navigation";
+import Link from "next/link";
 
 export async function generateStaticParams() {
   const slugs = await getAllPublishedSlugs();
@@ -70,13 +71,16 @@ export default async function BlogPostPage({ params }) {
         <div className="max-w-3xl mx-auto px-4 sm:px-6">
           {/* Breadcrumbs */}
           <nav className="text-sm text-gray-400 mb-8">
-            <a href="/" className="hover:text-gray-600 transition-colors">
+            <Link href="/" className="hover:text-gray-600 transition-colors">
               Home
-            </a>
+            </Link>
             <span className="mx-2">/</span>
-            <a href="/blog" className="hover:text-gray-600 transition-colors">
+            <Link
+              href="/blog"
+              className="hover:text-gray-600 transition-colors"
+            >
               Blog
-            </a>
+            </Link>
           </nav>
 
           {/* Category */}
@@ -163,7 +167,7 @@ export default async function BlogPostPage({ params }) {
 
           {/* Back to Blog */}
           <div className="mt-12 pt-8 border-t border-gray-100">
-            <a
+            <Link
               href="/blog"
               className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 font-medium transition-colors"
             >
@@ -181,7 +185,7 @@ export default async function BlogPostPage({ params }) {
                 />
               </svg>
               All posts
-            </a>
+            </Link>
           </div>
         </div>
       </article>
