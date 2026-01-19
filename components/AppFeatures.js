@@ -61,7 +61,7 @@ const AppFeatures = () => {
             initial={{ opacity: 0, y: 50 }}
             whileInView={{ opacity: 1, y: 0, transition: { duration: 0.8 } }}
             viewport={{ once: true }}
-            className="text-h2 lg:text-h1 font-bold mb-4 bg-gradient-to-r from-indigo-900 to-purple-900 bg-clip-text text-transparent"
+            className="text-h2 lg:text-h1 font-bold mb-4 text-black"
           >
             Features That Align Your Digital Life with the Law of Attraction
           </motion.h2>
@@ -106,49 +106,6 @@ const AppFeatures = () => {
             </motion.div>
           ))}
         </div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 50 }}
-          whileInView={{
-            opacity: 1,
-            y: 0,
-            transition: { duration: 0.8, delay: 0.5 },
-          }}
-          viewport={{ once: true }}
-          className="text-center mt-12"
-        >
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-8 rounded-lg">
-            <h3 className="text-2xl font-bold mb-4 bg-gradient-to-r from-indigo-900 to-purple-900 bg-clip-text text-transparent">
-              Ready to Align Your Digital Life with Your Highest Self?
-            </h3>
-            <p className="text-gray-600 mb-6 max-w-2xl mx-auto">
-              Join thousands who are using the Law of Attraction to transform
-              their relationship with technology and attract more of what they
-              truly desire.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button
-                onClick={() =>
-                  window.open("https://apps.apple.com/app/6754241860", "_blank")
-                }
-                className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-8 py-3 rounded-lg font-semibold hover:from-indigo-700 hover:to-purple-700 transition-all duration-300 cursor-pointer"
-              >
-                Download for iOS
-              </button>
-              <button
-                onClick={() =>
-                  window.open(
-                    "https://play.google.com/store/apps/details?id=com.loa.lawofattraction.prod",
-                    "_blank"
-                  )
-                }
-                className="bg-gradient-to-r from-purple-800 to-black text-white px-8 py-3 rounded-lg font-semibold hover:from-purple-900 hover:to-gray-900 transition-all duration-300 cursor-pointer"
-              >
-                Download for Android
-              </button>
-            </div>
-          </div>
-        </motion.div>
       </div>
     </motion.section>
   );

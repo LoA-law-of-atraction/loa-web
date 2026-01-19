@@ -1,5 +1,6 @@
 "use client";
 import { motion } from "framer-motion";
+import Image from "next/image";
 
 const features = [
   {
@@ -10,6 +11,7 @@ const features = [
       "Receive personalized affirmations and manifestation reminders aligned with your goals.",
       "Create sacred pauses that help you choose consciousness over distraction.",
     ],
+    mockImage: "/mock/mock6.png",
   },
   {
     id: "02",
@@ -19,6 +21,7 @@ const features = [
       "Each affirmation is designed to elevate your vibration and attract abundance.",
       "Practice manifestation principles seamlessly integrated into your daily digital routine.",
     ],
+    mockImage: "/mock/mock10.png",
   },
   {
     id: "03",
@@ -28,6 +31,7 @@ const features = [
       "Gain insights into when you're most aligned and when you need energetic realignment.",
       "Discover patterns that either support or hinder your conscious living goals.",
     ],
+    mockImage: "/mock/mock7.png",
   },
   {
     id: "04",
@@ -37,6 +41,7 @@ const features = [
       "Create conscious pauses before potentially energy-draining activities.",
       "Stay focused on attracting your desires through intentional digital interactions.",
     ],
+    mockImage: "/mock/mock11.png",
   },
   {
     id: "05",
@@ -46,6 +51,7 @@ const features = [
       "Create and view digital vision boards that reinforce your manifestation practice.",
       "Turn every digital interaction into an opportunity to visualize your dream life.",
     ],
+    mockImage: "/mock/mock5.png",
   },
   {
     id: "06",
@@ -55,6 +61,7 @@ const features = [
       "No data sharing ensures your spiritual practice stays sacred and personal.",
       "Maintain the energetic integrity of your conscious living path.",
     ],
+    mockImage: "/mock/mock12.png",
   },
 ];
 
@@ -92,22 +99,29 @@ const Feature = () => {
                 index % 2 === 0 ? "md:flex-row" : "md:flex-row-reverse"
               }`}
             >
-              <div className="w-[50%] md:w-[20%] h-[200px] flex items-center justify-center">
-                <div className="relative w-32 h-32 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-2xl shadow-lg flex items-center justify-center">
-                  <div className="absolute inset-2 bg-gray-900 rounded-xl flex items-center justify-center">
-                    <div className="text-3xl">
-                      {paragraph.id === "01" && "🛡️"}
-                      {paragraph.id === "02" && "✨"}
-                      {paragraph.id === "03" && "📊"}
-                      {paragraph.id === "04" && "🎯"}
-                      {paragraph.id === "05" && "🌟"}
-                      {paragraph.id === "06" && "🔐"}
-                    </div>
-                  </div>
-                  <div className="absolute -top-1 -right-1 w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center text-sm">
-                    ⚡
-                  </div>
+              <div className="w-[160px] md:w-[200px] h-[200px] relative overflow-hidden rounded-2xl">
+                <div
+                  className="absolute w-full"
+                  style={{
+                    height: "400px",
+                    top: index % 2 === 0 ? "0" : "-150px",
+                  }}
+                >
+                  <Image
+                    src={paragraph.mockImage}
+                    alt={paragraph.title}
+                    fill
+                    className="object-contain object-top"
+                  />
                 </div>
+                {/* Fade effect on cropping side */}
+                <div
+                  className={`absolute left-0 right-0 h-16 pointer-events-none ${
+                    index % 2 === 0
+                      ? "bottom-0 bg-gradient-to-t from-black to-transparent"
+                      : "top-0 bg-gradient-to-b from-black to-transparent"
+                  }`}
+                />
               </div>
               <div className="flex flex-col items-start">
                 <h4 className="text-h5 font-bold mt-5 lg:mt0 lg:text-left text-center">

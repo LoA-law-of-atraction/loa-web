@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Open+Sans:wght@300;400;600;700&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Open+Sans:wght@300;400;600;700&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -7,8 +7,8 @@
 :root {
   --background: #000;
   --foreground: #171717;
-  --font-inter: 'Inter' sans-serif;
-  --font-tiempos: 'Tiempos Fine', serif;
+  --font-inter: "Inter" sans-serif;
+  --font-tiempos: "Tiempos Fine", serif;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -19,9 +19,10 @@
 }
 
 @font-face {
-  font-family: 'Tiempos fine';
-  src: url('/fonts/TiemposFine-Regular.otf') format('opentype'),
-       url('/fonts/TiemposFine-Semibold.otf') format('opentype');
+  font-family: "Tiempos fine";
+  src:
+    url("/fonts/TiemposFine-Regular.otf") format("opentype"),
+    url("/fonts/TiemposFine-Semibold.otf") format("opentype");
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -30,13 +31,13 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: 'Inter', Helvetica, sans-serif;
+  font-family: "Inter", Helvetica, sans-serif;
   scroll-behavior: smooth;
   font-size: 0.875rem;
 }
 
 .arc {
-  background-image: url('/bg/glowingBg.png');
+  background-image: url("/bg/glowingBg.png");
   background-size: contain;
   background-repeat: no-repeat;
   background-position: bottom;
@@ -49,7 +50,7 @@ body {
   .arc {
     background-size: 100% 40%;
     background-position: bottom;
-  } 
+  }
 }
 
 h1,
@@ -57,7 +58,7 @@ h2,
 h3,
 h4,
 h5 {
-  font-family: 'Tiempos Fine', serif;
+  font-family: "Tiempos Fine", serif;
   font-weight: 600;
 }
 
@@ -68,8 +69,8 @@ h5 {
 
 .bullet li::before {
   list-style-type: none;
-  content: '';
-  background-image: url('/icons/list.svg');
+  content: "";
+  background-image: url("/icons/list.svg");
   background-size: contain;
   background-repeat: no-repeat;
   position: absolute;
@@ -88,8 +89,8 @@ h5 {
   flex: 0 0 100%;
   min-width: 0;
   flex: 0 0 auto;
-  width: 100%; 
-  min-height: 200px; 
+  width: 100%;
+  min-height: 200px;
 }
 
 @media (min-width: 1024px) {
@@ -98,7 +99,7 @@ h5 {
   }
 
   .footer {
-    background-image: url('/bg/footerBg.webp');
+    background-image: url("/bg/footerBg.webp");
     background-size: 30%;
     background-repeat: no-repeat;
     background-position: center right;
@@ -147,4 +148,20 @@ h5 {
   .css-1im77uy-control {
     font-size: 1rem;
   }
+}
+
+/* Toast animation */
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out;
 }

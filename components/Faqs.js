@@ -14,14 +14,14 @@ const Faqs = () => {
     <motion.section
       initial={{ opacity: 0 }}
       animate={{ opacity: 1, transition: { duration: 0.8 } }}
-      className="relative z-10 w-full bg-white text-primary overflow-hidden"
+      className="relative z-10 w-full bg-black text-white overflow-hidden"
     >
       <article className="container mx-auto py-14 p-4 px-5 md:px-[5%] 2xl:px-0 max-w-5xl flex flex-col items-center justify-center gap-4">
-        <div className="flex flex-col items-center justify-center bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-8 shadow-2xl w-full">
-          <h2 className="text-h2 lg:text-h3 font-bold text-center max-w-[80%]">
+        <div className="flex flex-col items-center justify-center w-full">
+          <h2 className="text-h2 lg:text-h3 font-bold text-center max-w-[80%] text-white">
             Frequently Asked Questions (FAQs)
           </h2>
-          <span className="w-16 h-1 mt-3 bg-bg" />
+          <span className="w-16 h-1 mt-3 bg-white" />
         </div>
         <ul className="space-y-4 mt-14 w-full">
           {faqs.map((faq, index) => (
@@ -33,20 +33,20 @@ const Faqs = () => {
               viewport={{ once: true }}
             >
               <div
-                className={`faq-item border-b-2 bg-white/5 backdrop-blur-sm border-white/10 rounded-xl p-4 shadow-lg ${
+                className={`faq-item border-b border-white/20 rounded-xl p-4 ${
                   activeIndex === index
-                    ? "py-6 px-4 bg-white/10 backdrop-blur-sm text-gray-900"
+                    ? "py-6 px-4 bg-white/10 backdrop-blur-sm"
                     : ""
                 }`}
               >
                 <div className="flex justify-between items-start py-3">
                   <div className="faq-question cursor-pointer max-w-[90%]">
-                    <span className="text-lg font-semibold">
+                    <span className="text-lg font-semibold text-white">
                       {faq.question}
                     </span>
                   </div>
                   <button
-                    className="toggle-button"
+                    className="toggle-button text-white"
                     onClick={() => toggleAnswer(index)}
                   >
                     {activeIndex === index ? (
@@ -57,13 +57,7 @@ const Faqs = () => {
                   </button>
                 </div>
 
-                <div
-                  className={`faq-answer mt-2 transition-transform duration-1000 ease-in-out transform ${
-                    activeIndex === index
-                      ? "translate-x-0"
-                      : "-translate-x-full"
-                  }`}
-                >
+                <div className="faq-answer mt-2 text-white/80">
                   {activeIndex === index && (
                     <>
                       <p>{faq?.answer}</p>
