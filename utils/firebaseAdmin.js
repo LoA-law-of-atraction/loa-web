@@ -2,15 +2,24 @@ import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 
+let adminApp = null;
+let adminDb = null;
+let adminStorage = null;
+
 /**
- * Initialize Firebase Admin SDK
+ * Initialize Firebase Admin SDK (lazy initialization)
  *
  * For Vercel deployment, set FIREBASE_SERVICE_ACCOUNT_KEY environment variable
  * with the JSON content of your service account key (as a string)
  */
-function initializeFirebaseAdmin() {
+function getAdminApp() {
+  if (adminApp) {
+    return adminApp;
+  }
+
   if (getApps().length > 0) {
-    return getApps()[0];
+    adminApp = getApps()[0];
+    return adminApp;
   }
 
   // Option 1: Using service account JSON from environment variable
@@ -19,10 +28,11 @@ function initializeFirebaseAdmin() {
       const serviceAccount = JSON.parse(
         process.env.FIREBASE_SERVICE_ACCOUNT_KEY,
       );
-      return initializeApp({
+      adminApp = initializeApp({
         credential: cert(serviceAccount),
         storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
       });
+      return adminApp;
     } catch (error) {
       console.error("Error parsing FIREBASE_SERVICE_ACCOUNT_KEY:", error);
     }
@@ -34,7 +44,7 @@ function initializeFirebaseAdmin() {
     process.env.FIREBASE_CLIENT_EMAIL &&
     process.env.FIREBASE_PRIVATE_KEY
   ) {
-    return initializeApp({
+    adminApp = initializeApp({
       credential: cert({
         projectId: process.env.FIREBASE_PROJECT_ID,
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
@@ -43,6 +53,7 @@ function initializeFirebaseAdmin() {
       }),
       storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
     });
+    return adminApp;
   }
 
   throw new Error(
@@ -51,8 +62,26 @@ function initializeFirebaseAdmin() {
   );
 }
 
-const adminApp = initializeFirebaseAdmin();
-const adminDb = getFirestore(adminApp);
-const adminStorage = getStorage(adminApp);
+/**
+ * Get Firestore instance (lazy initialization)
+ */
+function getAdminDb() {
+  if (adminDb) {
+    return adminDb;
+  }
+  adminDb = getFirestore(getAdminApp());
+  return adminDb;
+}
 
-export { adminApp, adminDb, adminStorage };
+/**
+ * Get Storage instance (lazy initialization)
+ */
+function getAdminStorage() {
+  if (adminStorage) {
+    return adminStorage;
+  }
+  adminStorage = getStorage(getAdminApp());
+  return adminStorage;
+}
+
+export { getAdminApp, getAdminDb, getAdminStorage };
