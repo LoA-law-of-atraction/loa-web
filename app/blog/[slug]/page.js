@@ -16,23 +16,30 @@ import RelatedPosts from "@/components/blog/RelatedPosts";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 
-export async function generateStaticParams() {
-  const slugs = await getAllPublishedSlugs();
-  return slugs.map((item) => ({
-    slug: item.slug,
-  }));
-}
+// Make page dynamic to support new posts without rebuild
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }) {
-  const post = await getPostBySlug(params.slug);
+  const { slug } = await params;
+  const post = await getPostBySlug(slug);
   if (!post) return {};
   return generatePostMetadata(post, BLOG_CONFIG.SITE_URL);
 }
 
-export default async function BlogPostPage({ params }) {
-  const post = await getPostBySlug(params.slug);
+export default async function BlogPostPage({ params, searchParams }) {
+  const { slug } = await params;
+  const { preview } = await searchParams;
+  const post = await getPostBySlug(slug);
 
-  if (!post || post.status !== "published") {
+  // Allow preview mode for drafts with ?preview=true
+  const isPreview = preview === "true";
+
+  if (!post) {
+    notFound();
+  }
+
+  // Only show published posts, unless in preview mode
+  if (post.status !== "published" && !isPreview) {
     notFound();
   }
 
@@ -57,17 +64,34 @@ export default async function BlogPostPage({ params }) {
 
   return (
     <>
-      {/* Structured Data */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(blogPostingSchema) }}
-      />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
-      />
+      {/* Structured Data - only for published posts */}
+      {post.status === "published" && (
+        <>
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify(blogPostingSchema),
+            }}
+          />
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify(breadcrumbSchema),
+            }}
+          />
+        </>
+      )}
 
-      <article className="min-h-screen bg-white pt-32 pb-16">
+      {/* Draft Preview Banner */}
+      {post.status !== "published" && (
+        <div className="fixed top-0 left-0 right-0 bg-yellow-500 text-black text-center py-2 z-50 font-medium">
+          ⚠️ DRAFT PREVIEW - This post is not published yet
+        </div>
+      )}
+
+      <article
+        className={`min-h-screen bg-white pb-16 ${post.status !== "published" ? "pt-44" : "pt-32"}`}
+      >
         <div className="max-w-3xl mx-auto px-4 sm:px-6">
           {/* Breadcrumbs */}
           <nav className="text-sm text-gray-400 mb-8">
@@ -201,6 +225,3 @@ export default async function BlogPostPage({ params }) {
     </>
   );
 }
-
-// Enable ISR (Incremental Static Regeneration)
-export const revalidate = 60; // Revalidate every 60 seconds
