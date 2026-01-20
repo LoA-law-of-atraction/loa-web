@@ -83,8 +83,12 @@ export async function POST(request) {
       if (isExternalUrl && authMethod === "api-key") {
         try {
           console.log(
-            "Downloading and storing image from:",
+            "[Image Upload] Downloading and storing image from:",
             body.featuredImage,
+          );
+          console.log(
+            "[Image Upload] Storage bucket:",
+            process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
           );
           const uploadResult = await uploadImageFromUrl(
             body.featuredImage,
@@ -92,12 +96,13 @@ export async function POST(request) {
           );
           featuredImageUrl = uploadResult.url;
           featuredImagePath = uploadResult.path;
-          console.log("Image stored at:", featuredImageUrl);
+          console.log("[Image Upload] Success! Stored at:", featuredImageUrl);
         } catch (imageError) {
           console.error(
-            "Failed to store image, using original URL:",
-            imageError,
+            "[Image Upload] FAILED to store image:",
+            imageError.message,
           );
+          console.error("[Image Upload] Full error:", imageError);
           featuredImageUrl = body.featuredImage;
         }
       } else {
@@ -105,12 +110,21 @@ export async function POST(request) {
       }
     }
 
-    // Set default values
+    // Set default values - format featuredImage as object for the blog display
+    const featuredImageObject = featuredImageUrl
+      ? {
+          url: featuredImageUrl,
+          alt: body.featuredImageAlt || body.title,
+          width: body.featuredImageWidth || 1200,
+          height: body.featuredImageHeight || 630,
+        }
+      : null;
+
     const postData = {
       title: body.title,
       content: body.content,
       excerpt: body.excerpt || body.content.substring(0, 160),
-      featuredImage: featuredImageUrl,
+      featuredImage: featuredImageObject,
       featuredImagePath: featuredImagePath,
       categories: body.categories || [],
       tags: body.tags || [],

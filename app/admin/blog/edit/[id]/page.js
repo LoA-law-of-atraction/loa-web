@@ -125,6 +125,7 @@ export default function EditBlogPost({ params }) {
             </h2>
             <div className="border border-gray-200 rounded-lg p-5">
               <ImageUploader
+                key={post.id || "new"}
                 onImageUploaded={(image) =>
                   setPost({ ...post, featuredImage: image })
                 }

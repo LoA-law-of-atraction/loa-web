@@ -7,13 +7,52 @@ export default function ImageUploader({
   currentImage = null,
 }) {
   const [uploading, setUploading] = useState(false);
-  const [preview, setPreview] = useState(currentImage?.url || null);
   const [error, setError] = useState("");
-  const [altText, setAltText] = useState(currentImage?.alt || "");
   const [showGallery, setShowGallery] = useState(false);
   const [galleryImages, setGalleryImages] = useState([]);
   const [loadingGallery, setLoadingGallery] = useState(false);
+  // undefined = use prop, null = cleared by user, string = user uploaded new
+  const [localPreview, setLocalPreview] = useState(undefined);
+  const [altText, setAltText] = useState("");
   const fileInputRef = useRef(null);
+
+  // Handle both string URLs and object format for backward compatibility
+  const getImageUrl = (img) => {
+    if (!img) return null;
+    if (typeof img === "string") return img;
+    return img.url || null;
+  };
+  const getImageAlt = (img) => {
+    if (!img) return "";
+    if (typeof img === "string") return "";
+    return img.alt || "";
+  };
+
+  // Use local preview if set (including null for cleared), otherwise use currentImage prop
+  const preview =
+    localPreview !== undefined ? localPreview : getImageUrl(currentImage);
+
+  // DEBUG: Show what values we have
+  const debugInfo = {
+    currentImageType: typeof currentImage,
+    currentImageValue: currentImage
+      ? typeof currentImage === "string"
+        ? currentImage.substring(0, 50) + "..."
+        : JSON.stringify(currentImage).substring(0, 100)
+      : "null",
+    localPreview:
+      localPreview === undefined
+        ? "undefined"
+        : localPreview === null
+          ? "null"
+          : localPreview.substring(0, 50) + "...",
+    computedPreview: preview ? preview.substring(0, 50) + "..." : "null",
+  };
+
+  // Initialize altText from currentImage on mount
+  useEffect(() => {
+    setAltText(getImageAlt(currentImage));
+  }, [currentImage]);
 
   const fetchGalleryImages = async () => {
     setLoadingGallery(true);
@@ -36,7 +75,7 @@ export default function ImageUploader({
   };
 
   const handleSelectFromGallery = (image) => {
-    setPreview(image.url);
+    setLocalPreview(image.url);
     setAltText(image.name);
     onImageUploaded({
       url: image.url,
@@ -77,7 +116,7 @@ export default function ImageUploader({
       // Create preview
       const reader = new FileReader();
       reader.onloadend = () => {
-        setPreview(reader.result);
+        setLocalPreview(reader.result);
       };
       reader.readAsDataURL(file);
 
@@ -109,13 +148,13 @@ export default function ImageUploader({
     } catch (err) {
       console.error("Upload error:", err);
       setError(err.message || "Failed to upload image. Please try again.");
-      setPreview(null);
+      setLocalPreview(null);
       setUploading(false);
     }
   };
 
   const handleRemove = () => {
-    setPreview(null);
+    setLocalPreview(null);
     setAltText("");
     onImageUploaded(null);
     if (fileInputRef.current) {
@@ -125,6 +164,17 @@ export default function ImageUploader({
 
   return (
     <div className="space-y-4">
+      {/* DEBUG INFO - Remove after fixing */}
+      <div className="bg-yellow-100 border border-yellow-400 p-3 rounded text-xs font-mono">
+        <div>
+          <strong>DEBUG:</strong>
+        </div>
+        <div>currentImage type: {debugInfo.currentImageType}</div>
+        <div>currentImage value: {debugInfo.currentImageValue}</div>
+        <div>localPreview: {debugInfo.localPreview}</div>
+        <div>computed preview: {debugInfo.computedPreview}</div>
+      </div>
+
       {/* Gallery Modal */}
       {showGallery && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
