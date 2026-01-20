@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getBlogPosts, createPost } from "@/utils/blogService";
 import { createPostAdmin } from "@/utils/blogServiceAdmin";
+import { uploadImageFromUrl } from "@/utils/storageServiceAdmin";
 import { DEFAULT_AUTHOR } from "@/lib/constants/blogConfig";
 
 // Verify admin authentication (cookie-based for admin panel)
@@ -68,12 +69,49 @@ export async function POST(request) {
       );
     }
 
+    // Handle featured image - download from URL and upload to Firebase Storage
+    let featuredImageUrl = null;
+    let featuredImagePath = null;
+
+    if (body.featuredImage) {
+      // Check if it's an external URL (like Fal.ai) that needs to be stored
+      const isExternalUrl =
+        body.featuredImage.startsWith("http") &&
+        !body.featuredImage.includes("storage.googleapis.com") &&
+        !body.featuredImage.includes("firebasestorage.googleapis.com");
+
+      if (isExternalUrl && authMethod === "api-key") {
+        try {
+          console.log(
+            "Downloading and storing image from:",
+            body.featuredImage,
+          );
+          const uploadResult = await uploadImageFromUrl(
+            body.featuredImage,
+            "blog",
+          );
+          featuredImageUrl = uploadResult.url;
+          featuredImagePath = uploadResult.path;
+          console.log("Image stored at:", featuredImageUrl);
+        } catch (imageError) {
+          console.error(
+            "Failed to store image, using original URL:",
+            imageError,
+          );
+          featuredImageUrl = body.featuredImage;
+        }
+      } else {
+        featuredImageUrl = body.featuredImage;
+      }
+    }
+
     // Set default values
     const postData = {
       title: body.title,
       content: body.content,
       excerpt: body.excerpt || body.content.substring(0, 160),
-      featuredImage: body.featuredImage || null,
+      featuredImage: featuredImageUrl,
+      featuredImagePath: featuredImagePath,
       categories: body.categories || [],
       tags: body.tags || [],
       author: body.author || DEFAULT_AUTHOR,
