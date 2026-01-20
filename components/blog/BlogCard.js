@@ -45,11 +45,20 @@ export default function BlogCard({ post, index = 0 }) {
           </div>
 
           {/* Thumbnail - handle both string URL and object format */}
-          {(post.featuredImage?.url || typeof post.featuredImage === "string") && (
+          {(post.featuredImage?.url ||
+            typeof post.featuredImage === "string") && (
             <div className="sm:w-40 sm:h-28 w-full h-48 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
               <img
-                src={typeof post.featuredImage === "string" ? post.featuredImage : post.featuredImage.url}
-                alt={typeof post.featuredImage === "string" ? post.title : (post.featuredImage.alt || post.title)}
+                src={
+                  typeof post.featuredImage === "string"
+                    ? post.featuredImage
+                    : post.featuredImage.url
+                }
+                alt={
+                  typeof post.featuredImage === "string"
+                    ? post.title
+                    : post.featuredImage.alt || post.title
+                }
                 className="w-full h-full object-cover"
               />
             </div>

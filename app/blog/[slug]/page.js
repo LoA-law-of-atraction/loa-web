@@ -112,11 +112,20 @@ export default async function BlogPostPage({ params }) {
           </div>
 
           {/* Featured Image - handle both string URL and object format */}
-          {(post.featuredImage?.url || typeof post.featuredImage === "string") && (
+          {(post.featuredImage?.url ||
+            typeof post.featuredImage === "string") && (
             <div className="mb-10 rounded-lg overflow-hidden">
               <img
-                src={typeof post.featuredImage === "string" ? post.featuredImage : post.featuredImage.url}
-                alt={typeof post.featuredImage === "string" ? post.title : (post.featuredImage.alt || post.title)}
+                src={
+                  typeof post.featuredImage === "string"
+                    ? post.featuredImage
+                    : post.featuredImage.url
+                }
+                alt={
+                  typeof post.featuredImage === "string"
+                    ? post.title
+                    : post.featuredImage.alt || post.title
+                }
                 className="w-full h-auto"
                 width={post.featuredImage?.width || 1200}
                 height={post.featuredImage?.height || 630}
