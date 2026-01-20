@@ -7,13 +7,30 @@ export default function ImageUploader({
   currentImage = null,
 }) {
   const [uploading, setUploading] = useState(false);
-  const [preview, setPreview] = useState(currentImage?.url || null);
+  // Handle both string URLs and object format for backward compatibility
+  const getImageUrl = (img) => {
+    if (!img) return null;
+    if (typeof img === "string") return img;
+    return img.url || null;
+  };
+  const getImageAlt = (img) => {
+    if (!img) return "";
+    if (typeof img === "string") return "";
+    return img.alt || "";
+  };
+  const [preview, setPreview] = useState(getImageUrl(currentImage));
   const [error, setError] = useState("");
-  const [altText, setAltText] = useState(currentImage?.alt || "");
+  const [altText, setAltText] = useState(getImageAlt(currentImage));
   const [showGallery, setShowGallery] = useState(false);
   const [galleryImages, setGalleryImages] = useState([]);
   const [loadingGallery, setLoadingGallery] = useState(false);
   const fileInputRef = useRef(null);
+
+  // Update preview when currentImage changes
+  useEffect(() => {
+    setPreview(getImageUrl(currentImage));
+    setAltText(getImageAlt(currentImage));
+  }, [currentImage]);
 
   const fetchGalleryImages = async () => {
     setLoadingGallery(true);
