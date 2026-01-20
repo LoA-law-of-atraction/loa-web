@@ -3,11 +3,23 @@ import { cookies } from "next/headers";
 import { getBlogPosts, createPost } from "@/utils/blogService";
 import { DEFAULT_AUTHOR } from "@/lib/constants/blogConfig";
 
-// Verify admin authentication
+// Verify admin authentication (cookie-based for admin panel)
 async function verifyAuth() {
   const cookieStore = await cookies();
   const authCookie = cookieStore.get("admin_session");
   return authCookie && authCookie.value && authCookie.value.length === 64;
+}
+
+// Verify API key authentication (for automation like Make.com)
+function verifyApiKey(request) {
+  const apiKey = request.headers.get("x-api-key");
+  const validApiKey = process.env.BLOG_API_KEY;
+  return apiKey && validApiKey && apiKey === validApiKey;
+}
+
+// Combined auth check - accepts either cookie OR API key
+async function isAuthorized(request) {
+  return verifyApiKey(request) || (await verifyAuth());
 }
 
 export async function GET(request) {
@@ -37,8 +49,8 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
-    // Verify authentication
-    if (!(await verifyAuth())) {
+    // Verify authentication (cookie OR API key)
+    if (!(await isAuthorized(request))) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
