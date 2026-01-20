@@ -7,6 +7,12 @@ export default function ImageUploader({
   currentImage = null,
 }) {
   const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+  const [showGallery, setShowGallery] = useState(false);
+  const [galleryImages, setGalleryImages] = useState([]);
+  const [loadingGallery, setLoadingGallery] = useState(false);
+  const fileInputRef = useRef(null);
+
   // Handle both string URLs and object format for backward compatibility
   const getImageUrl = (img) => {
     if (!img) return null;
@@ -18,18 +24,18 @@ export default function ImageUploader({
     if (typeof img === "string") return "";
     return img.alt || "";
   };
-  const [preview, setPreview] = useState(getImageUrl(currentImage));
-  const [error, setError] = useState("");
-  const [altText, setAltText] = useState(getImageAlt(currentImage));
-  const [showGallery, setShowGallery] = useState(false);
-  const [galleryImages, setGalleryImages] = useState([]);
-  const [loadingGallery, setLoadingGallery] = useState(false);
-  const fileInputRef = useRef(null);
 
-  // Update preview when currentImage changes
+  // Initialize state with current image - derive directly from prop
+  const [preview, setPreview] = useState(() => getImageUrl(currentImage));
+  const [altText, setAltText] = useState(() => getImageAlt(currentImage));
+
+  // Update preview when currentImage prop changes
   useEffect(() => {
-    setPreview(getImageUrl(currentImage));
-    setAltText(getImageAlt(currentImage));
+    const url = getImageUrl(currentImage);
+    const alt = getImageAlt(currentImage);
+    console.log("[ImageUploader] currentImage changed:", currentImage, "-> url:", url);
+    setPreview(url);
+    setAltText(alt);
   }, [currentImage]);
 
   const fetchGalleryImages = async () => {
