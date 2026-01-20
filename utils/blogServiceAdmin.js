@@ -3,8 +3,8 @@
  * This bypasses Firestore security rules for server-to-server operations
  */
 
-import { adminDb } from "./firebaseAdmin";
-import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import { getAdminDb } from "./firebaseAdmin";
+import { Timestamp } from "firebase-admin/firestore";
 import { slugify, generateUniqueSlug } from "./slugify";
 
 const POSTS_COLLECTION = "blog_posts";
@@ -15,7 +15,8 @@ const CONFIG_COLLECTION = "blog_config";
  * Check if a slug already exists (Admin version)
  */
 async function slugExistsAdmin(slug, excludeId = null) {
-  const snapshot = await adminDb
+  const db = getAdminDb();
+  const snapshot = await db
     .collection(POSTS_COLLECTION)
     .where("slug", "==", slug)
     .get();
@@ -38,7 +39,8 @@ export async function getBlogPostsAdmin({
   lastDoc = null,
 } = {}) {
   try {
-    let query = adminDb.collection(POSTS_COLLECTION);
+    const db = getAdminDb();
+    let query = db.collection(POSTS_COLLECTION);
 
     if (status) {
       query = query.where("status", "==", status);
@@ -80,7 +82,8 @@ export async function getBlogPostsAdmin({
  */
 export async function getPostBySlugAdmin(slug) {
   try {
-    const snapshot = await adminDb
+    const db = getAdminDb();
+    const snapshot = await db
       .collection(POSTS_COLLECTION)
       .where("slug", "==", slug)
       .limit(1)
@@ -109,7 +112,8 @@ export async function getPostBySlugAdmin(slug) {
  */
 export async function getPostByIdAdmin(id) {
   try {
-    const doc = await adminDb.collection(POSTS_COLLECTION).doc(id).get();
+    const db = getAdminDb();
+    const doc = await db.collection(POSTS_COLLECTION).doc(id).get();
 
     if (!doc.exists) {
       return null;
@@ -147,7 +151,8 @@ export async function createPostAdmin(postData) {
       likes: 0,
     };
 
-    const docRef = await adminDb.collection(POSTS_COLLECTION).add(newPost);
+    const db = getAdminDb();
+    const docRef = await db.collection(POSTS_COLLECTION).add(newPost);
 
     return {
       id: docRef.id,
@@ -167,7 +172,8 @@ export async function createPostAdmin(postData) {
  */
 export async function updatePostAdmin(id, postData) {
   try {
-    const docRef = adminDb.collection(POSTS_COLLECTION).doc(id);
+    const db = getAdminDb();
+    const docRef = db.collection(POSTS_COLLECTION).doc(id);
 
     let updates = { ...postData };
 
@@ -209,7 +215,8 @@ export async function updatePostAdmin(id, postData) {
  */
 export async function deletePostAdmin(id) {
   try {
-    await adminDb.collection(POSTS_COLLECTION).doc(id).delete();
+    const db = getAdminDb();
+    await db.collection(POSTS_COLLECTION).doc(id).delete();
     return { success: true };
   } catch (error) {
     console.error("Error deleting post (Admin):", error);
@@ -222,7 +229,8 @@ export async function deletePostAdmin(id) {
  */
 export async function getAllPublishedSlugsAdmin() {
   try {
-    const snapshot = await adminDb
+    const db = getAdminDb();
+    const snapshot = await db
       .collection(POSTS_COLLECTION)
       .where("status", "==", "published")
       .get();
@@ -249,7 +257,8 @@ export async function getRelatedPostsAdmin(
       return [];
     }
 
-    const snapshot = await adminDb
+    const db = getAdminDb();
+    const snapshot = await db
       .collection(POSTS_COLLECTION)
       .where("status", "==", "published")
       .where("categories", "array-contains-any", categories)
@@ -278,7 +287,8 @@ export async function getRelatedPostsAdmin(
  */
 export async function getCategoriesAdmin() {
   try {
-    const snapshot = await adminDb.collection(CATEGORIES_COLLECTION).get();
+    const db = getAdminDb();
+    const snapshot = await db.collection(CATEGORIES_COLLECTION).get();
     return snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
