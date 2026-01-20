@@ -23,7 +23,9 @@ export async function uploadImageFromUrl(imageUrl, folder = "blog") {
     // Fetch the image
     const response = await fetch(imageUrl);
     if (!response.ok) {
-      throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `Failed to fetch image: ${response.status} ${response.statusText}`,
+      );
     }
 
     console.log("[Storage] Image fetched successfully");
