@@ -11,6 +11,8 @@ export default function ImageUploader({
   const [showGallery, setShowGallery] = useState(false);
   const [galleryImages, setGalleryImages] = useState([]);
   const [loadingGallery, setLoadingGallery] = useState(false);
+  const [localPreview, setLocalPreview] = useState(null);
+  const [altText, setAltText] = useState("");
   const fileInputRef = useRef(null);
 
   // Handle both string URLs and object format for backward compatibility
@@ -25,18 +27,14 @@ export default function ImageUploader({
     return img.alt || "";
   };
 
-  // Initialize state with current image - derive directly from prop
-  const [preview, setPreview] = useState(() => getImageUrl(currentImage));
-  const [altText, setAltText] = useState(() => getImageAlt(currentImage));
+  // Use local preview if set, otherwise use currentImage prop
+  const preview =
+    localPreview !== null ? localPreview : getImageUrl(currentImage);
 
-  // Update preview when currentImage prop changes
+  // Initialize altText from currentImage on mount
   useEffect(() => {
-    const url = getImageUrl(currentImage);
-    const alt = getImageAlt(currentImage);
-    console.log("[ImageUploader] currentImage changed:", currentImage, "-> url:", url);
-    setPreview(url);
-    setAltText(alt);
-  }, [currentImage]);
+    setAltText(getImageAlt(currentImage));
+  }, []);
 
   const fetchGalleryImages = async () => {
     setLoadingGallery(true);
@@ -59,7 +57,7 @@ export default function ImageUploader({
   };
 
   const handleSelectFromGallery = (image) => {
-    setPreview(image.url);
+    setLocalPreview(image.url);
     setAltText(image.name);
     onImageUploaded({
       url: image.url,
@@ -100,7 +98,7 @@ export default function ImageUploader({
       // Create preview
       const reader = new FileReader();
       reader.onloadend = () => {
-        setPreview(reader.result);
+        setLocalPreview(reader.result);
       };
       reader.readAsDataURL(file);
 
@@ -132,13 +130,13 @@ export default function ImageUploader({
     } catch (err) {
       console.error("Upload error:", err);
       setError(err.message || "Failed to upload image. Please try again.");
-      setPreview(null);
+      setLocalPreview(null);
       setUploading(false);
     }
   };
 
   const handleRemove = () => {
-    setPreview(null);
+    setLocalPreview(null);
     setAltText("");
     onImageUploaded(null);
     if (fileInputRef.current) {
