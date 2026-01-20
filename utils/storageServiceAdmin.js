@@ -18,14 +18,19 @@ export async function uploadImageFromUrl(imageUrl, folder = "blog") {
       throw new Error("No image URL provided");
     }
 
+    console.log("[Storage] Starting image upload from URL:", imageUrl);
+
     // Fetch the image
     const response = await fetch(imageUrl);
     if (!response.ok) {
-      throw new Error(`Failed to fetch image: ${response.statusText}`);
+      throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
     }
+
+    console.log("[Storage] Image fetched successfully");
 
     // Get the content type
     const contentType = response.headers.get("content-type") || "image/png";
+    console.log("[Storage] Content type:", contentType);
 
     // Determine file extension
     let extension = "png";
@@ -50,9 +55,11 @@ export async function uploadImageFromUrl(imageUrl, folder = "blog") {
     // Get Firebase Admin Storage bucket
     const storage = getAdminStorage();
     const bucket = storage.bucket();
+    console.log("[Storage] Bucket name:", bucket.name);
     const file = bucket.file(path);
 
     // Upload to Firebase Storage
+    console.log("[Storage] Uploading file to path:", path);
     await file.save(buffer, {
       metadata: {
         contentType: contentType,
@@ -63,11 +70,13 @@ export async function uploadImageFromUrl(imageUrl, folder = "blog") {
     });
 
     // Make the file publicly accessible
+    console.log("[Storage] Making file public...");
     await file.makePublic();
 
     // Get the public URL
     const bucketName = bucket.name;
     const publicUrl = `https://storage.googleapis.com/${bucketName}/${path}`;
+    console.log("[Storage] Upload complete! Public URL:", publicUrl);
 
     return {
       url: publicUrl,
