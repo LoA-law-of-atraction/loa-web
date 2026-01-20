@@ -28,18 +28,27 @@ export async function generateMetadata({ params }) {
 
 export default async function BlogPostPage({ params, searchParams }) {
   const { slug } = await params;
-  const { preview } = await searchParams;
+  const resolvedSearchParams = await searchParams;
+  const preview = resolvedSearchParams?.preview;
   const post = await getPostBySlug(slug);
+
+  // Debug: log what we have
+  console.log("[BlogPost] slug:", slug);
+  console.log("[BlogPost] preview param:", preview);
+  console.log("[BlogPost] post found:", !!post);
+  console.log("[BlogPost] post status:", post?.status);
 
   // Allow preview mode for drafts with ?preview=true
   const isPreview = preview === "true";
 
   if (!post) {
+    console.log("[BlogPost] 404 - post not found");
     notFound();
   }
 
   // Only show published posts, unless in preview mode
   if (post.status !== "published" && !isPreview) {
+    console.log("[BlogPost] 404 - not published and not preview mode");
     notFound();
   }
 
