@@ -32,23 +32,6 @@ export default function ImageUploader({
   const preview =
     localPreview !== undefined ? localPreview : getImageUrl(currentImage);
 
-  // DEBUG: Show what values we have
-  const debugInfo = {
-    currentImageType: typeof currentImage,
-    currentImageValue: currentImage
-      ? typeof currentImage === "string"
-        ? currentImage.substring(0, 50) + "..."
-        : JSON.stringify(currentImage).substring(0, 100)
-      : "null",
-    localPreview:
-      localPreview === undefined
-        ? "undefined"
-        : localPreview === null
-          ? "null"
-          : localPreview.substring(0, 50) + "...",
-    computedPreview: preview ? preview.substring(0, 50) + "..." : "null",
-  };
-
   // Initialize altText from currentImage on mount
   useEffect(() => {
     setAltText(getImageAlt(currentImage));
@@ -164,17 +147,6 @@ export default function ImageUploader({
 
   return (
     <div className="space-y-4">
-      {/* DEBUG INFO - Remove after fixing */}
-      <div className="bg-yellow-100 border border-yellow-400 p-3 rounded text-xs font-mono">
-        <div>
-          <strong>DEBUG:</strong>
-        </div>
-        <div>currentImage type: {debugInfo.currentImageType}</div>
-        <div>currentImage value: {debugInfo.currentImageValue}</div>
-        <div>localPreview: {debugInfo.localPreview}</div>
-        <div>computed preview: {debugInfo.computedPreview}</div>
-      </div>
-
       {/* Gallery Modal */}
       {showGallery && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">

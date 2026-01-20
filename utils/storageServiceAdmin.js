@@ -57,11 +57,9 @@ export async function uploadImageFromUrl(imageUrl, folder = "blog") {
     // Get Firebase Admin Storage bucket
     const storage = getAdminStorage();
     const bucket = storage.bucket();
-    console.log("[Storage] Bucket name:", bucket.name);
     const file = bucket.file(path);
 
-    // Upload to Firebase Storage
-    console.log("[Storage] Uploading file to path:", path);
+    // Upload to Firebase Storage with public read access
     await file.save(buffer, {
       metadata: {
         contentType: contentType,
@@ -69,15 +67,20 @@ export async function uploadImageFromUrl(imageUrl, folder = "blog") {
           firebaseStorageDownloadTokens: uniqueId,
         },
       },
+      public: true, // Make public on upload
     });
 
-    // Make the file publicly accessible
-    console.log("[Storage] Making file public...");
-    await file.makePublic();
+    // Try to make file public (may fail if bucket doesn't allow, but we have fallback URL)
+    try {
+      await file.makePublic();
+    } catch (err) {
+      // Ignore - we'll use the Firebase download URL format instead
+    }
 
-    // Get the public URL
+    // Use Firebase Storage download URL format (works even without public access)
     const bucketName = bucket.name;
-    const publicUrl = `https://storage.googleapis.com/${bucketName}/${path}`;
+    const encodedPath = encodeURIComponent(path);
+    const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodedPath}?alt=media&token=${uniqueId}`;
     console.log("[Storage] Upload complete! Public URL:", publicUrl);
 
     return {
