@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getBlogPosts, createPost } from "@/utils/blogService";
+import { createPostAdmin } from "@/utils/blogServiceAdmin";
 import { DEFAULT_AUTHOR } from "@/lib/constants/blogConfig";
 
 // Verify admin authentication (cookie-based for admin panel)
@@ -17,9 +18,11 @@ function verifyApiKey(request) {
   return apiKey && validApiKey && apiKey === validApiKey;
 }
 
-// Combined auth check - accepts either cookie OR API key
-async function isAuthorized(request) {
-  return verifyApiKey(request) || (await verifyAuth());
+// Check which auth method is used
+async function getAuthMethod(request) {
+  if (verifyApiKey(request)) return "api-key";
+  if (await verifyAuth()) return "cookie";
+  return null;
 }
 
 export async function GET(request) {
@@ -49,8 +52,9 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
-    // Verify authentication (cookie OR API key)
-    if (!(await isAuthorized(request))) {
+    // Check authentication method
+    const authMethod = await getAuthMethod(request);
+    if (!authMethod) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -80,11 +84,16 @@ export async function POST(request) {
       aiGenerated: body.aiGenerated || false,
       aiPrompt: body.aiPrompt || null,
       aiModel: body.aiModel || null,
-      createdBy: "admin",
-      lastEditedBy: "admin",
+      createdBy: authMethod === "api-key" ? "automation" : "admin",
+      lastEditedBy: authMethod === "api-key" ? "automation" : "admin",
     };
 
-    const newPost = await createPost(postData);
+    // Use Admin SDK for API key auth (bypasses Firestore rules)
+    // Use regular client SDK for cookie auth (works with existing auth)
+    const newPost =
+      authMethod === "api-key"
+        ? await createPostAdmin(postData)
+        : await createPost(postData);
 
     return NextResponse.json(newPost, { status: 201 });
   } catch (error) {
