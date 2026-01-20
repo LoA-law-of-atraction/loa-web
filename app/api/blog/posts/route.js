@@ -110,12 +110,21 @@ export async function POST(request) {
       }
     }
 
-    // Set default values
+    // Set default values - format featuredImage as object for the blog display
+    const featuredImageObject = featuredImageUrl
+      ? {
+          url: featuredImageUrl,
+          alt: body.featuredImageAlt || body.title,
+          width: body.featuredImageWidth || 1200,
+          height: body.featuredImageHeight || 630,
+        }
+      : null;
+
     const postData = {
       title: body.title,
       content: body.content,
       excerpt: body.excerpt || body.content.substring(0, 160),
-      featuredImage: featuredImageUrl,
+      featuredImage: featuredImageObject,
       featuredImagePath: featuredImagePath,
       categories: body.categories || [],
       tags: body.tags || [],
