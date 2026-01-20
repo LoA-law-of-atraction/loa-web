@@ -11,7 +11,8 @@ export default function ImageUploader({
   const [showGallery, setShowGallery] = useState(false);
   const [galleryImages, setGalleryImages] = useState([]);
   const [loadingGallery, setLoadingGallery] = useState(false);
-  const [localPreview, setLocalPreview] = useState(null);
+  // undefined = use prop, null = cleared by user, string = user uploaded new
+  const [localPreview, setLocalPreview] = useState(undefined);
   const [altText, setAltText] = useState("");
   const fileInputRef = useRef(null);
 
@@ -27,14 +28,14 @@ export default function ImageUploader({
     return img.alt || "";
   };
 
-  // Use local preview if set, otherwise use currentImage prop
+  // Use local preview if set (including null for cleared), otherwise use currentImage prop
   const preview =
-    localPreview !== null ? localPreview : getImageUrl(currentImage);
+    localPreview !== undefined ? localPreview : getImageUrl(currentImage);
 
   // Initialize altText from currentImage on mount
   useEffect(() => {
     setAltText(getImageAlt(currentImage));
-  }, []);
+  }, [currentImage]);
 
   const fetchGalleryImages = async () => {
     setLoadingGallery(true);
