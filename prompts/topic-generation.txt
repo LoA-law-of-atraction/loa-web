@@ -1,0 +1,23 @@
+Generate {{count}} viral video topic ideas for short-form content (TikTok, Instagram Reels, YouTube Shorts) in the manifestation, law of attraction, and personal development niche.
+
+Each topic should be:
+- Attention-grabbing and emotional
+- First-person narrative style
+- 30-60 seconds long when spoken
+- Focused on transformation, success stories, or practical tips
+
+Return ONLY a JSON array with this exact format:
+[
+  {
+    "topic": "How I manifested $10k in 30 days using this simple technique",
+    "category": "Money Manifestation"
+  },
+  {
+    "topic": "The 3AM method that changed my entire life",
+    "category": "Life Transformation"
+  }
+]
+
+Categories should be one of: {{categories}}
+
+Return ONLY the JSON array, no other text.
