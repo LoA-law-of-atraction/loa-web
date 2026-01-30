@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { getAdminDb, getAdminStorage } from "@/utils/firebaseAdmin";
+import { calculateFalVideoCost } from "@/utils/costCalculator";
 
 export async function POST(request) {
   try {
-    const { session_id, images, script_data } = await request.json();
+    const { project_id, session_id, images, script_data } = await request.json();
 
-    if (!session_id || !images || !script_data) {
+    if (!project_id || !session_id || !images || !script_data) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
@@ -67,11 +68,30 @@ export async function POST(request) {
 
     const videos = await Promise.all(videoPromises);
 
+    // Calculate FAL AI video cost
+    const falVideoCost = calculateFalVideoCost(videos.length);
+
     // Update Firestore
     const db = getAdminDb();
     await db.collection("video_sessions").doc(session_id).update({
       videos,
       status: "videos_generated",
+      updated_at: new Date().toISOString(),
+    });
+
+    // Get existing costs
+    const projectRef = db.collection("projects").doc(project_id);
+    const projectDoc = await projectRef.get();
+    const existingCosts = projectDoc.data()?.costs || {};
+
+    // Update project progress
+    await projectRef.update({
+      current_step: 5,
+      status: "videos_generated",
+      costs: {
+        ...existingCosts,
+        fal_videos: (existingCosts.fal_videos || 0) + falVideoCost,
+      },
       updated_at: new Date().toISOString(),
     });
 

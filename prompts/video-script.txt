@@ -10,7 +10,7 @@ A SELECTED CHARACTER is provided externally as JSON with:
 Task:
 Use the provided character to create a short motivational video script inspired by a real-feeling Law of Attraction success story aligned tightly to the given topic.
 
-Create exactly 4 scenes (8 seconds each) that will be generated independently with TWO distinct locations to show visual transformation.
+Create exactly {{scene_count}} scenes (8 seconds each) that will be generated independently with TWO distinct locations to show visual transformation.
 
 WORKFLOW:
 1. Generate STATIC IMAGE for each scene (text-to-image)
@@ -23,7 +23,25 @@ SCRIPT RULES:
 - Show struggle → inner shift → positive outcome
 - No direct teaching ("you should…")
 - Voiceover pacing must feel natural and unhurried
-- Generate ONE CONTINUOUS SCRIPT (32 seconds) that flows without pauses
+- Generate ONE CONTINUOUS SCRIPT ({{scene_count}} × 8 seconds = total duration) that flows naturally
+
+PAUSE PLACEMENT (CRITICAL):
+Add natural pauses throughout the script using these markers:
+- [pause:1s] or [pause:2s] or [pause:500ms] for specific durations
+- [pause] for default 1 second pause
+
+Place pauses where a human narrator would naturally pause:
+✓ After complete thoughts or sentences (1-1.5s)
+✓ Before introducing a new idea or shift (1.5-2s)
+✓ After rhetorical questions or reflective moments (1-2s)
+✓ Between major story beats or emotional shifts (2s)
+✓ For dramatic emphasis before key realizations (1.5-2s)
+✓ Between location transitions (scene changes) (2s)
+
+Example with natural pauses:
+"She sat in the dim light, wondering if anything would ever change. [pause:1.5s] The doubt had been there for months. [pause] But tonight... [pause:2s] tonight felt different. [pause:1s]"
+
+DO NOT over-pause - keep it natural and conversational. Aim for 4-6 pauses total in a 32-second script.
 
 ENDING RULE (IMPORTANT):
 The final scene MUST end with a quietly empowering realization that implies forward motion, self-trust, or inner alignment.
@@ -31,16 +49,20 @@ The ending should feel like "something has unlocked", not advice or instruction.
 Avoid clichés and commands; keep it subtle, confident, and emotionally affirming.
 
 SCENE STRUCTURE (TWO LOCATIONS):
-- Scenes 1-2: FIRST LOCATION (e.g., indoor/night - struggle/reflection)
-- Scenes 3-4: SECOND LOCATION (e.g., outdoor/dawn - breakthrough/resolution)
+Note: Adapt this structure to {{scene_count}} total scenes, dividing them roughly equally between two locations.
+- First half of scenes: FIRST LOCATION (e.g., indoor/night - struggle/reflection)
+- Second half of scenes: SECOND LOCATION (e.g., outdoor/dawn - breakthrough/resolution)
 - Location change represents visual transformation/shift
 - Maintain consistency WITHIN each location pair
 
-VISUAL PROGRESSION:
-- Scene 1: Initial struggle/contemplation (Location 1)
-- Scene 2: Subtle shift/realization dawning (Location 1)
-- Scene 3: Emerging into new space/clarity (Location 2 - NEW)
-- Scene 4: Quiet resolution/confidence (Location 2)
+Example for 4 scenes:
+- Scenes 1-2: FIRST LOCATION
+- Scenes 3-4: SECOND LOCATION
+
+VISUAL PROGRESSION (Example for 4 scenes - adapt to {{scene_count}}):
+- First half: Struggle/reflection in Location 1
+- Second half: Breakthrough/resolution in Location 2 (NEW)
+- Progression should show: struggle → shift → clarity → resolution
 
 VISUAL CONSISTENCY RULES (CRITICAL):
 
@@ -157,7 +179,7 @@ Return ONLY valid JSON. No explanations.
     "image_url": "string",
     "voice_id": "string"
   },
-  "script": "string (complete continuous voiceover - approximately 32 seconds when spoken naturally, NO pauses)",
+  "script": "string (complete continuous voiceover with natural [pause] markers inserted - approximately {{scene_count}} × 8 seconds when spoken naturally)",
   "scenes": [
     {
       "id": 1,
@@ -203,21 +225,25 @@ Return ONLY valid JSON. No explanations.
 }
 
 BEFORE OUTPUTTING - VALIDATE (DO NOT SKIP):
-✓ Script field contains ONE continuous story (no breaks)?
-✓ ALL 4 image_prompts start with "Dark cinematic cartoon style"?
-✓ ALL 4 image_prompts end with "Vertical 9:16, single frame, no motion"?
-✓ Scenes 1-2 image_prompts describe EXACT SAME environment?
-✓ Scenes 3-4 image_prompts describe EXACT SAME environment (different from 1-2)?
-✓ Scenes 1-2 use EXACT SAME color palette?
-✓ Scenes 3-4 use EXACT SAME color palette (can differ from 1-2)?
-✓ ALL 4 scenes use SAME style keywords?
+✓ Script field contains ONE continuous story with natural [pause] markers?
+✓ Pauses placed naturally (4-6 total for 32s script)?
+✓ ALL image_prompts start with "Dark cinematic cartoon style"?
+✓ ALL image_prompts end with "Vertical 9:16, single frame, no motion"?
+✓ First half of scenes image_prompts describe EXACT SAME environment?
+✓ Second half of scenes image_prompts describe EXACT SAME environment (different from first half)?
+✓ First half of scenes use EXACT SAME color palette?
+✓ Second half of scenes use EXACT SAME color palette (can differ from first half)?
+✓ ALL scenes use SAME style keywords?
 ✓ Image prompts describe STATIC frames (no motion words)?
 ✓ Motion prompts describe SUBTLE movements only?
-✓ Location change happens between Scene 2 and 3?
+✓ Location change happens between first and second half of scenes?
 ✓ Character description consistent (same gender + age_range)?
 
 Topic:
 {{topic}}
+
+Number of Scenes:
+{{scene_count}}
 
 Selected Character (JSON):
 {{selected_character}}

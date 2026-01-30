@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { getAdminDb } from "@/utils/firebaseAdmin";
+import { calculateShotstackCost } from "@/utils/costCalculator";
 
 export async function POST(request) {
   try {
-    const { session_id, videos, voiceover_url } = await request.json();
+    const { project_id, session_id, videos, voiceover_url } = await request.json();
 
-    if (!session_id || !videos || !voiceover_url) {
+    if (!project_id || !session_id || !videos || !voiceover_url) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
@@ -77,6 +78,10 @@ export async function POST(request) {
     const shotstackResult = await shotstackResponse.json();
     const renderId = shotstackResult.response.id;
 
+    // Calculate Shotstack cost (videos are 8 seconds each)
+    const totalDuration = videos.length * 8;
+    const shotstackCost = calculateShotstackCost(totalDuration);
+
     // Update Firestore
     const db = getAdminDb();
     await db.collection("video_sessions").doc(session_id).update({
@@ -85,8 +90,24 @@ export async function POST(request) {
       updated_at: new Date().toISOString(),
     });
 
+    // Get existing costs
+    const projectRef = db.collection("projects").doc(project_id);
+    const projectDoc = await projectRef.get();
+    const existingCosts = projectDoc.data()?.costs || {};
+
+    // Update project progress
+    await projectRef.update({
+      current_step: 5,
+      status: "rendering",
+      costs: {
+        ...existingCosts,
+        shotstack: (existingCosts.shotstack || 0) + shotstackCost,
+      },
+      updated_at: new Date().toISOString(),
+    });
+
     // Start polling for completion
-    pollShotstackStatus(session_id, renderId);
+    pollShotstackStatus(project_id, session_id, renderId);
 
     return NextResponse.json({
       success: true,
@@ -103,7 +124,7 @@ export async function POST(request) {
 }
 
 // Background polling function
-async function pollShotstackStatus(sessionId, renderId) {
+async function pollShotstackStatus(projectId, sessionId, renderId) {
   const maxAttempts = 60; // 5 minutes
   let attempts = 0;
 
@@ -137,6 +158,14 @@ async function pollShotstackStatus(sessionId, renderId) {
           updated_at: new Date().toISOString(),
         });
 
+        // Update project
+        await db.collection("projects").doc(projectId).update({
+          current_step: 5,
+          status: "completed",
+          final_video_url: finalVideoUrl,
+          updated_at: new Date().toISOString(),
+        });
+
         console.log(`Video completed for session ${sessionId}`);
         return;
       } else if (status === "failed") {
@@ -158,6 +187,13 @@ async function pollShotstackStatus(sessionId, renderId) {
       await db.collection("video_sessions").doc(sessionId).update({
         status: "failed",
         error: error.message,
+        updated_at: new Date().toISOString(),
+      });
+
+      // Update project
+      await db.collection("projects").doc(projectId).update({
+        current_step: 5,
+        status: "failed",
         updated_at: new Date().toISOString(),
       });
     }

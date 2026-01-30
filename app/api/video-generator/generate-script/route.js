@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
 import { getPrompt } from "@/utils/promptService";
 import { getAdminDb } from "@/utils/firebaseAdmin";
+import { calculateClaudeCost } from "@/utils/costCalculator";
 
 export async function POST(request) {
   try {
-    const { topic, selected_character, categories = [] } = await request.json();
+    const { project_id, topic, selected_character, categories = [], scene_count = 4 } = await request.json();
 
-    if (!topic || !selected_character) {
+    if (!project_id || !topic || !selected_character) {
       return NextResponse.json(
-        { error: "Missing topic or character" },
+        { error: "Missing project_id, topic, or character" },
         { status: 400 }
       );
     }
@@ -17,6 +18,7 @@ export async function POST(request) {
     const prompt = getPrompt("video-script", {
       topic,
       selected_character: JSON.stringify(selected_character, null, 2),
+      scene_count: scene_count,
     });
 
     // Call Claude API
@@ -47,6 +49,11 @@ export async function POST(request) {
     const claudeResult = await claudeResponse.json();
     const scriptText = claudeResult.content[0].text;
 
+    // Calculate Claude API cost
+    const inputTokens = claudeResult.usage?.input_tokens || 0;
+    const outputTokens = claudeResult.usage?.output_tokens || 0;
+    const claudeCost = calculateClaudeCost(inputTokens, outputTokens);
+
     // Extract JSON from Claude's response
     const jsonMatch = scriptText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
@@ -55,14 +62,28 @@ export async function POST(request) {
 
     const scriptData = JSON.parse(jsonMatch[0]);
 
-    // Save script to Firestore
+    // Update project in Firestore
     const db = getAdminDb();
-    const scriptRef = db.collection("scripts").doc();
+    const projectRef = db.collection("projects").doc(project_id);
 
-    // Save main script document
-    await scriptRef.set({
+    // Check if project exists
+    const projectDoc = await projectRef.get();
+    if (!projectDoc.exists) {
+      return NextResponse.json(
+        { error: "Project not found" },
+        { status: 404 }
+      );
+    }
+
+    // Get existing costs
+    const projectDoc = await projectRef.get();
+    const existingCosts = projectDoc.data()?.costs || {};
+
+    // Update main project document
+    await projectRef.update({
       topic,
       categories,
+      scene_count,
       character: {
         character_id: selected_character.character_id,
         name: selected_character.name,
@@ -71,11 +92,17 @@ export async function POST(request) {
         voice_id: selected_character.voice_id,
       },
       script: scriptData.script,
-      created_at: new Date().toISOString(),
+      status: "script_generated",
+      current_step: 2,
+      costs: {
+        ...existingCosts,
+        claude: (existingCosts.claude || 0) + claudeCost,
+      },
+      updated_at: new Date().toISOString(),
     });
 
     // Save scenes as subcollection
-    const scenesCollection = scriptRef.collection("scenes");
+    const scenesCollection = projectRef.collection("scenes");
     const batch = db.batch();
 
     scriptData.scenes.forEach((scene) => {
@@ -105,7 +132,7 @@ export async function POST(request) {
     return NextResponse.json({
       success: true,
       data: scriptData,
-      script_id: scriptRef.id,
+      project_id: project_id,
     });
   } catch (error) {
     console.error("Generate script error:", error);
