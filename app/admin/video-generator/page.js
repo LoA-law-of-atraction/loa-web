@@ -327,6 +327,7 @@ export default function VideoGeneratorPage() {
           use_speaker_boost: true,
         });
         setVoiceoverUrl(result.project.voiceover_url || null);
+        setSessionId(result.project.session_id || null);
         setProjectCosts(result.project.costs || null);
 
         // Resume from URL step if available, otherwise use saved position
@@ -747,7 +748,7 @@ export default function VideoGeneratorPage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
+    <div className="max-w-6xl mx-auto px-2 sm:px-4 py-4 sm:py-8">
       {/* Header with Steps */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
@@ -790,17 +791,22 @@ export default function VideoGeneratorPage() {
             )}
           </div>
 
-          {/* Right Side - Credits & Navigation */}
+          {/* Right Side - Total Spending & Navigation */}
           <div className="flex items-center gap-3">
-            {/* ElevenLabs Credits */}
-            {elevenLabsInfo && elevenLabsInfo.character_limit && (
-              <div className="bg-purple-50 border border-purple-200 rounded-lg px-4 py-2">
+            {/* Total Spending */}
+            {projectCosts && (
+              <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2">
                 <div className="flex items-center gap-2 text-xs">
-                  <span className="text-purple-700 font-medium">🎤 ElevenLabs:</span>
-                  <span className="font-semibold text-purple-900">
-                    {elevenLabsInfo.characters_remaining?.toLocaleString() || 0}
+                  <span className="text-green-700 font-medium">💰 Total Spent:</span>
+                  <span className="font-semibold text-green-900">
+                    ${(
+                      (projectCosts.claude || 0) +
+                      (projectCosts.elevenlabs || 0) +
+                      (projectCosts.fal_images || 0) +
+                      (projectCosts.fal_videos || 0) +
+                      (projectCosts.shotstack || 0)
+                    ).toFixed(4)}
                   </span>
-                  <span className="text-purple-600">/ {elevenLabsInfo.character_limit?.toLocaleString()}</span>
                 </div>
               </div>
             )}
@@ -827,7 +833,7 @@ export default function VideoGeneratorPage() {
 
         {/* Progress Steps - Only show if past Step 0 */}
         {step > 0 && (
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-center">
             {[
               { num: 1, label: "Topic & Character" },
               { num: 2, label: "Script & Voice" },
@@ -835,14 +841,14 @@ export default function VideoGeneratorPage() {
               { num: 4, label: "Videos" },
               { num: 5, label: "Post" },
             ].map((s, idx) => (
-            <div key={s.num} className="flex items-center">
+            <div key={s.num} className="flex items-center flex-1">
               <div
                 onClick={() => {
                   if (s.num <= maxStepReached) {
                     setStep(s.num);
                   }
                 }}
-                className={`flex items-center justify-center w-10 h-10 flex-shrink-0 rounded-full font-semibold transition-all ${
+                className={`flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0 rounded-full text-sm sm:text-base font-semibold transition-all ${
                   s.num === step
                     ? "bg-blue-600 text-white cursor-pointer hover:bg-blue-700 ring-2 ring-blue-300"
                     : s.num <= maxStepReached
@@ -852,10 +858,10 @@ export default function VideoGeneratorPage() {
               >
                 {s.num}
               </div>
-              <span className="ml-2 text-sm font-medium">{s.label}</span>
+              <span className="ml-1 sm:ml-2 text-xs sm:text-sm font-medium hidden md:inline whitespace-nowrap">{s.label}</span>
               {idx < 4 && (
                 <div
-                  className={`w-16 h-1 mx-4 ${
+                  className={`flex-1 h-1 mx-1 sm:mx-4 ${
                     step > s.num ? "bg-blue-600" : "bg-gray-200"
                   }`}
                 />
@@ -1600,7 +1606,7 @@ export default function VideoGeneratorPage() {
                   <button
                     onClick={handleGenerateTopics}
                     disabled={generatingTopics}
-                    className="bg-purple-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-purple-700 disabled:opacity-50"
+                    className="bg-purple-600 text-white px-6 py-2 sm:py-3 rounded-lg font-medium hover:bg-purple-700 disabled:opacity-50"
                   >
                     {generatingTopics
                       ? `Generating ${aiGenerateCount} topic${aiGenerateCount !== 1 ? "s" : ""}...`
@@ -1792,14 +1798,14 @@ export default function VideoGeneratorPage() {
           <div className="flex gap-4">
             <button
               onClick={() => setStep(0)}
-              className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-300"
+              className="flex-1 bg-gray-200 text-gray-700 py-2 sm:py-3 rounded-lg font-medium hover:bg-gray-300"
             >
               ← Back
             </button>
             <button
               onClick={handleGenerateScript}
               disabled={loading || !topic.trim() || !selectedCharacter}
-              className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 bg-blue-600 text-white py-2 sm:py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? "Generating Script..." : "Generate Script →"}
             </button>
@@ -1824,24 +1830,33 @@ export default function VideoGeneratorPage() {
       {/* Step 2: Script & Voiceover */}
       {step === 2 && scriptData && (
         <div className="bg-white border rounded-lg p-8">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold">Step 2: Script & Voiceover</h2>
-            <div className="flex gap-3">
-              <div className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg text-sm font-medium">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold mb-3">Step 2: Script & Voiceover</h2>
+            <div className="flex flex-wrap gap-2">
+              <div className="bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap">
                 📝 {scriptData.scenes?.length || sceneCount} scenes
               </div>
-              <div className="bg-purple-100 text-purple-700 px-4 py-2 rounded-lg text-sm font-medium">
-                ⏱️ {(scriptData.scenes?.length || sceneCount) * 8}s total
+              <div className="bg-purple-100 text-purple-700 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap">
+                ⏱️ {(scriptData.scenes?.length || sceneCount) * 8}s
               </div>
               {projectCosts && (
-                <div className="bg-green-100 text-green-700 px-4 py-2 rounded-lg text-sm font-medium">
+                <div className="bg-green-100 text-green-700 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap">
                   💰 ${(
                     (projectCosts.claude || 0) +
                     (projectCosts.elevenlabs || 0) +
                     (projectCosts.fal_images || 0) +
                     (projectCosts.fal_videos || 0) +
                     (projectCosts.shotstack || 0)
-                  ).toFixed(4)} total
+                  ).toFixed(4)}
+                </div>
+              )}
+              {elevenLabsInfo && elevenLabsInfo.character_limit && (
+                <div className="bg-purple-50 border border-purple-200 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
+                  <span className="text-purple-700">🎤</span>
+                  <span className="font-semibold text-purple-900">
+                    {elevenLabsInfo.characters_remaining?.toLocaleString() || 0}
+                  </span>
+                  <span className="text-purple-600">/ {elevenLabsInfo.character_limit?.toLocaleString()}</span>
                 </div>
               )}
             </div>
@@ -2014,7 +2029,7 @@ export default function VideoGeneratorPage() {
                   <button
                     onClick={handleGenerateVoiceover}
                     disabled={generatingVoiceover}
-                    className="w-full bg-purple-600 text-white py-3 rounded-lg font-medium hover:bg-purple-700 disabled:opacity-50"
+                    className="w-full bg-purple-600 text-white py-2 sm:py-3 rounded-lg font-medium hover:bg-purple-700 disabled:opacity-50"
                   >
                     {generatingVoiceover ? "Generating Voiceover..." : "🎤 Generate Voiceover from Script"}
                   </button>
@@ -2085,16 +2100,16 @@ export default function VideoGeneratorPage() {
           <div className="flex gap-4">
             <button
               onClick={() => setStep(1)}
-              className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-300"
+              className="flex-1 bg-gray-200 text-gray-700 py-2 sm:py-3 rounded-lg font-medium hover:bg-gray-300"
             >
               ← Back
             </button>
             <button
-              onClick={handleGenerateImages}
-              disabled={loading || !voiceoverUrl}
-              className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
+              onClick={() => setStep(3)}
+              disabled={!voiceoverUrl}
+              className="flex-1 bg-blue-600 text-white py-2 sm:py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
             >
-              {loading ? "Generating Scenes..." : "Generate Scenes →"}
+              Continue to Scenes →
             </button>
           </div>
         </div>
@@ -2213,14 +2228,14 @@ export default function VideoGeneratorPage() {
               <div className="flex gap-4">
                 <button
                   onClick={() => setStep(2)}
-                  className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-300"
+                  className="flex-1 bg-gray-200 text-gray-700 py-2 sm:py-3 rounded-lg font-medium hover:bg-gray-300"
                 >
                   ← Back
                 </button>
                 <button
                   onClick={handleGenerateImages}
                   disabled={loading}
-                  className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
+                  className="flex-1 bg-blue-600 text-white py-2 sm:py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
                 >
                   {loading ? "Generating Scene Images..." : "Generate Scene Images →"}
                 </button>
@@ -2273,14 +2288,14 @@ export default function VideoGeneratorPage() {
               <div className="flex gap-4">
                 <button
                   onClick={() => setStep(2)}
-                  className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-300"
+                  className="flex-1 bg-gray-200 text-gray-700 py-2 sm:py-3 rounded-lg font-medium hover:bg-gray-300"
                 >
                   ← Back
                 </button>
                 <button
                   onClick={handleGenerateVideos}
                   disabled={loading}
-                  className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
+                  className="flex-1 bg-blue-600 text-white py-2 sm:py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
                 >
                   {loading ? "Generating Videos..." : "Generate Videos →"}
                 </button>
@@ -2322,14 +2337,14 @@ export default function VideoGeneratorPage() {
           <div className="flex gap-4">
             <button
               onClick={() => setStep(3)}
-              className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-300"
+              className="flex-1 bg-gray-200 text-gray-700 py-2 sm:py-3 rounded-lg font-medium hover:bg-gray-300"
             >
               ← Back
             </button>
             <button
               onClick={handleAssembleVideo}
               disabled={loading}
-              className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
+              className="flex-1 bg-blue-600 text-white py-2 sm:py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
             >
               {loading ? "Assembling Video..." : "Assemble Final Video →"}
             </button>
@@ -2415,7 +2430,7 @@ export default function VideoGeneratorPage() {
                 setCurrentProjectName("");
                 loadProjects();
               }}
-              className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700"
+              className="w-full bg-blue-600 text-white py-2 sm:py-3 rounded-lg font-medium hover:bg-blue-700"
             >
               Create Another Video
             </button>

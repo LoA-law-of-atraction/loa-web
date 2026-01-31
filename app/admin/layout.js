@@ -2,12 +2,20 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import { ToastProvider } from "@/components/admin/Toast";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function AdminLayout({ children }) {
   const router = useRouter();
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Override body background for admin pages
+  useEffect(() => {
+    document.body.style.backgroundColor = "white";
+    return () => {
+      document.body.style.backgroundColor = "";
+    };
+  }, []);
 
   // Don't show admin layout on login page
   if (pathname === "/admin/login") {
