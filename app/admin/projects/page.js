@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useToast } from "@/components/admin/Toast";
 
 export default function ProjectsPage() {
+  const { alert, confirm } = useToast();
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingProjectId, setEditingProjectId] = useState(null);
@@ -27,7 +29,7 @@ export default function ProjectsPage() {
   };
 
   const handleDeleteProject = async (projectId) => {
-    if (!confirm("Are you sure you want to delete this project?")) {
+    if (!await confirm("Are you sure you want to delete this project?")) {
       return;
     }
 
@@ -40,10 +42,10 @@ export default function ProjectsPage() {
       if (result.success) {
         await loadProjects();
       } else {
-        alert("Failed to delete project: " + result.error);
+        await alert("Failed to delete project: " + result.error, "error");
       }
     } catch (error) {
-      alert("Error deleting project: " + error.message);
+      await alert("Error deleting project: " + error.message, "error");
     }
   };
 
@@ -64,7 +66,7 @@ export default function ProjectsPage() {
 
   const handleSaveProjectName = async (projectId) => {
     if (!editingProjectName.trim()) {
-      alert("Project name cannot be empty");
+      await alert("Project name cannot be empty", "warning");
       return;
     }
 
@@ -81,10 +83,10 @@ export default function ProjectsPage() {
         setEditingProjectId(null);
         setEditingProjectName("");
       } else {
-        alert("Failed to update project name: " + result.error);
+        await alert("Failed to update project name: " + result.error, "error");
       }
     } catch (error) {
-      alert("Error updating project name: " + error.message);
+      await alert("Error updating project name: " + error.message, "error");
     }
   };
 

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { getAdminDb, getAdminStorage } from "@/utils/firebaseAdmin";
-import { calculateFalVideoCost } from "@/utils/costCalculator";
 
 export async function POST(request) {
   try {
@@ -20,7 +19,7 @@ export async function POST(request) {
       const scene = script_data.scenes.find((s) => s.id === image.scene_id);
 
       const videoResponse = await fetch(
-        "https://fal.run/fal-ai/veo3.1/fast/image-to-video",
+        `https://fal.run/${process.env.FAL_VEO_MODEL}`,
         {
           method: "POST",
           headers: {
@@ -68,8 +67,28 @@ export async function POST(request) {
 
     const videos = await Promise.all(videoPromises);
 
-    // Calculate FAL AI video cost
-    const falVideoCost = calculateFalVideoCost(videos.length);
+    // Fetch Veo pricing from FAL API
+    const pricingResponse = await fetch(`https://api.fal.ai/v1/models/pricing?endpoint_id=${process.env.FAL_VEO_MODEL}`, {
+      headers: {
+        Authorization: `Key ${process.env.FAL_API_KEY}`,
+      },
+    });
+
+    if (!pricingResponse.ok) {
+      const errorText = await pricingResponse.text();
+      throw new Error(`FAL Pricing API failed (${pricingResponse.status}): ${errorText}`);
+    }
+
+    const pricingData = await pricingResponse.json();
+    const veoPrice = pricingData.prices?.find(
+      (p) => p.endpoint_id === process.env.FAL_VEO_MODEL
+    );
+
+    if (!veoPrice) {
+      throw new Error("Veo pricing not found in FAL API response");
+    }
+
+    const falVideoCost = videos.length * veoPrice.unit_price;
 
     // Update Firestore
     const db = getAdminDb();
@@ -84,13 +103,27 @@ export async function POST(request) {
     const projectDoc = await projectRef.get();
     const existingCosts = projectDoc.data()?.costs || {};
 
+    // Calculate new costs
+    const newFalVideosCost = (existingCosts.fal_videos || 0) + falVideoCost;
+    const newStep4FalVideosCost = (existingCosts.step4?.fal_videos || 0) + falVideoCost;
+    const newStep4Total = (existingCosts.step4?.total || 0) + falVideoCost;
+    const newTotal = (existingCosts.total || 0) + falVideoCost;
+
     // Update project progress
     await projectRef.update({
       current_step: 5,
       status: "videos_generated",
       costs: {
         ...existingCosts,
-        fal_videos: (existingCosts.fal_videos || 0) + falVideoCost,
+        // Legacy API-level
+        fal_videos: newFalVideosCost,
+        // Step-level
+        step4: {
+          ...existingCosts.step4,
+          fal_videos: newStep4FalVideosCost,
+          total: newStep4Total,
+        },
+        total: newTotal,
       },
       updated_at: new Date().toISOString(),
     });

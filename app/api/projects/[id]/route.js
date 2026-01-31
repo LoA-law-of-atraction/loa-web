@@ -4,8 +4,9 @@ import { getAdminDb } from "@/utils/firebaseAdmin";
 // GET single project with scenes
 export async function GET(request, { params }) {
   try {
+    const resolvedParams = await params;
     const db = getAdminDb();
-    const projectDoc = await db.collection("projects").doc(params.id).get();
+    const projectDoc = await db.collection("projects").doc(resolvedParams.id).get();
 
     if (!projectDoc.exists) {
       return NextResponse.json(
@@ -17,7 +18,7 @@ export async function GET(request, { params }) {
     // Get scenes subcollection
     const scenesSnapshot = await db
       .collection("projects")
-      .doc(params.id)
+      .doc(resolvedParams.id)
       .collection("scenes")
       .get();
 
@@ -53,8 +54,9 @@ export async function GET(request, { params }) {
 // PATCH - Update project
 export async function PATCH(request, { params }) {
   try {
+    const resolvedParams = await params;
     const db = getAdminDb();
-    const projectRef = db.collection("projects").doc(params.id);
+    const projectRef = db.collection("projects").doc(resolvedParams.id);
 
     // Check if project exists
     const projectDoc = await projectRef.get();
@@ -89,8 +91,9 @@ export async function PATCH(request, { params }) {
 // DELETE project and its scenes
 export async function DELETE(request, { params }) {
   try {
+    const resolvedParams = await params;
     const db = getAdminDb();
-    const projectRef = db.collection("projects").doc(params.id);
+    const projectRef = db.collection("projects").doc(resolvedParams.id);
 
     // Check if project exists
     const projectDoc = await projectRef.get();

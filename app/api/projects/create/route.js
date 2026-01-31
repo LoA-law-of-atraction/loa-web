@@ -20,6 +20,35 @@ export async function POST(request) {
     await projectRef.set({
       project_name,
       status,
+      costs: {
+        // Legacy API-level costs (for backward compatibility)
+        claude: 0,
+        elevenlabs: 0,
+        fal_images: 0,
+        fal_videos: 0,
+        shotstack: 0,
+
+        // Pipeline step-level costs
+        step1: { total: 0 },
+        step2: {
+          claude: 0,
+          elevenlabs: 0,
+          total: 0
+        },
+        step3: {
+          fal_images: 0,
+          total: 0
+        },
+        step4: {
+          fal_videos: 0,
+          total: 0
+        },
+        step5: {
+          shotstack: 0,
+          total: 0
+        },
+        total: 0
+      },
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });

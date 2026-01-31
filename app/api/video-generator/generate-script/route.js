@@ -30,7 +30,7 @@ export async function POST(request) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: process.env.CLAUDE_MODEL,
         max_tokens: 4096,
         messages: [
           {
@@ -79,6 +79,12 @@ export async function POST(request) {
     const projectDoc = await projectRef.get();
     const existingCosts = projectDoc.data()?.costs || {};
 
+    // Calculate new costs
+    const newClaudeCost = (existingCosts.claude || 0) + claudeCost;
+    const newStep2ClaudeCost = (existingCosts.step2?.claude || 0) + claudeCost;
+    const newStep2Total = (existingCosts.step2?.total || 0) + claudeCost;
+    const newTotal = (existingCosts.total || 0) + claudeCost;
+
     // Update main project document
     await projectRef.update({
       topic,
@@ -96,7 +102,15 @@ export async function POST(request) {
       current_step: 2,
       costs: {
         ...existingCosts,
-        claude: (existingCosts.claude || 0) + claudeCost,
+        // Legacy API-level
+        claude: newClaudeCost,
+        // Step-level
+        step2: {
+          ...existingCosts.step2,
+          claude: newStep2ClaudeCost,
+          total: newStep2Total,
+        },
+        total: newTotal,
       },
       updated_at: new Date().toISOString(),
     });

@@ -1,22 +1,18 @@
 // API Cost Calculator
-// Prices as of 2024 - update these based on actual pricing
+// Prices loaded from environment variables
 
 export const API_COSTS = {
   // Claude AI - Sonnet 4 pricing per million tokens
-  CLAUDE_INPUT_PER_MILLION: 3.00,
-  CLAUDE_OUTPUT_PER_MILLION: 15.00,
+  CLAUDE_INPUT_PER_MILLION: parseFloat(process.env.CLAUDE_INPUT_PER_MILLION || "0.00"),
+  CLAUDE_OUTPUT_PER_MILLION: parseFloat(process.env.CLAUDE_OUTPUT_PER_MILLION || "0.00"),
 
-  // ElevenLabs - per 1000 characters
-  ELEVENLABS_PER_1000_CHARS: 0.30, // Varies by plan, using average
-
-  // FAL AI - Flux Schnell (image generation)
-  FAL_FLUX_SCHNELL_PER_IMAGE: 0.003,
-
-  // FAL AI - Veo3.1 Fast (image-to-video)
-  FAL_VEO_PER_VIDEO: 0.05, // Approximate
+  // ElevenLabs - subscription plan configuration
+  ELEVENLABS_PLAN_COST: parseFloat(process.env.ELEVENLABS_PLAN_COST || "0.00"),
+  ELEVENLABS_PLAN_CREDITS: parseFloat(process.env.ELEVENLABS_PLAN_CREDITS || "0"),
+  ELEVENLABS_OVERAGE_PER_1000_CHARS: parseFloat(process.env.ELEVENLABS_OVERAGE_PER_1000_CHARS || "0.00"),
 
   // Shotstack - per render minute
-  SHOTSTACK_PER_MINUTE: 0.05, // Varies by plan
+  SHOTSTACK_PER_MINUTE: parseFloat(process.env.SHOTSTACK_PER_MINUTE || "0.00"),
 };
 
 export function calculateClaudeCost(inputTokens, outputTokens) {
@@ -25,16 +21,21 @@ export function calculateClaudeCost(inputTokens, outputTokens) {
   return inputCost + outputCost;
 }
 
+export function getElevenLabsCostPerChar() {
+  // Calculate exact cost per character based on plan
+  // monthly_cost / included_credits = cost per character
+  if (API_COSTS.ELEVENLABS_PLAN_CREDITS > 0) {
+    return API_COSTS.ELEVENLABS_PLAN_COST / API_COSTS.ELEVENLABS_PLAN_CREDITS;
+  }
+  // Fallback to overage rate
+  return API_COSTS.ELEVENLABS_OVERAGE_PER_1000_CHARS / 1000;
+}
+
 export function calculateElevenLabsCost(characterCount) {
-  return (characterCount / 1000) * API_COSTS.ELEVENLABS_PER_1000_CHARS;
-}
-
-export function calculateFalImageCost(imageCount) {
-  return imageCount * API_COSTS.FAL_FLUX_SCHNELL_PER_IMAGE;
-}
-
-export function calculateFalVideoCost(videoCount) {
-  return videoCount * API_COSTS.FAL_VEO_PER_VIDEO;
+  // Calculate total cost based on character count
+  // Uses exact cost per character from plan
+  const costPerChar = getElevenLabsCostPerChar();
+  return characterCount * costPerChar;
 }
 
 export function calculateShotstackCost(durationSeconds) {

@@ -95,13 +95,27 @@ export async function POST(request) {
     const projectDoc = await projectRef.get();
     const existingCosts = projectDoc.data()?.costs || {};
 
+    // Calculate new costs
+    const newShotstackCost = (existingCosts.shotstack || 0) + shotstackCost;
+    const newStep5ShotstackCost = (existingCosts.step5?.shotstack || 0) + shotstackCost;
+    const newStep5Total = (existingCosts.step5?.total || 0) + shotstackCost;
+    const newTotal = (existingCosts.total || 0) + shotstackCost;
+
     // Update project progress
     await projectRef.update({
       current_step: 5,
       status: "rendering",
       costs: {
         ...existingCosts,
-        shotstack: (existingCosts.shotstack || 0) + shotstackCost,
+        // Legacy API-level
+        shotstack: newShotstackCost,
+        // Step-level
+        step5: {
+          ...existingCosts.step5,
+          shotstack: newStep5ShotstackCost,
+          total: newStep5Total,
+        },
+        total: newTotal,
       },
       updated_at: new Date().toISOString(),
     });

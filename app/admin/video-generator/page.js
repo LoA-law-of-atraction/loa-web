@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import { useToast } from "@/components/admin/Toast";
 
 export default function VideoGeneratorPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { alert, confirm } = useToast();
   const [step, setStep] = useState(0);
   const [maxStepReached, setMaxStepReached] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -55,7 +57,15 @@ export default function VideoGeneratorPage() {
   const [projectCosts, setProjectCosts] = useState(null);
 
   // Step 3: Image Generation
-  const [images, setImages] = useState([]);
+  const [generatingSceneId, setGeneratingSceneId] = useState(null);
+  const [fluxProCost, setFluxProCost] = useState(null); // Dynamic cost from API (NO FALLBACK)
+  const [showFluxSettings, setShowFluxSettings] = useState(false);
+  const [fluxSettings, setFluxSettings] = useState({
+    strength: 0.65,
+    guidance_scale: 3.5,
+    num_inference_steps: 28,
+    output_format: "png",
+  });
 
   // Step 4: Video Generation
   const [videos, setVideos] = useState([]);
@@ -70,6 +80,7 @@ export default function VideoGeneratorPage() {
     loadTopics();
     loadCategories();
     loadProjects();
+    loadFluxPricing();
   }, []);
 
   // Check for project_id in URL and load project automatically
@@ -81,7 +92,7 @@ export default function VideoGeneratorPage() {
       const checkAndLoadProject = setInterval(() => {
         if (projects.length > 0) {
           clearInterval(checkAndLoadProject);
-          const project = projects.find(p => p.id === projectId);
+          const project = projects.find((p) => p.id === projectId);
           if (project) {
             handleSelectProject(project.id);
           }
@@ -121,6 +132,7 @@ export default function VideoGeneratorPage() {
           gender: selectedCharacter.gender,
           age: selectedCharacter.age,
           voice_id: selectedCharacter.voice_id,
+          image_urls: selectedCharacter.image_urls,
         },
       });
     }
@@ -163,7 +175,9 @@ export default function VideoGeneratorPage() {
   // Update URL when step changes (for persistence)
   useEffect(() => {
     if (currentProjectId && step > 0) {
-      router.replace(`/admin/video-generator?project_id=${currentProjectId}&step=${step}`);
+      router.replace(
+        `/admin/video-generator?project_id=${currentProjectId}&step=${step}`,
+      );
     }
   }, [step, currentProjectId]);
 
@@ -174,6 +188,22 @@ export default function VideoGeneratorPage() {
     }
   }, [step, maxStepReached]);
 
+  // Update selectedCharacter with full data when characters load
+  useEffect(() => {
+    if (
+      selectedCharacter?.character_id &&
+      characters.length > 0 &&
+      !selectedCharacter.image_urls
+    ) {
+      const fullCharacter = characters.find(
+        (c) => c.character_id === selectedCharacter.character_id,
+      );
+      if (fullCharacter) {
+        setSelectedCharacter(fullCharacter);
+      }
+    }
+  }, [characters, selectedCharacter]);
+
   const loadCharacters = async () => {
     try {
       const response = await fetch("/api/characters");
@@ -183,6 +213,22 @@ export default function VideoGeneratorPage() {
       }
     } catch (error) {
       console.error("Failed to load characters:", error);
+    }
+  };
+
+  const loadFluxPricing = async () => {
+    try {
+      const response = await fetch("/api/video-generator/fal-pricing");
+      const result = await response.json();
+      if (result.success && result.cost) {
+        setFluxProCost(result.cost);
+        console.log(`Loaded Flux Pro pricing: $${result.cost}/image`);
+      } else {
+        throw new Error(result.error || "Failed to load FAL pricing");
+      }
+    } catch (error) {
+      console.error("CRITICAL: Failed to load FAL pricing:", error);
+      alert(`Failed to load FAL AI pricing: ${error.message}. Cannot proceed with image generation.`);
     }
   };
 
@@ -211,7 +257,10 @@ export default function VideoGeneratorPage() {
         setCategories(result.categories);
         console.log("Loaded categories:", result.categories.length);
       } else {
-        console.error("Failed to load categories:", result.error || result.message);
+        console.error(
+          "Failed to load categories:",
+          result.error || result.message,
+        );
         setCategories([]);
       }
     } catch (error) {
@@ -259,15 +308,25 @@ export default function VideoGeneratorPage() {
       0: { label: "Draft", color: "bg-gray-100 text-gray-700" },
       1: { label: "Step 1: Setup", color: "bg-yellow-100 text-yellow-700" },
       2: { label: "Step 2: Script Ready", color: "bg-blue-100 text-blue-700" },
-      3: { label: "Step 3: Voiceover Done", color: "bg-purple-100 text-purple-700" },
-      4: { label: "Step 4: Images Ready", color: "bg-indigo-100 text-indigo-700" },
-      5: status === "completed"
-        ? { label: "✓ Completed", color: "bg-green-100 text-green-700" }
-        : status === "rendering"
-        ? { label: "Rendering...", color: "bg-orange-100 text-orange-700" }
-        : status === "failed"
-        ? { label: "Failed", color: "bg-red-100 text-red-700" }
-        : { label: "Step 5: Videos Ready", color: "bg-teal-100 text-teal-700" },
+      3: {
+        label: "Step 3: Voiceover Done",
+        color: "bg-purple-100 text-purple-700",
+      },
+      4: {
+        label: "Step 4: Images Ready",
+        color: "bg-indigo-100 text-indigo-700",
+      },
+      5:
+        status === "completed"
+          ? { label: "✓ Completed", color: "bg-green-100 text-green-700" }
+          : status === "rendering"
+            ? { label: "Rendering...", color: "bg-orange-100 text-orange-700" }
+            : status === "failed"
+              ? { label: "Failed", color: "bg-red-100 text-red-700" }
+              : {
+                  label: "Step 5: Videos Ready",
+                  color: "bg-teal-100 text-teal-700",
+                },
     };
 
     return statusMap[step] || statusMap[0];
@@ -297,10 +356,10 @@ export default function VideoGeneratorPage() {
         setStep(1);
         setMaxStepReached(1);
       } else {
-        alert("Failed to create project: " + result.error);
+        await alert("Failed to create project: " + result.error, "error");
       }
     } catch (error) {
-      alert("Error creating project: " + error.message);
+      await alert("Error creating project: " + error.message, "error");
     } finally {
       setLoading(false);
     }
@@ -314,33 +373,52 @@ export default function VideoGeneratorPage() {
 
       if (result.success) {
         setCurrentProjectId(projectId);
-        setCurrentProjectName(result.project.project_name || "Untitled Project");
+        setCurrentProjectName(
+          result.project.project_name || "Untitled Project",
+        );
         setScriptData(result.scriptData);
         setTopic(result.project.topic || "");
         setTopicCategories(result.project.categories || []);
-        setSelectedCharacter(result.project.character || null);
+
+        // Load full character object including image_urls
+        if (result.project.character?.character_id) {
+          const fullCharacter = characters.find(
+            (c) => c.character_id === result.project.character.character_id,
+          );
+          setSelectedCharacter(fullCharacter || result.project.character);
+        } else {
+          setSelectedCharacter(result.project.character || null);
+        }
+
         setSceneCount(result.project.scene_count || 4);
-        setVoiceSettings(result.project.voice_settings || {
-          stability: 0.65,
-          similarity_boost: 0.75,
-          style: 0.1,
-          use_speaker_boost: true,
-        });
+        setVoiceSettings(
+          result.project.voice_settings || {
+            stability: 0.65,
+            similarity_boost: 0.75,
+            style: 0.1,
+            use_speaker_boost: true,
+          },
+        );
         setVoiceoverUrl(result.project.voiceover_url || null);
         setSessionId(result.project.session_id || null);
+        console.log(
+          "Loaded project costs on project select:",
+          result.project.costs,
+        );
         setProjectCosts(result.project.costs || null);
 
         // Resume from URL step if available, otherwise use saved position
         const urlStep = searchParams.get("step");
-        const dbMaxStep = result.project.current_step || (result.project.script ? 2 : 1);
+        const dbMaxStep =
+          result.project.current_step || (result.project.script ? 2 : 1);
         const resumeStep = urlStep ? parseInt(urlStep) : dbMaxStep;
         setStep(resumeStep);
         setMaxStepReached(dbMaxStep);
       } else {
-        alert("Failed to load project: " + result.error);
+        await alert("Failed to load project: " + result.error, "error");
       }
     } catch (error) {
-      alert("Error loading project: " + error.message);
+      await alert("Error loading project: " + error.message, "error");
     } finally {
       setLoadingProject(false);
     }
@@ -370,7 +448,7 @@ export default function VideoGeneratorPage() {
 
   const handleSaveManualTopic = async () => {
     if (!topic.trim()) {
-      alert("Please enter a topic");
+      await alert("Please enter a topic", "warning");
       return;
     }
 
@@ -406,7 +484,7 @@ export default function VideoGeneratorPage() {
 
     // Check if category exists in database, if not save it
     const categoryExists = categories.some(
-      (cat) => cat.name.toLowerCase() === trimmed.toLowerCase()
+      (cat) => cat.name.toLowerCase() === trimmed.toLowerCase(),
     );
 
     if (!categoryExists) {
@@ -485,7 +563,8 @@ export default function VideoGeneratorPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           count: aiGenerateCount,
-          categories: aiGenerateCategories.length > 0 ? aiGenerateCategories : null
+          categories:
+            aiGenerateCategories.length > 0 ? aiGenerateCategories : null,
         }),
       });
 
@@ -493,13 +572,15 @@ export default function VideoGeneratorPage() {
       if (result.success) {
         await loadTopics();
         setGeneratedTopics(result.topics || []);
-        setSuccessMessage(`Generated ${result.count} new topic${result.count !== 1 ? 's' : ''}!`);
+        setSuccessMessage(
+          `Generated ${result.count} new topic${result.count !== 1 ? "s" : ""}!`,
+        );
         setShowSuccessModal(true);
       } else {
-        alert("Failed to generate topics: " + result.error);
+        await alert("Failed to generate topics: " + result.error, "error");
       }
     } catch (error) {
-      alert("Error: " + error.message);
+      await alert("Error: " + error.message, "error");
     } finally {
       setGeneratingTopics(false);
     }
@@ -508,12 +589,12 @@ export default function VideoGeneratorPage() {
   // Step 1: Generate Script
   const handleGenerateScript = async () => {
     if (!topic.trim() || !selectedCharacter) {
-      alert("Please enter a topic and select a character");
+      await alert("Please enter a topic and select a character", "warning");
       return;
     }
 
     if (!currentProjectId) {
-      alert("No project selected. Please start from Step 0.");
+      await alert("No project selected. Please start from Step 0.", "warning");
       return;
     }
 
@@ -539,10 +620,10 @@ export default function VideoGeneratorPage() {
         setVoiceoverDuration(null);
         setStep(2);
       } else {
-        alert("Failed to generate script: " + result.error);
+        await alert("Failed to generate script: " + result.error, "error");
       }
     } catch (error) {
-      alert("Error: " + error.message);
+      await alert("Error: " + error.message, "error");
     } finally {
       setLoading(false);
     }
@@ -551,7 +632,7 @@ export default function VideoGeneratorPage() {
   // Step 2: Generate Voiceover
   const handleGenerateVoiceover = async () => {
     if (!currentProjectId) {
-      alert("No project selected. Please start from Step 0.");
+      await alert("No project selected. Please start from Step 0.", "warning");
       return;
     }
 
@@ -577,10 +658,10 @@ export default function VideoGeneratorPage() {
         // Refresh ElevenLabs credits after generation
         loadElevenLabsInfo();
       } else {
-        alert("Failed to generate voiceover: " + result.error);
+        await alert("Failed to generate voiceover: " + result.error, "error");
       }
     } catch (error) {
-      alert("Error: " + error.message);
+      await alert("Error: " + error.message, "error");
     } finally {
       setGeneratingVoiceover(false);
     }
@@ -589,12 +670,36 @@ export default function VideoGeneratorPage() {
   // Step 3: Generate Images
   const handleGenerateImages = async () => {
     if (!voiceoverUrl) {
-      alert("Please generate voiceover first");
+      await alert("Please generate voiceover first", "warning");
       return;
     }
 
     if (!currentProjectId) {
-      alert("No project selected. Please start from Step 0.");
+      await alert("No project selected. Please start from Step 0.", "warning");
+      return;
+    }
+
+    if (!sessionId) {
+      await alert(
+        "Session ID is missing. Please regenerate the voiceover first.",
+        "warning",
+      );
+      return;
+    }
+
+    if (!scriptData || !scriptData.scenes || scriptData.scenes.length === 0) {
+      await alert(
+        "Script data is missing. Please generate the script first.",
+        "warning",
+      );
+      return;
+    }
+
+    if (!selectedCharacter) {
+      await alert(
+        "Character is not selected. Please select a character first.",
+        "warning",
+      );
       return;
     }
 
@@ -614,47 +719,207 @@ export default function VideoGeneratorPage() {
 
       const result = await response.json();
       if (result.success) {
-        setImages(result.images);
+        // Reload project to get updated scriptData with image_urls
+        await handleSelectProject(currentProjectId);
         setStep(3);
       } else {
-        alert("Failed to generate images: " + result.error);
+        const errorMsg = result.message
+          ? `${result.error}: ${result.message}`
+          : result.error;
+        await alert("Failed to generate images: " + errorMsg, "error");
       }
     } catch (error) {
-      alert("Error: " + error.message);
+      await alert("Error: " + error.message, "error");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Step 3: Generate Single Scene Image
+  const handleGenerateSingleImage = async (sceneId) => {
+    // Use sessionId if available, otherwise use project_id as fallback
+    const effectiveSessionId = sessionId || currentProjectId;
+
+    if (!effectiveSessionId) {
+      await alert("Project ID is missing. Please reload the page.", "warning");
+      return;
+    }
+
+    setLoading(true);
+    setGeneratingSceneId(sceneId);
+    try {
+      const scene = scriptData.scenes.find((s) => s.id === sceneId);
+
+      // Get character reference image
+      const characterImageUrl = selectedCharacter?.image_urls?.[0] || null;
+
+      const response = await fetch(
+        "/api/video-generator/generate-single-image",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            session_id: effectiveSessionId,
+            project_id: currentProjectId,
+            scene_id: sceneId,
+            image_prompt: scene.image_prompt,
+            character_image_url: characterImageUrl,
+            flux_settings: fluxSettings,
+          }),
+        },
+      );
+
+      const result = await response.json();
+      if (result.success) {
+        // Update the scene in scriptData locally
+        const updatedScenes = scriptData.scenes.map((scene) => {
+          if (scene.id === sceneId) {
+            const existingUrls = scene.image_urls || [];
+            return {
+              ...scene,
+              image_urls: [...existingUrls, result.image_url],
+            };
+          }
+          return scene;
+        });
+        const updatedScriptData = { ...scriptData, scenes: updatedScenes };
+        setScriptData(updatedScriptData);
+
+        // Save image_urls to scene document in subcollection
+        const scene = updatedScenes.find((s) => s.id === sceneId);
+        await fetch(`/api/projects/${currentProjectId}/scenes/${sceneId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            image_urls: scene.image_urls,
+          }),
+        });
+
+        // Reload project to get updated costs
+        const projectResponse = await fetch(
+          `/api/projects/${currentProjectId}`,
+        );
+        const projectResult = await projectResponse.json();
+        if (projectResult.success) {
+          console.log("Reloaded project costs:", projectResult.project.costs);
+          setProjectCosts(projectResult.project.costs || null);
+        }
+      } else {
+        const errorMsg = result.message
+          ? `${result.error}: ${result.message}`
+          : result.error;
+        await alert("Failed to generate image: " + errorMsg, "error");
+      }
+    } catch (error) {
+      await alert("Error generating image: " + error.message, "error");
+    } finally {
+      setLoading(false);
+      setGeneratingSceneId(null);
     }
   };
 
   // Step 3: Regenerate Single Image
   const handleRegenerateImage = async (sceneId) => {
     setLoading(true);
+    setGeneratingSceneId(sceneId); // Show loading indicator
     try {
       const scene = scriptData.scenes.find((s) => s.id === sceneId);
+      const characterImageUrl = selectedCharacter?.image_urls?.[0] || null;
+
       const response = await fetch("/api/video-generator/regenerate-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           session_id: sessionId,
+          project_id: currentProjectId,
           scene_id: sceneId,
           image_prompt: scene.image_prompt,
+          character_image_url: characterImageUrl,
+          flux_settings: fluxSettings,
         }),
       });
 
       const result = await response.json();
       if (result.success) {
-        setImages(
-          images.map((img) =>
-            img.scene_id === sceneId
-              ? { ...img, image_url: result.image_url }
-              : img
-          )
+        // Replace the latest image instead of adding a new one
+        const updatedScenes = scriptData.scenes.map((scene) => {
+          if (scene.id === sceneId) {
+            const existingUrls = scene.image_urls || [];
+            // Replace the last image with the new one
+            const updatedUrls =
+              existingUrls.length > 0
+                ? [...existingUrls.slice(0, -1), result.image_url] // Replace last
+                : [result.image_url]; // Or add first
+            return { ...scene, image_urls: updatedUrls };
+          }
+          return scene;
+        });
+        const updatedScriptData = { ...scriptData, scenes: updatedScenes };
+        setScriptData(updatedScriptData);
+
+        // Save image_urls to scene document in subcollection
+        const scene = updatedScenes.find((s) => s.id === sceneId);
+        await fetch(`/api/projects/${currentProjectId}/scenes/${sceneId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            image_urls: scene.image_urls,
+          }),
+        });
+
+        // Reload project to get updated costs
+        const projectResponse = await fetch(
+          `/api/projects/${currentProjectId}`,
         );
+        const projectResult = await projectResponse.json();
+        if (projectResult.success) {
+          console.log("Reloaded project costs:", projectResult.project.costs);
+          setProjectCosts(projectResult.project.costs || null);
+        }
       } else {
-        alert("Failed to regenerate: " + result.error);
+        await alert("Failed to regenerate: " + result.error, "error");
       }
     } catch (error) {
-      alert("Error: " + error.message);
+      await alert("Error: " + error.message, "error");
+    } finally {
+      setLoading(false);
+      setGeneratingSceneId(null); // Hide loading indicator
+    }
+  };
+
+  // Step 3: Remove Generated Image
+  const handleRemoveImage = async (sceneId, imageIndex) => {
+    const confirmed = await confirm(
+      `Remove this generated image? This cannot be undone.`,
+    );
+    if (!confirmed) return;
+
+    setLoading(true);
+    try {
+      const scene = scriptData.scenes.find((s) => s.id === sceneId);
+      const updatedUrls = scene.image_urls.filter(
+        (_, idx) => idx !== imageIndex,
+      );
+
+      // Update local state
+      const updatedScenes = scriptData.scenes.map((s) => {
+        if (s.id === sceneId) {
+          return { ...s, image_urls: updatedUrls };
+        }
+        return s;
+      });
+      setScriptData({ ...scriptData, scenes: updatedScenes });
+
+      // Save to Firestore
+      await fetch(`/api/projects/${currentProjectId}/scenes/${sceneId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image_urls: updatedUrls,
+        }),
+      });
+    } catch (error) {
+      await alert("Error removing image: " + error.message, "error");
     } finally {
       setLoading(false);
     }
@@ -681,10 +946,10 @@ export default function VideoGeneratorPage() {
         setVideos(result.videos);
         setStep(4);
       } else {
-        alert("Failed to generate videos: " + result.error);
+        await alert("Failed to generate videos: " + result.error, "error");
       }
     } catch (error) {
-      alert("Error: " + error.message);
+      await alert("Error: " + error.message, "error");
     } finally {
       setLoading(false);
     }
@@ -710,10 +975,10 @@ export default function VideoGeneratorPage() {
         setFinalVideoUrl(result.video_url);
         setStep(5);
       } else {
-        alert("Failed to assemble video: " + result.error);
+        await alert("Failed to assemble video: " + result.error, "error");
       }
     } catch (error) {
-      alert("Error: " + error.message);
+      await alert("Error: " + error.message, "error");
     } finally {
       setLoading(false);
     }
@@ -736,12 +1001,12 @@ export default function VideoGeneratorPage() {
 
       const result = await response.json();
       if (result.success) {
-        alert(`Posted to ${platform} successfully!`);
+        await alert(`Posted to ${platform} successfully!`, "success");
       } else {
-        alert(`Failed to post to ${platform}: ` + result.error);
+        await alert(`Failed to post to ${platform}: ` + result.error, "error");
       }
     } catch (error) {
-      alert("Error: " + error.message);
+      await alert("Error: " + error.message, "error");
     } finally {
       setLoading(false);
     }
@@ -763,10 +1028,10 @@ export default function VideoGeneratorPage() {
                     onChange={(e) => setCurrentProjectName(e.target.value)}
                     onBlur={() => handleUpdateProjectName(currentProjectName)}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
+                      if (e.key === "Enter") {
                         handleUpdateProjectName(currentProjectName);
                       }
-                      if (e.key === 'Escape') {
+                      if (e.key === "Escape") {
                         setEditingProjectName(false);
                       }
                     }}
@@ -778,9 +1043,21 @@ export default function VideoGeneratorPage() {
                     onClick={() => setEditingProjectName(true)}
                     className="flex items-center gap-2 px-3 py-1 bg-gray-100 rounded-lg cursor-pointer hover:bg-gray-200 transition"
                   >
-                    <span className="text-2xl font-bold text-gray-900">{currentProjectName}</span>
-                    <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                    <span className="text-2xl font-bold text-gray-900">
+                      {currentProjectName}
+                    </span>
+                    <svg
+                      className="w-5 h-5 text-gray-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                      />
                     </svg>
                   </div>
                 )}
@@ -797,9 +1074,12 @@ export default function VideoGeneratorPage() {
             {projectCosts && (
               <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2">
                 <div className="flex items-center gap-2 text-xs">
-                  <span className="text-green-700 font-medium">💰 Total Spent:</span>
+                  <span className="text-green-700 font-medium">
+                    💰 Total Spent:
+                  </span>
                   <span className="font-semibold text-green-900">
-                    ${(
+                    $
+                    {(
                       (projectCosts.claude || 0) +
                       (projectCosts.elevenlabs || 0) +
                       (projectCosts.fal_images || 0) +
@@ -841,33 +1121,35 @@ export default function VideoGeneratorPage() {
               { num: 4, label: "Videos" },
               { num: 5, label: "Post" },
             ].map((s, idx) => (
-            <div key={s.num} className="flex items-center flex-1">
-              <div
-                onClick={() => {
-                  if (s.num <= maxStepReached) {
-                    setStep(s.num);
-                  }
-                }}
-                className={`flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0 rounded-full text-sm sm:text-base font-semibold transition-all ${
-                  s.num === step
-                    ? "bg-blue-600 text-white cursor-pointer hover:bg-blue-700 ring-2 ring-blue-300"
-                    : s.num <= maxStepReached
-                    ? "bg-blue-500 text-white cursor-pointer hover:bg-blue-700"
-                    : "bg-gray-200 text-gray-500 cursor-not-allowed"
-                }`}
-              >
-                {s.num}
-              </div>
-              <span className="ml-1 sm:ml-2 text-xs sm:text-sm font-medium hidden md:inline whitespace-nowrap">{s.label}</span>
-              {idx < 4 && (
+              <div key={s.num} className="flex items-center flex-1">
                 <div
-                  className={`flex-1 h-1 mx-1 sm:mx-4 ${
-                    step > s.num ? "bg-blue-600" : "bg-gray-200"
+                  onClick={() => {
+                    if (s.num <= maxStepReached) {
+                      setStep(s.num);
+                    }
+                  }}
+                  className={`flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0 rounded-full text-sm sm:text-base font-semibold transition-all ${
+                    s.num === step
+                      ? "bg-blue-600 text-white cursor-pointer hover:bg-blue-700 ring-2 ring-blue-300"
+                      : s.num <= maxStepReached
+                        ? "bg-blue-500 text-white cursor-pointer hover:bg-blue-700"
+                        : "bg-gray-200 text-gray-500 cursor-not-allowed"
                   }`}
-                />
-              )}
-            </div>
-          ))}
+                >
+                  {s.num}
+                </div>
+                <span className="ml-1 sm:ml-2 text-xs sm:text-sm font-medium hidden md:inline whitespace-nowrap">
+                  {s.label}
+                </span>
+                {idx < 4 && (
+                  <div
+                    className={`flex-1 h-1 mx-1 sm:mx-4 ${
+                      step > s.num ? "bg-blue-600" : "bg-gray-200"
+                    }`}
+                  />
+                )}
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -884,14 +1166,27 @@ export default function VideoGeneratorPage() {
           >
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center group-hover:bg-blue-500 transition flex-shrink-0">
-                <svg className="w-8 h-8 text-blue-600 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                <svg
+                  className="w-8 h-8 text-blue-600 group-hover:text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
+                  />
                 </svg>
               </div>
               <div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-1">Create New Project</h3>
+                <h3 className="text-xl font-semibold text-gray-900 mb-1">
+                  Create New Project
+                </h3>
                 <p className="text-sm text-gray-600">
-                  Start fresh with a new topic and character to generate a complete video
+                  Start fresh with a new topic and character to generate a
+                  complete video
                 </p>
               </div>
             </div>
@@ -922,12 +1217,24 @@ export default function VideoGeneratorPage() {
             {projects.length === 0 ? (
               <div className="border-2 border-dashed border-gray-200 rounded-lg p-8 text-center">
                 <div className="text-gray-400 mb-2">
-                  <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  <svg
+                    className="w-12 h-12 mx-auto"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
                   </svg>
                 </div>
                 <p className="text-gray-500 text-sm">No existing projects</p>
-                <p className="text-gray-400 text-xs mt-1">Create your first project to get started</p>
+                <p className="text-gray-400 text-xs mt-1">
+                  Create your first project to get started
+                </p>
               </div>
             ) : (
               <div className="space-y-3 max-h-96 overflow-y-auto">
@@ -946,26 +1253,40 @@ export default function VideoGeneratorPage() {
                               {project.project_name}
                             </span>
                           )}
-                          <span className={`inline-block text-xs font-medium px-2 py-1 rounded ${getProjectStatus(project).color}`}>
+                          <span
+                            className={`inline-block text-xs font-medium px-2 py-1 rounded ${getProjectStatus(project).color}`}
+                          >
                             {getProjectStatus(project).label}
                           </span>
                         </div>
 
                         {/* Topic */}
                         <h4 className="text-sm font-medium text-gray-900 mb-1">
-                          {project.topic || 'Untitled'}
+                          {project.topic || "Untitled"}
                         </h4>
 
                         {/* Character & Dates */}
                         <div className="flex items-center gap-3 text-xs text-gray-500 mb-2">
-                          <span>👤 {project.character?.name || 'No character'}</span>
-                          <span>📅 {new Date(project.created_at).toLocaleDateString()}</span>
-                          {project.updated_at && project.updated_at !== project.created_at && (
-                            <span>🔄 {new Date(project.updated_at).toLocaleDateString()}</span>
-                          )}
+                          <span>
+                            👤 {project.character?.name || "No character"}
+                          </span>
+                          <span>
+                            📅{" "}
+                            {new Date(project.created_at).toLocaleDateString()}
+                          </span>
+                          {project.updated_at &&
+                            project.updated_at !== project.created_at && (
+                              <span>
+                                🔄{" "}
+                                {new Date(
+                                  project.updated_at,
+                                ).toLocaleDateString()}
+                              </span>
+                            )}
                           {project.costs && (
                             <span className="font-medium text-green-600">
-                              💰 ${(
+                              💰 $
+                              {(
                                 (project.costs.claude || 0) +
                                 (project.costs.elevenlabs || 0) +
                                 (project.costs.fal_images || 0) +
@@ -977,22 +1298,33 @@ export default function VideoGeneratorPage() {
                         </div>
 
                         {/* Categories */}
-                        {project.categories && project.categories.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
-                            {project.categories.map((cat, idx) => (
-                              <span
-                                key={idx}
-                                className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded"
-                              >
-                                {cat}
-                              </span>
-                            ))}
-                          </div>
-                        )}
+                        {project.categories &&
+                          project.categories.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {project.categories.map((cat, idx) => (
+                                <span
+                                  key={idx}
+                                  className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded"
+                                >
+                                  {cat}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                       </div>
                       <div className="text-blue-600">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 5l7 7-7 7"
+                          />
                         </svg>
                       </div>
                     </div>
@@ -1003,7 +1335,14 @@ export default function VideoGeneratorPage() {
 
             {projects.length > 10 && (
               <p className="text-xs text-gray-500 mt-3 text-center">
-                Showing 10 most recent projects. <a href="/admin/projects" target="_blank" className="text-blue-600 hover:underline">View all {projects.length}</a>
+                Showing 10 most recent projects.{" "}
+                <a
+                  href="/admin/projects"
+                  target="_blank"
+                  className="text-blue-600 hover:underline"
+                >
+                  View all {projects.length}
+                </a>
               </p>
             )}
           </div>
@@ -1095,18 +1434,21 @@ export default function VideoGeneratorPage() {
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-4">
                       <p className="text-sm text-gray-600">
-                        {topics.filter((t) => {
-                          const categoryMatch =
-                            modalFilterCategory === "all" ||
-                            (Array.isArray(t.categories)
-                              ? t.categories.includes(modalFilterCategory)
-                              : t.category === modalFilterCategory);
-                          const statusMatch =
-                            modalFilterStatus === "all" ||
-                            (modalFilterStatus === "unused" && !t.generated) ||
-                            (modalFilterStatus === "used" && t.generated);
-                          return categoryMatch && statusMatch;
-                        }).length}{" "}
+                        {
+                          topics.filter((t) => {
+                            const categoryMatch =
+                              modalFilterCategory === "all" ||
+                              (Array.isArray(t.categories)
+                                ? t.categories.includes(modalFilterCategory)
+                                : t.category === modalFilterCategory);
+                            const statusMatch =
+                              modalFilterStatus === "all" ||
+                              (modalFilterStatus === "unused" &&
+                                !t.generated) ||
+                              (modalFilterStatus === "used" && t.generated);
+                            return categoryMatch && statusMatch;
+                          }).length
+                        }{" "}
                         {modalFilterCategory === "all" &&
                         modalFilterStatus === "all"
                           ? "total topics"
@@ -1141,62 +1483,62 @@ export default function VideoGeneratorPage() {
                           : dateA - dateB;
                       })
                       .map((t) => (
-                      <div
-                        key={t.id}
-                        onClick={() => {
-                          setTopic(t.topic);
-                          setTopicCategories(
-                            Array.isArray(t.categories)
-                              ? t.categories
-                              : t.category
-                              ? [t.category]
-                              : []
-                          );
-                          setShowTopicLibrary(false);
-                        }}
-                        className={`border rounded-lg p-4 cursor-pointer transition hover:shadow-md bg-white relative ${
-                          topic === t.topic
-                            ? "border-green-600 bg-green-50"
-                            : "border-gray-200 hover:border-gray-300"
-                        } ${t.generated ? "opacity-60" : ""}`}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-start gap-2 mb-2">
-                              <p className="text-sm font-medium text-gray-900 flex-1">
-                                {t.topic}
-                              </p>
-                              {t.generated && (
-                                <span className="flex-shrink-0 inline-block text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
-                                  ✓ Used
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              {Array.isArray(t.categories)
-                                ? t.categories.map((cat, idx) => (
-                                    <span
-                                      key={idx}
-                                      className="inline-block text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded"
-                                    >
-                                      {cat}
-                                    </span>
-                                  ))
-                                : t.category && (
-                                    <span className="inline-block text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                                      {t.category}
-                                    </span>
-                                  )}
-                              {!t.generated && (
-                                <span className="inline-block text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
-                                  New
-                                </span>
-                              )}
+                        <div
+                          key={t.id}
+                          onClick={() => {
+                            setTopic(t.topic);
+                            setTopicCategories(
+                              Array.isArray(t.categories)
+                                ? t.categories
+                                : t.category
+                                  ? [t.category]
+                                  : [],
+                            );
+                            setShowTopicLibrary(false);
+                          }}
+                          className={`border rounded-lg p-4 cursor-pointer transition hover:shadow-md bg-white relative ${
+                            topic === t.topic
+                              ? "border-green-600 bg-green-50"
+                              : "border-gray-200 hover:border-gray-300"
+                          } ${t.generated ? "opacity-60" : ""}`}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-start gap-2 mb-2">
+                                <p className="text-sm font-medium text-gray-900 flex-1">
+                                  {t.topic}
+                                </p>
+                                {t.generated && (
+                                  <span className="flex-shrink-0 inline-block text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+                                    ✓ Used
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {Array.isArray(t.categories)
+                                  ? t.categories.map((cat, idx) => (
+                                      <span
+                                        key={idx}
+                                        className="inline-block text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded"
+                                      >
+                                        {cat}
+                                      </span>
+                                    ))
+                                  : t.category && (
+                                      <span className="inline-block text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                                        {t.category}
+                                      </span>
+                                    )}
+                                {!t.generated && (
+                                  <span className="inline-block text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+                                    New
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
                   </div>
 
                   {/* No results message */}
@@ -1280,9 +1622,23 @@ export default function VideoGeneratorPage() {
       {/* Step 1: Topic & Character Selection */}
       {step === 1 && (
         <div className="bg-white border rounded-lg p-8">
-          <h2 className="text-2xl font-bold mb-6">
-            Step 1: Choose Topic & Character
-          </h2>
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold mb-3">
+              Step 1: Choose Topic & Character
+            </h2>
+            {projectCosts && projectCosts.total > 0 && (
+              <div className="flex flex-wrap gap-2">
+                <div className="bg-gray-50 border border-gray-300 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
+                  <span className="text-gray-700">
+                    💰 Current Project Cost:
+                  </span>
+                  <span className="font-semibold text-gray-900">
+                    ${projectCosts.total?.toFixed(4) || "0.0000"}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Topic Selection - Three Options */}
           <div className="mb-8">
@@ -1341,7 +1697,7 @@ export default function VideoGeneratorPage() {
                                 topic === "" ||
                                 t.topic
                                   .toLowerCase()
-                                  .includes(topic.toLowerCase())
+                                  .includes(topic.toLowerCase()),
                             )
                             .slice(0, 10)
                             .map((t) => (
@@ -1353,8 +1709,8 @@ export default function VideoGeneratorPage() {
                                     Array.isArray(t.categories)
                                       ? t.categories
                                       : t.category
-                                      ? [t.category]
-                                      : []
+                                        ? [t.category]
+                                        : [],
                                   );
                                 }}
                                 className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b last:border-b-0"
@@ -1372,8 +1728,8 @@ export default function VideoGeneratorPage() {
                                 {(Array.isArray(t.categories)
                                   ? t.categories
                                   : t.category
-                                  ? [t.category]
-                                  : []
+                                    ? [t.category]
+                                    : []
                                 ).length > 0 && (
                                   <div className="flex gap-1 mt-1">
                                     {(Array.isArray(t.categories)
@@ -1394,7 +1750,9 @@ export default function VideoGeneratorPage() {
                           {topics.filter(
                             (t) =>
                               topic === "" ||
-                              t.topic.toLowerCase().includes(topic.toLowerCase())
+                              t.topic
+                                .toLowerCase()
+                                .includes(topic.toLowerCase()),
                           ).length === 0 && (
                             <div className="px-4 py-3 text-sm text-gray-500">
                               No matching topics found
@@ -1457,7 +1815,9 @@ export default function VideoGeneratorPage() {
                       onChange={(e) => setCategoryInput(e.target.value)}
                       onKeyDown={handleCategoryKeyDown}
                       onFocus={() => setCategoryInputFocused(true)}
-                      onBlur={() => setTimeout(() => setCategoryInputFocused(false), 200)}
+                      onBlur={() =>
+                        setTimeout(() => setCategoryInputFocused(false), 200)
+                      }
                       placeholder="Type category or select from suggestions..."
                       className="w-full px-4 py-2 border rounded-lg"
                     />
@@ -1472,7 +1832,7 @@ export default function VideoGeneratorPage() {
                               (categoryInput === "" ||
                                 cat.name
                                   .toLowerCase()
-                                  .includes(categoryInput.toLowerCase()))
+                                  .includes(categoryInput.toLowerCase())),
                           )
                           .map((cat) => (
                             <button
@@ -1487,7 +1847,8 @@ export default function VideoGeneratorPage() {
                         {categoryInput &&
                           !categories.some(
                             (cat) =>
-                              cat.name.toLowerCase() === categoryInput.toLowerCase()
+                              cat.name.toLowerCase() ===
+                              categoryInput.toLowerCase(),
                           ) && (
                             <button
                               onClick={() => handleAddCategory(categoryInput)}
@@ -1502,7 +1863,8 @@ export default function VideoGeneratorPage() {
 
                   <div className="flex items-center justify-between mt-1">
                     <p className="text-xs text-gray-500">
-                      Press Enter or click suggestions to add categories. Type custom categories if needed.
+                      Press Enter or click suggestions to add categories. Type
+                      custom categories if needed.
                     </p>
                     <a
                       href="/admin/categories"
@@ -1555,7 +1917,7 @@ export default function VideoGeneratorPage() {
                           <button
                             onClick={() =>
                               setAiGenerateCategories(
-                                aiGenerateCategories.filter((c) => c !== cat)
+                                aiGenerateCategories.filter((c) => c !== cat),
                               )
                             }
                             className="hover:text-purple-900"
@@ -1575,7 +1937,9 @@ export default function VideoGeneratorPage() {
                         onClick={() => {
                           if (aiGenerateCategories.includes(cat.name)) {
                             setAiGenerateCategories(
-                              aiGenerateCategories.filter((c) => c !== cat.name)
+                              aiGenerateCategories.filter(
+                                (c) => c !== cat.name,
+                              ),
                             );
                           } else {
                             setAiGenerateCategories([
@@ -1621,7 +1985,9 @@ export default function VideoGeneratorPage() {
 
                 {topic && (
                   <div className="p-4 bg-gray-50 rounded-lg">
-                    <p className="text-sm text-gray-600 mb-1">Selected Topic:</p>
+                    <p className="text-sm text-gray-600 mb-1">
+                      Selected Topic:
+                    </p>
                     <p className="font-medium">{topic}</p>
                   </div>
                 )}
@@ -1650,8 +2016,8 @@ export default function VideoGeneratorPage() {
                               Array.isArray(t.categories)
                                 ? t.categories
                                 : t.category
-                                ? [t.category]
-                                : []
+                                  ? [t.category]
+                                  : [],
                             );
                             setTopicMode("manual");
                           }}
@@ -1660,7 +2026,12 @@ export default function VideoGeneratorPage() {
                           <p className="text-sm text-gray-900 mb-2">
                             {t.topic}
                           </p>
-                          {(Array.isArray(t.categories) ? t.categories : t.category ? [t.category] : []).length > 0 && (
+                          {(Array.isArray(t.categories)
+                            ? t.categories
+                            : t.category
+                              ? [t.category]
+                              : []
+                          ).length > 0 && (
                             <div className="flex flex-wrap gap-1">
                               {(Array.isArray(t.categories)
                                 ? t.categories
@@ -1685,7 +2056,6 @@ export default function VideoGeneratorPage() {
                 )}
               </div>
             )}
-
           </div>
 
           {/* Character Selection */}
@@ -1736,7 +2106,11 @@ export default function VideoGeneratorPage() {
                     ) : (
                       <div className="aspect-square bg-gray-200 rounded-lg mb-3 flex items-center justify-center">
                         <span className="text-4xl">
-                          {char.gender === "male" ? "👨" : char.gender === "female" ? "👩" : "🧑"}
+                          {char.gender === "male"
+                            ? "👨"
+                            : char.gender === "female"
+                              ? "👩"
+                              : "🧑"}
                         </span>
                       </div>
                     )}
@@ -1791,7 +2165,8 @@ export default function VideoGeneratorPage() {
               ))}
             </div>
             <p className="text-xs text-gray-500 mt-2">
-              Each scene is 8 seconds. Total video duration: {sceneCount * 8} seconds
+              Each scene is 8 seconds. Total video duration: {sceneCount * 8}{" "}
+              seconds
             </p>
           </div>
 
@@ -1816,12 +2191,19 @@ export default function VideoGeneratorPage() {
             <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-center gap-3 mb-2">
                 <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
-                <span className="text-sm font-medium text-blue-900">Generating your script with AI...</span>
+                <span className="text-sm font-medium text-blue-900">
+                  Generating your script with AI...
+                </span>
               </div>
               <div className="w-full bg-blue-200 rounded-full h-2 overflow-hidden">
-                <div className="h-full bg-blue-600 rounded-full animate-pulse" style={{ width: '100%' }}></div>
+                <div
+                  className="h-full bg-blue-600 rounded-full animate-pulse"
+                  style={{ width: "100%" }}
+                ></div>
               </div>
-              <p className="text-xs text-blue-700 mt-2">This usually takes 10-15 seconds</p>
+              <p className="text-xs text-blue-700 mt-2">
+                This usually takes 10-15 seconds
+              </p>
             </div>
           )}
         </div>
@@ -1831,7 +2213,9 @@ export default function VideoGeneratorPage() {
       {step === 2 && scriptData && (
         <div className="bg-white border rounded-lg p-8">
           <div className="mb-6">
-            <h2 className="text-2xl font-bold mb-3">Step 2: Script & Voiceover</h2>
+            <h2 className="text-2xl font-bold mb-3">
+              Step 2: Script & Voiceover
+            </h2>
             <div className="flex flex-wrap gap-2">
               <div className="bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap">
                 📝 {scriptData.scenes?.length || sceneCount} scenes
@@ -1839,15 +2223,28 @@ export default function VideoGeneratorPage() {
               <div className="bg-purple-100 text-purple-700 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap">
                 ⏱️ {(scriptData.scenes?.length || sceneCount) * 8}s
               </div>
-              {projectCosts && (
-                <div className="bg-green-100 text-green-700 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap">
-                  💰 ${(
-                    (projectCosts.claude || 0) +
-                    (projectCosts.elevenlabs || 0) +
-                    (projectCosts.fal_images || 0) +
-                    (projectCosts.fal_videos || 0) +
-                    (projectCosts.shotstack || 0)
-                  ).toFixed(4)}
+              {projectCosts?.step2?.claude > 0 && (
+                <div className="bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
+                  <span className="text-blue-700">🤖 Claude:</span>
+                  <span className="font-semibold text-blue-900">
+                    ${projectCosts.step2.claude.toFixed(4)}
+                  </span>
+                </div>
+              )}
+              {projectCosts?.step2?.elevenlabs > 0 && (
+                <div className="bg-purple-50 border border-purple-200 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
+                  <span className="text-purple-700">🎤 ElevenLabs:</span>
+                  <span className="font-semibold text-purple-900">
+                    ${projectCosts.step2.elevenlabs.toFixed(4)}
+                  </span>
+                </div>
+              )}
+              {projectCosts?.step2?.total > 0 && (
+                <div className="bg-gray-50 border border-gray-300 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
+                  <span className="text-gray-700">💰 Step 2 Total:</span>
+                  <span className="font-semibold text-gray-900">
+                    ${projectCosts.step2.total.toFixed(4)}
+                  </span>
                 </div>
               )}
               {elevenLabsInfo && elevenLabsInfo.character_limit && (
@@ -1856,7 +2253,17 @@ export default function VideoGeneratorPage() {
                   <span className="font-semibold text-purple-900">
                     {elevenLabsInfo.characters_remaining?.toLocaleString() || 0}
                   </span>
-                  <span className="text-purple-600">/ {elevenLabsInfo.character_limit?.toLocaleString()}</span>
+                  <span className="text-purple-600">
+                    / {elevenLabsInfo.character_limit?.toLocaleString()}
+                  </span>
+                </div>
+              )}
+              {elevenLabsInfo && elevenLabsInfo.tier && elevenLabsInfo.cost_per_char !== undefined && (
+                <div className="bg-green-50 border border-green-200 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
+                  <span className="text-green-700">📊 {elevenLabsInfo.tier}:</span>
+                  <span className="font-semibold text-green-900">
+                    ${elevenLabsInfo.cost_per_char.toFixed(6)}/char
+                  </span>
                 </div>
               )}
             </div>
@@ -1866,7 +2273,9 @@ export default function VideoGeneratorPage() {
           <div className="mb-6">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-3">
-                <label className="block font-semibold">Full Voiceover Script:</label>
+                <label className="block font-semibold">
+                  Full Voiceover Script:
+                </label>
                 {scriptSaving && (
                   <span className="text-xs text-gray-500 flex items-center gap-1">
                     <div className="animate-spin h-3 w-3 border-2 border-gray-400 border-t-transparent rounded-full"></div>
@@ -1880,8 +2289,12 @@ export default function VideoGeneratorPage() {
                 )}
               </div>
               <button
-                onClick={() => {
-                  if (confirm("This will generate a completely new script and overwrite the current one. Continue?")) {
+                onClick={async () => {
+                  if (
+                    await confirm(
+                      "This will generate a completely new script and overwrite the current one. Continue?",
+                    )
+                  ) {
                     handleGenerateScript();
                   }
                 }}
@@ -1893,15 +2306,30 @@ export default function VideoGeneratorPage() {
             </div>
             <textarea
               value={scriptData.script}
-              onChange={(e) => setScriptData({ ...scriptData, script: e.target.value })}
+              onChange={(e) =>
+                setScriptData({ ...scriptData, script: e.target.value })
+              }
               rows={12}
               className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y"
               placeholder="Your script here..."
             />
             <div className="text-xs text-gray-500 mt-2 space-y-1">
-              <p>Edit your script before generating the voiceover. This will be the narration for your entire video.</p>
+              <p>
+                Edit your script before generating the voiceover. This will be
+                the narration for your entire video.
+              </p>
               <p className="text-purple-600">
-                💡 <strong>Tip:</strong> Add pauses using: <code className="bg-gray-100 px-1 py-0.5 rounded">[pause:2s]</code> or <code className="bg-gray-100 px-1 py-0.5 rounded">[pause:500ms]</code> or <code className="bg-gray-100 px-1 py-0.5 rounded">[pause]</code> (1s default)
+                💡 <strong>Tip:</strong> Add pauses using:{" "}
+                <code className="bg-gray-100 px-1 py-0.5 rounded">
+                  [pause:2s]
+                </code>{" "}
+                or{" "}
+                <code className="bg-gray-100 px-1 py-0.5 rounded">
+                  [pause:500ms]
+                </code>{" "}
+                or{" "}
+                <code className="bg-gray-100 px-1 py-0.5 rounded">[pause]</code>{" "}
+                (1s default)
               </p>
             </div>
           </div>
@@ -1912,30 +2340,51 @@ export default function VideoGeneratorPage() {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold">Generate Voiceover</h3>
                 {/* ElevenLabs Credits Display */}
-                {elevenLabsInfo && elevenLabsInfo.character_limit && elevenLabsInfo.character_count !== undefined && (
-                  <div className="flex items-center gap-2 text-xs">
-                    <div className="bg-white border border-purple-300 rounded-lg px-3 py-1.5">
-                      <span className="text-gray-600">ElevenLabs </span>
-                      {elevenLabsInfo.tier && (
-                        <span className="text-purple-600 font-medium">({elevenLabsInfo.tier}): </span>
-                      )}
-                      <span className="font-semibold text-purple-700">
-                        {elevenLabsInfo.characters_remaining?.toLocaleString() || (elevenLabsInfo.character_limit - elevenLabsInfo.character_count).toLocaleString()}
-                      </span>
-                      <span className="text-gray-500"> / {elevenLabsInfo.character_limit.toLocaleString()}</span>
+                {elevenLabsInfo &&
+                  elevenLabsInfo.character_limit &&
+                  elevenLabsInfo.character_count !== undefined && (
+                    <div className="flex items-center gap-2 text-xs">
+                      <div className="bg-white border border-purple-300 rounded-lg px-3 py-1.5">
+                        <span className="text-gray-600">ElevenLabs </span>
+                        {elevenLabsInfo.tier && (
+                          <span className="text-purple-600 font-medium">
+                            ({elevenLabsInfo.tier}):{" "}
+                          </span>
+                        )}
+                        <span className="font-semibold text-purple-700">
+                          {elevenLabsInfo.characters_remaining?.toLocaleString() ||
+                            (
+                              elevenLabsInfo.character_limit -
+                              elevenLabsInfo.character_count
+                            ).toLocaleString()}
+                        </span>
+                        <span className="text-gray-500">
+                          {" "}
+                          / {elevenLabsInfo.character_limit.toLocaleString()}
+                        </span>
+                      </div>
+                      <button
+                        onClick={loadElevenLabsInfo}
+                        disabled={loadingElevenLabsInfo}
+                        className="text-purple-600 hover:text-purple-700 disabled:opacity-50"
+                        title="Refresh credits"
+                      >
+                        <svg
+                          className={`w-4 h-4 ${loadingElevenLabsInfo ? "animate-spin" : ""}`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                          />
+                        </svg>
+                      </button>
                     </div>
-                    <button
-                      onClick={loadElevenLabsInfo}
-                      disabled={loadingElevenLabsInfo}
-                      className="text-purple-600 hover:text-purple-700 disabled:opacity-50"
-                      title="Refresh credits"
-                    >
-                      <svg className={`w-4 h-4 ${loadingElevenLabsInfo ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                    </button>
-                  </div>
-                )}
+                  )}
               </div>
 
               {/* Voice Settings */}
@@ -1948,8 +2397,12 @@ export default function VideoGeneratorPage() {
                     {/* Stability */}
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <label className="text-xs font-medium text-gray-700">Stability</label>
-                        <span className="text-xs text-gray-500">{voiceSettings.stability.toFixed(2)}</span>
+                        <label className="text-xs font-medium text-gray-700">
+                          Stability
+                        </label>
+                        <span className="text-xs text-gray-500">
+                          {voiceSettings.stability.toFixed(2)}
+                        </span>
                       </div>
                       <input
                         type="range"
@@ -1957,7 +2410,12 @@ export default function VideoGeneratorPage() {
                         max="1"
                         step="0.01"
                         value={voiceSettings.stability}
-                        onChange={(e) => setVoiceSettings({ ...voiceSettings, stability: parseFloat(e.target.value) })}
+                        onChange={(e) =>
+                          setVoiceSettings({
+                            ...voiceSettings,
+                            stability: parseFloat(e.target.value),
+                          })
+                        }
                         className="w-full"
                       />
                       <p className="text-xs text-gray-500 mt-1">
@@ -1968,8 +2426,12 @@ export default function VideoGeneratorPage() {
                     {/* Similarity Boost */}
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <label className="text-xs font-medium text-gray-700">Similarity Boost</label>
-                        <span className="text-xs text-gray-500">{voiceSettings.similarity_boost.toFixed(2)}</span>
+                        <label className="text-xs font-medium text-gray-700">
+                          Similarity Boost
+                        </label>
+                        <span className="text-xs text-gray-500">
+                          {voiceSettings.similarity_boost.toFixed(2)}
+                        </span>
                       </div>
                       <input
                         type="range"
@@ -1977,7 +2439,12 @@ export default function VideoGeneratorPage() {
                         max="1"
                         step="0.01"
                         value={voiceSettings.similarity_boost}
-                        onChange={(e) => setVoiceSettings({ ...voiceSettings, similarity_boost: parseFloat(e.target.value) })}
+                        onChange={(e) =>
+                          setVoiceSettings({
+                            ...voiceSettings,
+                            similarity_boost: parseFloat(e.target.value),
+                          })
+                        }
                         className="w-full"
                       />
                       <p className="text-xs text-gray-500 mt-1">
@@ -1988,8 +2455,12 @@ export default function VideoGeneratorPage() {
                     {/* Style */}
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <label className="text-xs font-medium text-gray-700">Style</label>
-                        <span className="text-xs text-gray-500">{voiceSettings.style.toFixed(2)}</span>
+                        <label className="text-xs font-medium text-gray-700">
+                          Style
+                        </label>
+                        <span className="text-xs text-gray-500">
+                          {voiceSettings.style.toFixed(2)}
+                        </span>
                       </div>
                       <input
                         type="range"
@@ -1997,7 +2468,12 @@ export default function VideoGeneratorPage() {
                         max="1"
                         step="0.01"
                         value={voiceSettings.style}
-                        onChange={(e) => setVoiceSettings({ ...voiceSettings, style: parseFloat(e.target.value) })}
+                        onChange={(e) =>
+                          setVoiceSettings({
+                            ...voiceSettings,
+                            style: parseFloat(e.target.value),
+                          })
+                        }
                         className="w-full"
                       />
                       <p className="text-xs text-gray-500 mt-1">
@@ -2011,10 +2487,17 @@ export default function VideoGeneratorPage() {
                         <input
                           type="checkbox"
                           checked={voiceSettings.use_speaker_boost}
-                          onChange={(e) => setVoiceSettings({ ...voiceSettings, use_speaker_boost: e.target.checked })}
+                          onChange={(e) =>
+                            setVoiceSettings({
+                              ...voiceSettings,
+                              use_speaker_boost: e.target.checked,
+                            })
+                          }
                           className="w-4 h-4"
                         />
-                        <span className="text-xs font-medium text-gray-700">Use Speaker Boost</span>
+                        <span className="text-xs font-medium text-gray-700">
+                          Use Speaker Boost
+                        </span>
                       </label>
                       <p className="text-xs text-gray-500 mt-1 ml-6">
                         Enhances voice clarity and quality
@@ -2031,7 +2514,9 @@ export default function VideoGeneratorPage() {
                     disabled={generatingVoiceover}
                     className="w-full bg-purple-600 text-white py-2 sm:py-3 rounded-lg font-medium hover:bg-purple-700 disabled:opacity-50"
                   >
-                    {generatingVoiceover ? "Generating Voiceover..." : "🎤 Generate Voiceover from Script"}
+                    {generatingVoiceover
+                      ? "Generating Voiceover..."
+                      : "🎤 Generate Voiceover from Script"}
                   </button>
 
                   {/* Voiceover Generation Loading Bar */}
@@ -2039,12 +2524,20 @@ export default function VideoGeneratorPage() {
                     <div className="mt-4 bg-white border border-purple-300 rounded-lg p-4">
                       <div className="flex items-center gap-3 mb-2">
                         <div className="animate-spin h-4 w-4 border-2 border-purple-600 border-t-transparent rounded-full"></div>
-                        <span className="text-sm font-medium text-purple-900">Generating voiceover with {selectedCharacter?.name}'s voice...</span>
+                        <span className="text-sm font-medium text-purple-900">
+                          Generating voiceover with {selectedCharacter?.name}'s
+                          voice...
+                        </span>
                       </div>
                       <div className="w-full bg-purple-200 rounded-full h-2 overflow-hidden">
-                        <div className="h-full bg-purple-600 rounded-full animate-pulse" style={{ width: '100%' }}></div>
+                        <div
+                          className="h-full bg-purple-600 rounded-full animate-pulse"
+                          style={{ width: "100%" }}
+                        ></div>
                       </div>
-                      <p className="text-xs text-purple-700 mt-2">Processing with ElevenLabs API... (~15-20 seconds)</p>
+                      <p className="text-xs text-purple-700 mt-2">
+                        Processing with ElevenLabs API... (~15-20 seconds)
+                      </p>
                     </div>
                   )}
                 </>
@@ -2053,10 +2546,15 @@ export default function VideoGeneratorPage() {
                   {!generatingVoiceover ? (
                     <>
                       <div className="flex items-center justify-between mb-3">
-                        <span className="text-sm font-medium text-green-700">✓ Voiceover Generated</span>
+                        <span className="text-sm font-medium text-green-700">
+                          ✓ Voiceover Generated
+                        </span>
                         {voiceoverDuration && (
                           <span className="text-sm text-gray-600">
-                            Duration: {Math.floor(voiceoverDuration / 60)}:{String(Math.floor(voiceoverDuration % 60)).padStart(2, '0')}
+                            Duration: {Math.floor(voiceoverDuration / 60)}:
+                            {String(
+                              Math.floor(voiceoverDuration % 60),
+                            ).padStart(2, "0")}
                           </span>
                         )}
                       </div>
@@ -2064,7 +2562,9 @@ export default function VideoGeneratorPage() {
                         key={voiceoverUrl}
                         controls
                         className="w-full mb-3"
-                        onLoadedMetadata={(e) => setVoiceoverDuration(e.target.duration)}
+                        onLoadedMetadata={(e) =>
+                          setVoiceoverDuration(e.target.duration)
+                        }
                       >
                         <source src={voiceoverUrl} type="audio/mpeg" />
                       </audio>
@@ -2081,18 +2581,27 @@ export default function VideoGeneratorPage() {
                     <div className="bg-white border border-purple-300 rounded-lg p-4">
                       <div className="flex items-center gap-3 mb-2">
                         <div className="animate-spin h-4 w-4 border-2 border-purple-600 border-t-transparent rounded-full"></div>
-                        <span className="text-sm font-medium text-purple-900">Regenerating voiceover with {selectedCharacter?.name}'s voice...</span>
+                        <span className="text-sm font-medium text-purple-900">
+                          Regenerating voiceover with {selectedCharacter?.name}
+                          's voice...
+                        </span>
                       </div>
                       <div className="w-full bg-purple-200 rounded-full h-2 overflow-hidden">
-                        <div className="h-full bg-purple-600 rounded-full animate-pulse" style={{ width: '100%' }}></div>
+                        <div
+                          className="h-full bg-purple-600 rounded-full animate-pulse"
+                          style={{ width: "100%" }}
+                        ></div>
                       </div>
-                      <p className="text-xs text-purple-700 mt-2">Processing with ElevenLabs API... (~15-20 seconds)</p>
+                      <p className="text-xs text-purple-700 mt-2">
+                        Processing with ElevenLabs API... (~15-20 seconds)
+                      </p>
                     </div>
                   )}
                 </div>
               )}
               <p className="text-xs text-gray-500 mt-3">
-                The voiceover will use {selectedCharacter?.name}'s voice. Make sure your script is finalized before generating.
+                The voiceover will use {selectedCharacter?.name}'s voice. Make
+                sure your script is finalized before generating.
               </p>
             </div>
           </div>
@@ -2118,25 +2627,280 @@ export default function VideoGeneratorPage() {
       {/* Step 3: Scene Generation */}
       {step === 3 && (
         <div className="bg-white border rounded-lg p-8">
-          <h2 className="text-2xl font-bold mb-6">
-            Step 3: Scene Generation
-          </h2>
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold mb-3">
+              Step 3: Scene Generation
+            </h2>
+            {topic && (
+              <div className="mb-4">
+                <span className="text-sm font-medium text-gray-600">
+                  Topic:{" "}
+                </span>
+                <span className="text-sm text-gray-900">{topic}</span>
+              </div>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <div className="bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap">
+                🎨 {scriptData.scenes?.length || 0} scenes
+              </div>
+              <div className="bg-purple-50 border border-purple-200 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
+                <span className="text-purple-700">🤖 Model:</span>
+                <span className="font-semibold text-purple-900">Flux Pro</span>
+              </div>
+              <div className="bg-green-50 border border-green-200 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
+                <span className="text-green-700">💰 Cost:</span>
+                <span className="font-semibold text-green-900">
+                  ${fluxProCost.toFixed(3)}/image
+                </span>
+              </div>
+              {projectCosts?.step3?.total > 0 && (
+                <div className="bg-orange-50 border border-orange-200 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
+                  <span className="text-orange-700">💰 Step 3 Total:</span>
+                  <span className="font-semibold text-orange-900">
+                    ${projectCosts.step3.total.toFixed(3)}
+                  </span>
+                  <span className="text-orange-600 text-xs">
+                    ({Math.round(projectCosts.step3.total / fluxProCost)}{" "}
+                    images)
+                  </span>
+                </div>
+              )}
+              <a
+                href="https://fal.ai/dashboard/billing"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium hover:bg-gray-200 transition whitespace-nowrap"
+              >
+                💳 Check FAL Balance →
+              </a>
+              <button
+                onClick={() => setShowFluxSettings(!showFluxSettings)}
+                className="bg-indigo-50 border border-indigo-200 text-indigo-700 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium hover:bg-indigo-100 transition whitespace-nowrap"
+              >
+                ⚙️ {showFluxSettings ? "Hide" : "Show"} Flux Settings
+              </button>
+            </div>
+          </div>
 
-          {images.length === 0 ? (
-            /* Before Image Generation - Show Editable Scene Details */
+          {/* Flux Pro Settings Panel */}
+          {showFluxSettings && (
+            <div className="mb-6 bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-200 rounded-lg p-6">
+              <h3 className="font-semibold text-indigo-900 mb-4 flex items-center gap-2">
+                <span className="text-xl">⚙️</span>
+                Flux Pro Generation Settings
+              </h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Adjust these settings to control image quality and character
+                consistency. Changes apply to all new images.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Strength */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Character Preservation (Strength)
+                    <span className="ml-2 text-indigo-600 font-semibold">
+                      {fluxSettings.strength}
+                    </span>
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={fluxSettings.strength}
+                    onChange={(e) =>
+                      setFluxSettings({
+                        ...fluxSettings,
+                        strength: parseFloat(e.target.value),
+                      })
+                    }
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>More Creative (0.0)</span>
+                    <span>More Consistent (1.0)</span>
+                  </div>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Higher = Better character consistency. Lower = More scene
+                    variety.
+                  </p>
+                </div>
+
+                {/* Guidance Scale */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Prompt Adherence (Guidance Scale)
+                    <span className="ml-2 text-indigo-600 font-semibold">
+                      {fluxSettings.guidance_scale}
+                    </span>
+                  </label>
+                  <input
+                    type="range"
+                    min="1"
+                    max="10"
+                    step="0.5"
+                    value={fluxSettings.guidance_scale}
+                    onChange={(e) =>
+                      setFluxSettings({
+                        ...fluxSettings,
+                        guidance_scale: parseFloat(e.target.value),
+                      })
+                    }
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>Creative (1.0)</span>
+                    <span>Strict (10.0)</span>
+                  </div>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Higher = Follows prompt more strictly. Lower = More creative
+                    interpretation.
+                  </p>
+                </div>
+
+                {/* Inference Steps */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Quality (Inference Steps)
+                    <span className="ml-2 text-indigo-600 font-semibold">
+                      {fluxSettings.num_inference_steps}
+                    </span>
+                  </label>
+                  <input
+                    type="range"
+                    min="10"
+                    max="50"
+                    step="2"
+                    value={fluxSettings.num_inference_steps}
+                    onChange={(e) =>
+                      setFluxSettings({
+                        ...fluxSettings,
+                        num_inference_steps: parseInt(e.target.value),
+                      })
+                    }
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>Fast (10)</span>
+                    <span>Best Quality (50)</span>
+                  </div>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Higher = Better quality but slower. 28 is recommended for
+                    balanced results.
+                  </p>
+                </div>
+
+                {/* Output Format */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Output Format
+                  </label>
+                  <select
+                    value={fluxSettings.output_format}
+                    onChange={(e) =>
+                      setFluxSettings({
+                        ...fluxSettings,
+                        output_format: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  >
+                    <option value="png">PNG (Lossless, Higher Quality)</option>
+                    <option value="jpeg">JPEG (Compressed, Faster)</option>
+                  </select>
+                  <p className="text-xs text-gray-600 mt-1">
+                    PNG is recommended for best quality with character details.
+                  </p>
+                </div>
+              </div>
+
+              {/* Quick Presets */}
+              <div className="mt-4 pt-4 border-t border-indigo-200">
+                <p className="text-sm font-medium text-gray-700 mb-2">
+                  Quick Presets:
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() =>
+                      setFluxSettings({
+                        strength: 0.85,
+                        guidance_scale: 4.0,
+                        num_inference_steps: 35,
+                        output_format: "png",
+                      })
+                    }
+                    className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-200 transition"
+                  >
+                    🎯 Maximum Consistency
+                  </button>
+                  <button
+                    onClick={() =>
+                      setFluxSettings({
+                        strength: 0.65,
+                        guidance_scale: 3.5,
+                        num_inference_steps: 28,
+                        output_format: "png",
+                      })
+                    }
+                    className="px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-xs font-medium hover:bg-green-200 transition"
+                  >
+                    ⚖️ Balanced (Default)
+                  </button>
+                  <button
+                    onClick={() =>
+                      setFluxSettings({
+                        strength: 0.45,
+                        guidance_scale: 2.5,
+                        num_inference_steps: 20,
+                        output_format: "png",
+                      })
+                    }
+                    className="px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg text-xs font-medium hover:bg-purple-200 transition"
+                  >
+                    🎨 More Creative
+                  </button>
+                  <button
+                    onClick={() =>
+                      setFluxSettings({
+                        strength: 0.65,
+                        guidance_scale: 3.5,
+                        num_inference_steps: 15,
+                        output_format: "jpeg",
+                      })
+                    }
+                    className="px-3 py-1.5 bg-orange-100 text-orange-700 rounded-lg text-xs font-medium hover:bg-orange-200 transition"
+                  >
+                    ⚡ Fast Generation
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {scriptData.scenes.some(
+            (scene) => !scene.image_urls || scene.image_urls.length === 0,
+          ) ? (
+            /* Before All Images Generated - Show Editable Scene Details */
             <div>
               <div className="mb-6">
                 <h3 className="font-semibold mb-3">Review Scene Concepts</h3>
                 <p className="text-sm text-gray-600 mb-4">
-                  Review and edit the scene details before generating images. Each scene will be created based on these prompts.
+                  Review and edit the scene details before generating images.
+                  Each scene will be created based on these prompts.
                 </p>
               </div>
 
               <div className="space-y-4 mb-8">
                 {scriptData.scenes.map((scene, index) => (
-                  <div key={scene.id} className="border rounded-lg p-4 bg-gray-50">
+                  <div
+                    key={scene.id}
+                    className="border rounded-lg p-4 bg-gray-50"
+                  >
                     <div className="flex items-center justify-between mb-3">
-                      <span className="font-medium text-lg">Scene {scene.id}</span>
+                      <span className="font-medium text-lg">
+                        Scene {scene.id}
+                      </span>
                       <span className="text-xs text-gray-500">
                         {scene.location} • {scene.mood}
                       </span>
@@ -2153,6 +2917,32 @@ export default function VideoGeneratorPage() {
                         </p>
                       </div>
 
+                      {/* Character Reference */}
+                      {selectedCharacter?.image_urls?.[0] && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                          <label className="block text-xs font-medium text-blue-900 mb-2">
+                            Character Reference:
+                          </label>
+                          <div className="flex items-center gap-3">
+                            <div className="w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden border-2 border-blue-300">
+                              <img
+                                src={selectedCharacter.image_urls[0]}
+                                alt={selectedCharacter.name}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-blue-900">
+                                {selectedCharacter.name}
+                              </p>
+                              <p className="text-xs text-blue-600">
+                                Will maintain this character in the scene
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Location and Mood */}
                       <div className="grid grid-cols-2 gap-3">
                         <div>
@@ -2164,8 +2954,14 @@ export default function VideoGeneratorPage() {
                             value={scene.location}
                             onChange={(e) => {
                               const updatedScenes = [...scriptData.scenes];
-                              updatedScenes[index] = { ...scene, location: e.target.value };
-                              setScriptData({ ...scriptData, scenes: updatedScenes });
+                              updatedScenes[index] = {
+                                ...scene,
+                                location: e.target.value,
+                              };
+                              setScriptData({
+                                ...scriptData,
+                                scenes: updatedScenes,
+                              });
                             }}
                             className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           />
@@ -2179,8 +2975,14 @@ export default function VideoGeneratorPage() {
                             value={scene.mood}
                             onChange={(e) => {
                               const updatedScenes = [...scriptData.scenes];
-                              updatedScenes[index] = { ...scene, mood: e.target.value };
-                              setScriptData({ ...scriptData, scenes: updatedScenes });
+                              updatedScenes[index] = {
+                                ...scene,
+                                mood: e.target.value,
+                              };
+                              setScriptData({
+                                ...scriptData,
+                                scenes: updatedScenes,
+                              });
                             }}
                             className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           />
@@ -2196,30 +2998,98 @@ export default function VideoGeneratorPage() {
                           value={scene.image_prompt}
                           onChange={(e) => {
                             const updatedScenes = [...scriptData.scenes];
-                            updatedScenes[index] = { ...scene, image_prompt: e.target.value };
-                            setScriptData({ ...scriptData, scenes: updatedScenes });
+                            updatedScenes[index] = {
+                              ...scene,
+                              image_prompt: e.target.value,
+                            };
+                            setScriptData({
+                              ...scriptData,
+                              scenes: updatedScenes,
+                            });
                           }}
                           rows={8}
                           className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y text-sm"
                         />
                       </div>
 
-                      {/* Motion Prompt */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Motion Prompt:
-                        </label>
-                        <textarea
-                          value={scene.motion_prompt}
-                          onChange={(e) => {
-                            const updatedScenes = [...scriptData.scenes];
-                            updatedScenes[index] = { ...scene, motion_prompt: e.target.value };
-                            setScriptData({ ...scriptData, scenes: updatedScenes });
-                          }}
-                          rows={8}
-                          className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y text-sm"
-                        />
+                      {/* Generate Image Button */}
+                      <div className="mt-4">
+                        <button
+                          onClick={() => handleGenerateSingleImage(scene.id)}
+                          disabled={loading}
+                          className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                        >
+                          {scene.image_urls && scene.image_urls.length > 0
+                            ? `Generate Another (${scene.image_urls.length} generated)`
+                            : generatingSceneId === scene.id
+                              ? "Generating..."
+                              : "Generate Image"}
+                        </button>
+
+                        {/* Loading Progress Bar */}
+                        {generatingSceneId === scene.id && (
+                          <div className="mt-2">
+                            <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                              <div
+                                className="h-full bg-blue-600 rounded-full animate-pulse"
+                                style={{ width: "100%" }}
+                              ></div>
+                            </div>
+                            <p className="text-xs text-gray-500 text-center mt-1">
+                              Generating image with character reference...
+                            </p>
+                          </div>
+                        )}
                       </div>
+
+                      {/* Generated Images Preview */}
+                      {scene.image_urls && scene.image_urls.length > 0 && (
+                        <div className="mt-4">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Generated Images ({scene.image_urls.length}):
+                          </label>
+                          <div className="grid grid-cols-2 gap-3">
+                            {scene.image_urls.map((url, idx) => (
+                              <div
+                                key={idx}
+                                className="relative aspect-[9/16] bg-gray-100 rounded-lg overflow-hidden border-2 border-gray-300 group"
+                              >
+                                <img
+                                  src={url}
+                                  alt={`Scene ${scene.id} - Version ${idx + 1}`}
+                                  className="w-full h-full object-cover"
+                                />
+                                <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button
+                                    onClick={() =>
+                                      handleRemoveImage(scene.id, idx)
+                                    }
+                                    disabled={loading}
+                                    className="bg-red-600 text-white px-2 py-1 rounded-lg text-xs font-medium hover:bg-red-700 disabled:opacity-50"
+                                    title="Remove this image"
+                                  >
+                                    Remove
+                                  </button>
+                                  <button
+                                    onClick={() =>
+                                      handleRegenerateImage(scene.id)
+                                    }
+                                    disabled={
+                                      loading || generatingSceneId === scene.id
+                                    }
+                                    className="bg-blue-600 text-white px-2 py-1 rounded-lg text-xs font-medium hover:bg-blue-700 disabled:opacity-50"
+                                    title="Regenerate this scene"
+                                  >
+                                    {generatingSceneId === scene.id
+                                      ? "Regenerating..."
+                                      : "Regenerate"}
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -2237,7 +3107,9 @@ export default function VideoGeneratorPage() {
                   disabled={loading}
                   className="flex-1 bg-blue-600 text-white py-2 sm:py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
                 >
-                  {loading ? "Generating Scene Images..." : "Generate Scene Images →"}
+                  {loading
+                    ? "Generating Scene Images..."
+                    : "Generate Scene Images →"}
                 </button>
               </div>
             </div>
@@ -2247,42 +3119,70 @@ export default function VideoGeneratorPage() {
               <h3 className="font-semibold mb-4">Review Generated Scenes</h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                {images.map((img) => {
-                  const scene = scriptData.scenes.find(
-                    (s) => s.id === img.scene_id
-                  );
-                  return (
-                    <div key={img.scene_id} className="border rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="font-medium">Scene {img.scene_id}</span>
-                        <button
-                          onClick={() => handleRegenerateImage(img.scene_id)}
-                          disabled={loading}
-                          className="text-sm text-blue-600 hover:underline disabled:opacity-50"
-                        >
-                          Regenerate
-                        </button>
-                      </div>
+                {scriptData.scenes
+                  .filter(
+                    (scene) => scene.image_urls && scene.image_urls.length > 0,
+                  )
+                  .map((scene) => {
+                    const latestImageIndex = scene.image_urls.length - 1;
+                    const latestImage = scene.image_urls[latestImageIndex];
+                    return (
+                      <div key={scene.id} className="border rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="font-medium">Scene {scene.id}</span>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() =>
+                                handleRemoveImage(scene.id, latestImageIndex)
+                              }
+                              disabled={loading}
+                              className="text-sm text-red-600 hover:underline disabled:opacity-50"
+                            >
+                              Remove
+                            </button>
+                            <button
+                              onClick={() => handleRegenerateImage(scene.id)}
+                              disabled={
+                                loading || generatingSceneId === scene.id
+                              }
+                              className="text-sm text-blue-600 hover:underline disabled:opacity-50"
+                            >
+                              {generatingSceneId === scene.id
+                                ? "Regenerating..."
+                                : "Regenerate"}
+                            </button>
+                          </div>
+                        </div>
 
-                      <div className="aspect-[9/16] bg-gray-100 rounded-lg mb-3 overflow-hidden">
-                        <img
-                          src={img.image_url}
-                          alt={`Scene ${img.scene_id}`}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
+                        <div className="aspect-[9/16] bg-gray-100 rounded-lg mb-3 overflow-hidden">
+                          <img
+                            src={latestImage}
+                            alt={`Scene ${scene.id}`}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
 
-                      <div className="text-sm">
-                        <p className="text-gray-600 mb-2">{scene.voiceover}</p>
-                        <div className="flex gap-2 text-xs text-gray-500">
-                          <span>{scene.location}</span>
-                          <span>•</span>
-                          <span>{scene.mood}</span>
+                        <div className="text-sm">
+                          <p className="text-gray-600 mb-2">
+                            {scene.voiceover}
+                          </p>
+                          <div className="flex gap-2 text-xs text-gray-500">
+                            <span>{scene.location}</span>
+                            <span>•</span>
+                            <span>{scene.mood}</span>
+                            {scene.image_urls.length > 1 && (
+                              <>
+                                <span>•</span>
+                                <span className="text-blue-600">
+                                  {scene.image_urls.length} versions
+                                </span>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
               </div>
 
               <div className="flex gap-4">
@@ -2308,13 +3208,36 @@ export default function VideoGeneratorPage() {
       {/* Step 4: Review Videos */}
       {step === 4 && videos.length > 0 && (
         <div className="bg-white border rounded-lg p-8">
-          <h2 className="text-2xl font-bold mb-6">Step 4: Review Videos</h2>
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold mb-3">Step 4: Review Videos</h2>
+            <div className="flex flex-wrap gap-2">
+              <div className="bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap">
+                🎬 {videos.length} videos
+              </div>
+              {projectCosts?.step4?.fal_videos > 0 && (
+                <div className="bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
+                  <span className="text-indigo-700">🎥 FAL Videos:</span>
+                  <span className="font-semibold text-indigo-900">
+                    ${projectCosts.step4.fal_videos.toFixed(3)}
+                  </span>
+                </div>
+              )}
+              {projectCosts?.step4?.total > 0 && (
+                <div className="bg-gray-50 border border-gray-300 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
+                  <span className="text-gray-700">💰 Step 4 Total:</span>
+                  <span className="font-semibold text-gray-900">
+                    ${projectCosts.step4.total.toFixed(3)}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* Videos Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             {videos.map((vid) => {
               const scene = scriptData.scenes.find(
-                (s) => s.id === vid.scene_id
+                (s) => s.id === vid.scene_id,
               );
               return (
                 <div key={vid.scene_id} className="border rounded-lg p-4">
@@ -2355,9 +3278,40 @@ export default function VideoGeneratorPage() {
       {/* Step 5: Final Video & Social Posting */}
       {step === 5 && finalVideoUrl && (
         <div className="bg-white border rounded-lg p-8">
-          <h2 className="text-2xl font-bold mb-6">
-            Step 5: Final Video & Post
-          </h2>
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold mb-3">
+              Step 5: Final Video & Post
+            </h2>
+            <div className="flex flex-wrap gap-2">
+              <div className="bg-green-100 text-green-700 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap">
+                ✓ Video Complete
+              </div>
+              {projectCosts?.step5?.shotstack > 0 && (
+                <div className="bg-pink-50 border border-pink-200 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
+                  <span className="text-pink-700">🎞️ Shotstack:</span>
+                  <span className="font-semibold text-pink-900">
+                    ${projectCosts.step5.shotstack.toFixed(4)}
+                  </span>
+                </div>
+              )}
+              {projectCosts?.step5?.total > 0 && (
+                <div className="bg-gray-50 border border-gray-300 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
+                  <span className="text-gray-700">💰 Step 5 Total:</span>
+                  <span className="font-semibold text-gray-900">
+                    ${projectCosts.step5.total.toFixed(4)}
+                  </span>
+                </div>
+              )}
+              {projectCosts?.total > 0 && (
+                <div className="bg-blue-50 border border-blue-300 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
+                  <span className="text-blue-700">💎 Total Project Cost:</span>
+                  <span className="font-semibold text-blue-900">
+                    ${projectCosts.total.toFixed(4)}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* Final Video Player */}
           <div className="mb-8">

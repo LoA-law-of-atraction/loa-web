@@ -81,6 +81,12 @@ export async function POST(request) {
     const projectDoc = await projectRef.get();
     const existingCosts = projectDoc.data()?.costs || {};
 
+    // Calculate new costs
+    const newElevenLabsCost = (existingCosts.elevenlabs || 0) + elevenLabsCost;
+    const newStep2ElevenLabsCost = (existingCosts.step2?.elevenlabs || 0) + elevenLabsCost;
+    const newStep2Total = (existingCosts.step2?.total || 0) + elevenLabsCost;
+    const newTotal = (existingCosts.total || 0) + elevenLabsCost;
+
     await projectRef.update({
       voiceover_url: voiceoverUrl,
       session_id: sessionId,
@@ -88,7 +94,15 @@ export async function POST(request) {
       status: "voiceover_generated",
       costs: {
         ...existingCosts,
-        elevenlabs: (existingCosts.elevenlabs || 0) + elevenLabsCost,
+        // Legacy API-level
+        elevenlabs: newElevenLabsCost,
+        // Step-level
+        step2: {
+          ...existingCosts.step2,
+          elevenlabs: newStep2ElevenLabsCost,
+          total: newStep2Total,
+        },
+        total: newTotal,
       },
       updated_at: new Date().toISOString(),
     });
