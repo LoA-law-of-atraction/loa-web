@@ -3,8 +3,8 @@
 
 export const API_COSTS = {
   // Claude AI - Sonnet 4 pricing per million tokens
-  CLAUDE_INPUT_PER_MILLION: parseFloat(process.env.CLAUDE_INPUT_PER_MILLION || "0.00"),
-  CLAUDE_OUTPUT_PER_MILLION: parseFloat(process.env.CLAUDE_OUTPUT_PER_MILLION || "0.00"),
+  CLAUDE_INPUT_PER_MILLION: parseFloat(process.env.NEXT_PUBLIC_CLAUDE_INPUT_PER_MILLION || "0.00"),
+  CLAUDE_OUTPUT_PER_MILLION: parseFloat(process.env.NEXT_PUBLIC_CLAUDE_OUTPUT_PER_MILLION || "0.00"),
 
   // ElevenLabs - subscription plan configuration
   ELEVENLABS_PLAN_COST: parseFloat(process.env.ELEVENLABS_PLAN_COST || "0.00"),

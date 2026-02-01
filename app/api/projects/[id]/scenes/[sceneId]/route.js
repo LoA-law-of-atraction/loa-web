@@ -4,12 +4,15 @@ import { getAdminDb } from "@/utils/firebaseAdmin";
 // PATCH - Update scene in subcollection
 export async function PATCH(request, { params }) {
   try {
+    // Next.js 15: await params before accessing properties
+    const { id, sceneId } = await params;
+
     const db = getAdminDb();
     const sceneRef = db
       .collection("projects")
-      .doc(params.id)
+      .doc(id)
       .collection("scenes")
-      .doc(params.sceneId);
+      .doc(sceneId);
 
     // Check if scene exists
     const sceneDoc = await sceneRef.get();

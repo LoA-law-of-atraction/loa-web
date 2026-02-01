@@ -16,19 +16,29 @@ export async function POST(request) {
 
     // Generate images in parallel with Fal AI
     console.log("Generating images...");
+    const characterImageUrl = selected_character?.image_urls?.[0] || null;
+
     const imagePromises = script_data.scenes.map(async (scene) => {
+      const requestBody = {
+        prompt: scene.image_prompt,
+        image_size: "portrait_9_16",
+        num_images: 1,
+        enable_safety_checker: false,
+      };
+
+      // Add character reference image for consistency
+      if (characterImageUrl) {
+        requestBody.image_urls = [characterImageUrl]; // FAL expects array
+        requestBody.strength = 0.90; // High strength to preserve character appearance
+      }
+
       const imageResponse = await fetch(`https://fal.run/${process.env.FAL_FLUX_PRO_MODEL}`, {
         method: "POST",
         headers: {
           Authorization: `Key ${process.env.FAL_API_KEY}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          prompt: scene.image_prompt,
-          image_size: "portrait_9_16",
-          num_images: 1,
-          enable_safety_checker: false,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!imageResponse.ok) {
@@ -44,8 +54,8 @@ export async function POST(request) {
       const imageDataResponse = await fetch(imageUrl);
       const imageBuffer = await imageDataResponse.arrayBuffer();
 
-      // Upload to Cloud Storage
-      const imageFileName = `video-scenes/${sessionId}/scene_${scene.id}.png`;
+      // Upload to Cloud Storage with character-based path
+      const imageFileName = `characters/${selected_character.character_id}/projects/${project_id}/scene_${scene.id}.png`;
       const imageFile = bucket.file(imageFileName);
 
       await imageFile.save(Buffer.from(imageBuffer), {
@@ -62,6 +72,46 @@ export async function POST(request) {
     });
 
     const images = await Promise.all(imagePromises);
+
+    // Get database instance
+    const db = getAdminDb();
+
+    // Save image_urls to each scene document in subcollection
+    const sceneUpdatePromises = images.map(async (img) => {
+      const sceneRef = db
+        .collection("projects")
+        .doc(project_id)
+        .collection("scenes")
+        .doc(String(img.scene_id));
+
+      const sceneDoc = await sceneRef.get();
+      const existingImageUrls = sceneDoc.data()?.image_urls || [];
+
+      return sceneRef.set(
+        {
+          image_urls: [...existingImageUrls, img.image_url],
+          updated_at: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+    });
+
+    await Promise.all(sceneUpdatePromises);
+
+    // Track images in character's projects subcollection
+    const characterRef = db.collection("characters").doc(selected_character.character_id);
+    const characterProjectRef = characterRef.collection("projects").doc(project_id);
+
+    await characterProjectRef.set({
+      status: "images_generated",
+      image_count: images.length,
+      images: images.map(img => ({
+        scene_id: img.scene_id,
+        image_url: img.image_url,
+        storage_path: `characters/${selected_character.character_id}/projects/${project_id}/scene_${img.scene_id}.png`,
+      })),
+      updated_at: new Date().toISOString(),
+    }, { merge: true });
 
     // Fetch Flux Pro pricing from FAL API
     const pricingResponse = await fetch(`https://api.fal.ai/v1/models/pricing?endpoint_id=${process.env.FAL_FLUX_PRO_MODEL}`, {
@@ -87,7 +137,6 @@ export async function POST(request) {
     const falImageCost = images.length * fluxProPrice.unit_price;
 
     // Store/update in Firestore
-    const db = getAdminDb();
     await db.collection("video_sessions").doc(session_id).set({
       session_id,
       script_data,

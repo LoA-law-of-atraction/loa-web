@@ -5,7 +5,7 @@ import { calculateClaudeCost } from "@/utils/costCalculator";
 
 export async function POST(request) {
   try {
-    const { project_id, topic, selected_character, categories = [], scene_count = 4 } = await request.json();
+    const { project_id, topic, selected_character, categories = [], scene_count = 4, location_count = null } = await request.json();
 
     if (!project_id || !topic || !selected_character) {
       return NextResponse.json(
@@ -14,11 +14,79 @@ export async function POST(request) {
       );
     }
 
+    // Calculate duration and character limits
+    const totalSeconds = scene_count * 8;
+    // Use 12 chars/sec to account for natural speaking pace + pauses
+    // This ensures voiceover fits within video duration
+    const maxCharacters = Math.floor(totalSeconds * 12);
+    const minCharacters = Math.floor(maxCharacters * 0.85); // Minimum 85% of max
+
+    const db = getAdminDb();
+
+    // Fetch selected locations for this project
+    const projectRef = db.collection("projects").doc(project_id);
+    const projectDoc = await projectRef.get();
+
+    if (!projectDoc.exists) {
+      return NextResponse.json(
+        { error: "Project not found" },
+        { status: 404 }
+      );
+    }
+
+    const locationMapping = projectDoc.data()?.location_mapping || {};
+    let locationsContext = "";
+
+    if (Object.keys(locationMapping).length > 0) {
+      console.log("Using pre-selected locations from project");
+
+      // Fetch location details
+      const locationIds = [...new Set(Object.values(locationMapping))];
+      const locationsData = {};
+
+      for (const locationId of locationIds) {
+        const locationDoc = await db.collection("locations").doc(locationId).get();
+        if (locationDoc.exists) {
+          locationsData[locationId] = locationDoc.data();
+        }
+      }
+
+      // Build location context for prompt
+      const locationsByIndex = {};
+      for (const [sceneId, locationId] of Object.entries(locationMapping)) {
+        if (!locationsByIndex[locationId]) {
+          locationsByIndex[locationId] = [];
+        }
+        locationsByIndex[locationId].push(sceneId);
+      }
+
+      locationsContext = "SELECTED LOCATIONS:\n\n";
+      let locationIndex = 1;
+      for (const [locationId, sceneIds] of Object.entries(locationsByIndex)) {
+        const location = locationsData[locationId];
+        if (location) {
+          locationsContext += `Location ${locationIndex} (Scenes ${sceneIds.join(", ")}):\n`;
+          locationsContext += `Name: ${location.name}\n`;
+          locationsContext += `Type: ${location.type}\n`;
+          locationsContext += `Description: ${location.description}\n`;
+          locationsContext += `Lighting: ${location.visual_characteristics.lighting}\n`;
+          locationsContext += `Atmosphere: ${location.visual_characteristics.atmosphere}\n\n`;
+          locationIndex++;
+        }
+      }
+    }
+
     // Load prompt template and fill variables
     const prompt = getPrompt("video-script", {
       topic,
       selected_character: JSON.stringify(selected_character, null, 2),
       scene_count: scene_count,
+      total_seconds: totalSeconds,
+      max_characters: maxCharacters,
+      min_characters: minCharacters,
+      location_count: location_count === null ? scene_count : location_count,
+      location_mode: location_count === null ? "all_different" : "grouped",
+      locations_context: locationsContext,
     });
 
     // Call Claude API
@@ -30,7 +98,7 @@ export async function POST(request) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: process.env.CLAUDE_MODEL,
+        model: process.env.NEXT_PUBLIC_CLAUDE_MODEL,
         max_tokens: 4096,
         messages: [
           {
@@ -62,27 +130,27 @@ export async function POST(request) {
 
     const scriptData = JSON.parse(jsonMatch[0]);
 
-    // Update project in Firestore
-    const db = getAdminDb();
-    const projectRef = db.collection("projects").doc(project_id);
-
-    // Check if project exists
-    const projectDoc = await projectRef.get();
-    if (!projectDoc.exists) {
-      return NextResponse.json(
-        { error: "Project not found" },
-        { status: 404 }
+    // Validate script length
+    const scriptLength = scriptData.script?.length || 0;
+    if (scriptLength < minCharacters) {
+      throw new Error(
+        `Script too short: ${scriptLength} characters (minimum ${minCharacters} required for ${scene_count} scenes). The voiceover must fill the full ${totalSeconds}-second video duration.`
+      );
+    }
+    if (scriptLength > maxCharacters) {
+      console.warn(
+        `Script exceeds character limit: ${scriptLength} > ${maxCharacters} (${scene_count} scenes × 8s)`
       );
     }
 
+    // Update project in Firestore
     // Get existing costs
-    const projectDoc = await projectRef.get();
     const existingCosts = projectDoc.data()?.costs || {};
 
     // Calculate new costs
     const newClaudeCost = (existingCosts.claude || 0) + claudeCost;
-    const newStep2ClaudeCost = (existingCosts.step2?.claude || 0) + claudeCost;
-    const newStep2Total = (existingCosts.step2?.total || 0) + claudeCost;
+    const newStep1ClaudeCost = (existingCosts.step1?.claude || 0) + claudeCost;
+    const newStep1Total = (existingCosts.step1?.total || 0) + claudeCost;
     const newTotal = (existingCosts.total || 0) + claudeCost;
 
     // Update main project document
@@ -105,15 +173,29 @@ export async function POST(request) {
         // Legacy API-level
         claude: newClaudeCost,
         // Step-level
-        step2: {
-          ...existingCosts.step2,
-          claude: newStep2ClaudeCost,
-          total: newStep2Total,
+        step1: {
+          ...existingCosts.step1,
+          claude: newStep1ClaudeCost,
+          total: newStep1Total,
         },
         total: newTotal,
       },
       updated_at: new Date().toISOString(),
     });
+
+    // Track project usage in character's projects subcollection
+    const characterRef = db.collection("characters").doc(selected_character.character_id);
+    const characterProjectRef = characterRef.collection("projects").doc(project_id);
+
+    await characterProjectRef.set({
+      project_id,
+      project_name: projectDoc.data()?.project_name || "Untitled Project",
+      topic,
+      scene_count,
+      status: "script_generated",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }, { merge: true });
 
     // Save scenes as subcollection
     const scenesCollection = projectRef.collection("scenes");

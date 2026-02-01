@@ -68,8 +68,8 @@ export default function TopicsPage() {
       categories: Array.isArray(topic.categories)
         ? topic.categories
         : topic.category
-        ? [topic.category]
-        : [],
+          ? [topic.category]
+          : [],
     });
     setShowAddForm(false);
   };
@@ -88,7 +88,7 @@ export default function TopicsPage() {
 
     // Check if category exists in database, if not save it
     const categoryExists = categories.some(
-      (cat) => cat.name.toLowerCase() === trimmed.toLowerCase()
+      (cat) => cat.name.toLowerCase() === trimmed.toLowerCase(),
     );
 
     if (!categoryExists) {
@@ -225,34 +225,36 @@ export default function TopicsPage() {
   const usedTopics = filteredTopics.filter((t) => t.generated);
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
+    <div className="space-y-6">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold">Topic Management</h1>
-          <p className="text-gray-600 mt-1">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+            Topic Management
+          </h1>
+          <p className="admin-muted mt-1">
             Manage video topics for content generation
           </p>
         </div>
         <button
           onClick={handleAdd}
           disabled={loading || showAddForm}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="admin-btn-primary"
         >
           + Add Topic
         </button>
       </div>
 
       {/* Filter & Sort */}
-      <div className="bg-white border rounded-lg p-4 mb-6">
+      <div className="admin-card-solid p-4">
         <div className="flex items-center gap-6 flex-wrap">
           <div className="flex items-center gap-3">
-            <label className="text-sm font-medium text-gray-700">
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
               Category:
             </label>
             <select
               value={filterCategory}
               onChange={(e) => setFilterCategory(e.target.value)}
-              className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="admin-select"
             >
               <option value="all">All Categories</option>
               {categories.map((cat) => (
@@ -264,7 +266,7 @@ export default function TopicsPage() {
             {filterCategory !== "all" && (
               <button
                 onClick={() => setFilterCategory("all")}
-                className="text-sm text-gray-500 hover:text-gray-700"
+                className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
               >
                 Clear
               </button>
@@ -272,13 +274,13 @@ export default function TopicsPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <label className="text-sm font-medium text-gray-700">
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
               Status:
             </label>
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="admin-select"
             >
               <option value="all">All</option>
               <option value="unused">Unused</option>
@@ -287,13 +289,13 @@ export default function TopicsPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <label className="text-sm font-medium text-gray-700">
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
               Sort by:
             </label>
             <select
               value={sortOrder}
               onChange={(e) => setSortOrder(e.target.value)}
-              className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="admin-select"
             >
               <option value="newest">Newest First</option>
               <option value="oldest">Oldest First</option>
@@ -304,23 +306,25 @@ export default function TopicsPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="bg-white border rounded-lg p-4">
-          <p className="text-sm text-gray-600 mb-1">
+        <div className="admin-card-solid p-4">
+          <p className="text-sm text-gray-600 mb-1 dark:text-gray-300">
             {filterCategory === "all" ? "Total Topics" : "Filtered Topics"}
           </p>
-          <p className="text-2xl font-bold text-gray-900">
+          <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
             {filteredTopics.length}
           </p>
         </div>
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <p className="text-sm text-green-700 mb-1">Unused</p>
-          <p className="text-2xl font-bold text-green-900">
+        <div className="rounded-2xl border border-green-200 bg-green-50 p-4 dark:border-green-900/40 dark:bg-green-950/30">
+          <p className="text-sm text-green-700 mb-1 dark:text-green-200">
+            Unused
+          </p>
+          <p className="text-2xl font-bold text-green-900 dark:text-green-100">
             {unusedTopics.length}
           </p>
         </div>
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p className="text-sm text-blue-700 mb-1">Used</p>
-          <p className="text-2xl font-bold text-blue-900">
+        <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-900/40 dark:bg-blue-950/30">
+          <p className="text-sm text-blue-700 mb-1 dark:text-blue-200">Used</p>
+          <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
             {usedTopics.length}
           </p>
         </div>
@@ -328,30 +332,28 @@ export default function TopicsPage() {
 
       {/* Error Display */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-          <p className="text-red-800 font-medium">Error:</p>
-          <p className="text-red-700 text-sm">{error}</p>
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-900/40 dark:bg-red-950/30">
+          <p className="text-red-800 font-medium dark:text-red-200">Error:</p>
+          <p className="text-red-700 text-sm dark:text-red-200/90">{error}</p>
         </div>
       )}
 
       {/* Add/Edit Form */}
       {(showAddForm || editingId) && (
-        <div className="bg-white border rounded-lg p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4">
+        <div className="admin-card-solid p-6">
+          <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">
             {editingId ? "Edit Topic" : "Add New Topic"}
           </h2>
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Topic *
-              </label>
+              <label className="admin-label mb-1">Topic *</label>
               <textarea
                 value={formData.topic}
                 onChange={(e) =>
                   setFormData({ ...formData, topic: e.target.value })
                 }
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="admin-input"
                 placeholder="e.g., How I manifested my dream job in 30 days"
                 rows={3}
               />
@@ -407,7 +409,7 @@ export default function TopicsPage() {
                           (categoryInput === "" ||
                             cat.name
                               .toLowerCase()
-                              .includes(categoryInput.toLowerCase()))
+                              .includes(categoryInput.toLowerCase())),
                       )
                       .map((cat) => (
                         <button
@@ -422,7 +424,8 @@ export default function TopicsPage() {
                     {categoryInput &&
                       !categories.some(
                         (cat) =>
-                          cat.name.toLowerCase() === categoryInput.toLowerCase()
+                          cat.name.toLowerCase() ===
+                          categoryInput.toLowerCase(),
                       ) && (
                         <button
                           onClick={() => handleAddCategory(categoryInput)}

@@ -36,7 +36,7 @@ export async function PUT(request, { params }) {
     const db = getAdminDb();
     const body = await request.json();
 
-    const { name, gender, age, voice_id, image_urls, prompt } = body;
+    const { name, gender, age, voice_id, image_urls, description } = body;
 
     // Validate required fields
     if (!name || !gender || !age || !voice_id) {
@@ -62,7 +62,7 @@ export async function PUT(request, { params }) {
       age,
       voice_id,
       image_urls: image_urls || [],
-      prompt: prompt || "",
+      description: description || "",
       updated_at: new Date().toISOString(),
     };
 

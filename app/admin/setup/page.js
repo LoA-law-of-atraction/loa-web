@@ -74,19 +74,19 @@ export default function SetupPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
+    <div>
       <h1 className="text-3xl font-bold mb-8">Setup & Configuration</h1>
 
       {/* Error Display */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-          <p className="text-red-800 font-medium">Error:</p>
-          <p className="text-red-700 text-sm">{error}</p>
+        <div className="admin-card-solid p-4 mb-6 border border-red-200/70 bg-red-50/70 dark:border-red-900/50 dark:bg-red-950/30">
+          <p className="text-red-800 dark:text-red-200 font-medium">Error:</p>
+          <p className="text-red-700 dark:text-red-200/80 text-sm">{error}</p>
         </div>
       )}
 
       {/* Characters Setup */}
-      <div className="bg-white border rounded-lg p-6 mb-6">
+      <div className="admin-card-solid p-6 mb-6">
         <h2 className="text-xl font-semibold mb-4">Characters Setup</h2>
 
         {status && (
@@ -104,17 +104,14 @@ export default function SetupPage() {
                   )}
                 </p>
               </div>
-              <button
-                onClick={checkStatus}
-                className="text-sm text-blue-600 hover:underline"
-              >
+              <button onClick={checkStatus} className="admin-btn-secondary">
                 Refresh
               </button>
             </div>
 
             {status.count > 0 && (
-              <div className="bg-gray-50 rounded p-4">
-                <p className="text-sm font-medium text-gray-700 mb-2">
+              <div className="admin-card p-4">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
                   Characters:
                 </p>
                 <div className="space-y-2">
@@ -124,12 +121,14 @@ export default function SetupPage() {
                       className="flex items-center justify-between text-sm"
                     >
                       <div>
-                        <span className="font-medium">{char.name || "Unnamed"}</span>
-                        <span className="text-gray-500 ml-2">
+                        <span className="font-medium">
+                          {char.name || "Unnamed"}
+                        </span>
+                        <span className="admin-muted ml-2">
                           {char.gender} • {char.age_range}
                         </span>
                       </div>
-                      <span className="text-xs text-gray-400">
+                      <span className="text-xs text-gray-400 dark:text-gray-500">
                         ID: {char.id.slice(0, 8)}...
                       </span>
                     </div>
@@ -144,7 +143,7 @@ export default function SetupPage() {
           <button
             onClick={createCharacters}
             disabled={loading || (status && status.count > 0)}
-            className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="admin-btn-primary w-full py-3"
           >
             {loading ? "Creating..." : "Create Sample Characters"}
           </button>
@@ -153,16 +152,16 @@ export default function SetupPage() {
             <button
               onClick={deleteCharacters}
               disabled={loading}
-              className="w-full bg-red-600 text-white py-3 rounded-lg font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="admin-btn-danger w-full py-3"
             >
               {loading ? "Deleting..." : "Delete All Characters"}
             </button>
           )}
         </div>
 
-        <div className="mt-4 text-sm text-gray-600">
+        <div className="mt-4 text-sm admin-muted">
           <p className="font-medium mb-2">Sample characters include:</p>
-          <ul className="list-disc list-inside space-y-1 text-gray-500">
+          <ul className="list-disc list-inside space-y-1 text-gray-500 dark:text-gray-300">
             <li>Professional Woman (30s)</li>
             <li>Professional Man (30s)</li>
             <li>Young Woman (20s)</li>
@@ -176,12 +175,12 @@ export default function SetupPage() {
       </div>
 
       {/* Firebase Status */}
-      <div className="bg-white border rounded-lg p-6">
+      <div className="admin-card-solid p-6">
         <h2 className="text-xl font-semibold mb-4">Firebase Status</h2>
 
         <div className="space-y-2 text-sm">
           <div className="flex items-center justify-between">
-            <span className="text-gray-600">Service Account:</span>
+            <span className="admin-muted">Service Account:</span>
             <span
               className={`font-medium ${
                 process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
@@ -196,18 +195,18 @@ export default function SetupPage() {
           </div>
 
           <div className="flex items-center justify-between">
-            <span className="text-gray-600">Storage Bucket:</span>
-            <span className="font-mono text-xs text-gray-800">
+            <span className="admin-muted">Storage Bucket:</span>
+            <span className="font-mono text-xs text-gray-800 dark:text-gray-200">
               {process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "Not set"}
             </span>
           </div>
         </div>
 
         {!process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET && (
-          <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded p-3">
-            <p className="text-sm text-yellow-800">
-              ⚠️ Firebase is not configured. Add FIREBASE_SERVICE_ACCOUNT_KEY
-              to your .env file.
+          <div className="mt-4 border border-yellow-200/70 bg-yellow-50/70 rounded-xl p-3 dark:border-yellow-900/50 dark:bg-yellow-950/30">
+            <p className="text-sm text-yellow-800 dark:text-yellow-200">
+              ⚠️ Firebase is not configured. Add FIREBASE_SERVICE_ACCOUNT_KEY to
+              your .env file.
             </p>
           </div>
         )}

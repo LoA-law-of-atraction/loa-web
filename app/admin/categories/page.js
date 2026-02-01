@@ -115,7 +115,7 @@ export default function CategoriesPage() {
     if (usageCount > 0) {
       if (
         !confirm(
-          `This category is used by ${usageCount} topic(s). Are you sure you want to delete it? Topics will keep the category name but it won't appear in suggestions.`
+          `This category is used by ${usageCount} topic(s). Are you sure you want to delete it? Topics will keep the category name but it won't appear in suggestions.`,
         )
       ) {
         return;
@@ -153,18 +153,20 @@ export default function CategoriesPage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
+    <div className="space-y-6">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold">Category Management</h1>
-          <p className="text-gray-600 mt-1">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+            Category Management
+          </h1>
+          <p className="admin-muted mt-1">
             Manage topic categories for video generation
           </p>
         </div>
         <button
           onClick={handleAdd}
           disabled={loading || showAddForm}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="admin-btn-primary"
         >
           + Add Category
         </button>
@@ -172,31 +174,29 @@ export default function CategoriesPage() {
 
       {/* Error Display */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-          <p className="text-red-800 font-medium">Error:</p>
-          <p className="text-red-700 text-sm">{error}</p>
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-900/40 dark:bg-red-950/30">
+          <p className="text-red-800 font-medium dark:text-red-200">Error:</p>
+          <p className="text-red-700 text-sm dark:text-red-200/90">{error}</p>
         </div>
       )}
 
       {/* Add/Edit Form */}
       {(showAddForm || editingId) && (
-        <div className="bg-white border rounded-lg p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4">
+        <div className="admin-card-solid p-6">
+          <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">
             {editingId ? "Edit Category" : "Add New Category"}
           </h2>
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Category Name *
-              </label>
+              <label className="admin-label mb-1">Category Name *</label>
               <input
                 type="text"
                 value={formData.name}
                 onChange={(e) =>
                   setFormData({ ...formData, name: e.target.value })
                 }
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="admin-input"
                 placeholder="e.g., Money Manifestation"
               />
             </div>
@@ -205,14 +205,14 @@ export default function CategoriesPage() {
               <button
                 onClick={handleSave}
                 disabled={loading || !formData.name.trim()}
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="admin-btn-primary px-6"
               >
                 {loading ? "Saving..." : editingId ? "Update" : "Create"}
               </button>
               <button
                 onClick={handleCancel}
                 disabled={loading}
-                className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg font-medium hover:bg-gray-300 disabled:opacity-50"
+                className="admin-btn-secondary px-6"
               >
                 Cancel
               </button>
@@ -225,37 +225,26 @@ export default function CategoriesPage() {
       {!showAddForm && !editingId && (
         <>
           {loading && categories.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">Loading...</div>
+            <div className="text-center py-12 admin-muted">Loading...</div>
           ) : categories.length === 0 ? (
-            <div className="bg-white border rounded-lg p-12 text-center">
-              <p className="text-gray-500 mb-4">No categories found</p>
-              <button
-                onClick={handleAdd}
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700"
-              >
+            <div className="admin-card-solid p-12 text-center">
+              <p className="admin-muted mb-4">No categories found</p>
+              <button onClick={handleAdd} className="admin-btn-primary px-6">
                 Add Your First Category
               </button>
             </div>
           ) : (
-            <div className="bg-white border rounded-lg overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b">
+            <div className="admin-card-solid overflow-hidden">
+              <table className="admin-table">
+                <thead className="admin-thead">
                   <tr>
-                    <th className="text-left px-6 py-3 text-sm font-semibold text-gray-700">
-                      Category Name
-                    </th>
-                    <th className="text-center px-6 py-3 text-sm font-semibold text-gray-700">
-                      Used By Topics
-                    </th>
-                    <th className="text-center px-6 py-3 text-sm font-semibold text-gray-700">
-                      Created
-                    </th>
-                    <th className="text-right px-6 py-3 text-sm font-semibold text-gray-700">
-                      Actions
-                    </th>
+                    <th className="admin-th">Category Name</th>
+                    <th className="admin-th text-center">Used By Topics</th>
+                    <th className="admin-th text-center">Created</th>
+                    <th className="admin-th text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y">
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                   {categories.map((category) => {
                     const usageCount = getCategoryUsageCount(category.name);
                     return (
@@ -314,7 +303,8 @@ export default function CategoriesPage() {
           {/* Category Count */}
           {categories.length > 0 && (
             <div className="mt-6 text-center text-sm text-gray-500">
-              Total: {categories.length} categor{categories.length !== 1 ? "ies" : "y"}
+              Total: {categories.length} categor
+              {categories.length !== 1 ? "ies" : "y"}
             </div>
           )}
         </>

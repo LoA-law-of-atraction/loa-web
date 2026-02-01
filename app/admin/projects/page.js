@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useToast } from "@/components/admin/Toast";
+import { Film, Pencil, Trash2, Wallet } from "lucide-react";
 
 export default function ProjectsPage() {
   const { alert, confirm } = useToast();
@@ -29,7 +30,7 @@ export default function ProjectsPage() {
   };
 
   const handleDeleteProject = async (projectId) => {
-    if (!await confirm("Are you sure you want to delete this project?")) {
+    if (!(await confirm("Are you sure you want to delete this project?"))) {
       return;
     }
 
@@ -91,35 +92,31 @@ export default function ProjectsPage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
+    <div>
       <div className="mb-8">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-3xl font-bold">Video Projects</h1>
           <div className="flex gap-2">
-            <a
-              href="/admin/video-generator"
-              className="text-sm text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg hover:bg-gray-100 transition"
-            >
-              🎬 Generator
+            <a href="/admin/video-generator" className="admin-btn-secondary">
+              <Film size={16} />
+              Generator
             </a>
-            <a
-              href="/admin/budget"
-              className="text-sm text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg hover:bg-gray-100 transition"
-            >
-              💰 Budget
+            <a href="/admin/budget" className="admin-btn-secondary">
+              <Wallet size={16} />
+              Budget
             </a>
           </div>
         </div>
-        <p className="text-gray-600">
+        <p className="admin-muted">
           View and manage your video projects with scripts and scenes
         </p>
       </div>
 
       {loading ? (
-        <div className="text-center py-12 text-gray-500">Loading projects...</div>
+        <div className="text-center py-12 admin-muted">Loading projects...</div>
       ) : projects.length === 0 ? (
-        <div className="bg-gray-50 border rounded-lg p-12 text-center">
-          <p className="text-gray-500 mb-4">No projects created yet</p>
+        <div className="admin-card-solid p-12 text-center">
+          <p className="admin-muted mb-4">No projects created yet</p>
           <a
             href="/admin/video-generator"
             className="text-blue-600 hover:underline"
@@ -132,7 +129,7 @@ export default function ProjectsPage() {
           {projects.map((project) => (
             <div
               key={project.id}
-              className="border rounded-lg bg-white hover:shadow-md transition"
+              className="admin-card-solid hover:shadow-md transition-shadow"
             >
               {/* Project Header */}
               <div className="p-6">
@@ -146,7 +143,9 @@ export default function ProjectsPage() {
                             <input
                               type="text"
                               value={editingProjectName}
-                              onChange={(e) => setEditingProjectName(e.target.value)}
+                              onChange={(e) =>
+                                setEditingProjectName(e.target.value)
+                              }
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") {
                                   handleSaveProjectName(project.id);
@@ -154,47 +153,57 @@ export default function ProjectsPage() {
                                   handleCancelEditingName();
                                 }
                               }}
-                              className="text-sm font-semibold px-3 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="admin-input py-1 text-sm font-semibold"
                               autoFocus
                             />
                             <button
                               onClick={() => handleSaveProjectName(project.id)}
-                              className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700"
+                              className="admin-btn-primary px-3 py-1 text-xs"
                             >
                               Save
                             </button>
                             <button
                               onClick={handleCancelEditingName}
-                              className="text-xs bg-gray-500 text-white px-2 py-1 rounded hover:bg-gray-600"
+                              className="admin-btn-secondary px-3 py-1 text-xs"
                             >
                               Cancel
                             </button>
                           </div>
                         ) : (
                           <button
-                            onClick={() => handleStartEditingName(project.id, project.project_name)}
-                            className="inline-block text-sm font-semibold text-gray-700 bg-gray-200 px-3 py-1 rounded hover:bg-gray-300 transition"
+                            onClick={() =>
+                              handleStartEditingName(
+                                project.id,
+                                project.project_name,
+                              )
+                            }
+                            className="inline-flex items-center gap-2 text-sm font-semibold text-gray-800 bg-gray-100 px-3 py-1 rounded-xl hover:bg-gray-200 transition dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
                           >
-                            {project.project_name} ✏️
+                            {project.project_name}
+                            <Pencil size={14} className="opacity-70" />
                           </button>
                         )}
                       </div>
                     )}
 
                     {/* Topic */}
-                    <h2 className="text-lg font-semibold text-gray-900 mb-2">
-                      {project.topic || 'Untitled'}
+                    <h2 className="text-lg font-semibold text-gray-900 mb-2 dark:text-gray-100">
+                      {project.topic || "Untitled"}
                     </h2>
 
                     {/* Character & Dates */}
-                    <div className="flex items-center gap-4 text-sm text-gray-500 mb-3">
-                      <span>👤 {project.character?.name || "No character"}</span>
+                    <div className="flex items-center gap-4 text-sm admin-muted mb-3">
                       <span>
-                        📅 Created: {new Date(project.created_at).toLocaleDateString()}
+                        👤 {project.character?.name || "No character"}
+                      </span>
+                      <span>
+                        📅 Created:{" "}
+                        {new Date(project.created_at).toLocaleDateString()}
                       </span>
                       {project.updated_at && (
                         <span>
-                          🔄 Updated: {new Date(project.updated_at).toLocaleDateString()}
+                          🔄 Updated:{" "}
+                          {new Date(project.updated_at).toLocaleDateString()}
                         </span>
                       )}
                     </div>
@@ -203,7 +212,7 @@ export default function ProjectsPage() {
                         {project.categories.map((cat, idx) => (
                           <span
                             key={idx}
-                            className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded"
+                            className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-xl dark:bg-blue-900/30 dark:text-blue-200"
                           >
                             {cat}
                           </span>
@@ -214,14 +223,15 @@ export default function ProjectsPage() {
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleEditProject(project.id)}
-                      className="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
+                      className="admin-btn-primary"
                     >
                       Edit
                     </button>
                     <button
                       onClick={() => handleDeleteProject(project.id)}
-                      className="text-sm text-red-600 hover:underline"
+                      className="admin-btn-danger"
                     >
+                      <Trash2 size={16} />
                       Delete
                     </button>
                   </div>

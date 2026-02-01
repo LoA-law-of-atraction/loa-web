@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAdminDb, getAdminStorage } from "@/utils/firebaseAdmin";
+import { FAL_NEGATIVE_PROMPT } from "@/config/fal-settings";
 
 export async function POST(request) {
   try {
@@ -9,52 +10,68 @@ export async function POST(request) {
       scene_id,
       image_prompt,
       character_image_url,
+      character_id,
       flux_settings,
+      location,
+      action,
     } = await request.json();
 
-    if (!session_id || !scene_id || !image_prompt) {
+    if (!session_id || !scene_id || !image_prompt || !character_id || !project_id) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 },
       );
     }
 
-    // Use provided flux settings or defaults
+    // Get database instance
+    const db = getAdminDb();
+
+    // Get old image URL from scenes subcollection to delete it later
+    let oldImageUrl = null;
+    if (project_id) {
+      const sceneRef = db
+        .collection("projects")
+        .doc(project_id)
+        .collection("scenes")
+        .doc(String(scene_id));
+
+      const sceneDoc = await sceneRef.get();
+      if (sceneDoc.exists) {
+        const imageUrls = sceneDoc.data()?.image_urls || [];
+        // Get the last image URL (the one being replaced)
+        if (imageUrls.length > 0) {
+          oldImageUrl = imageUrls[imageUrls.length - 1];
+        }
+      }
+    }
+
+    // Use provided grok settings or defaults
     const settings = flux_settings || {
-      strength: 0.65,
-      guidance_scale: 3.5,
-      num_inference_steps: 28,
       output_format: "png",
+      num_images: 1,
     };
 
-    // Call FAL AI Flux Pro with image-to-image for character consistency
-    console.log("Regenerating image with Flux Pro, prompt:", image_prompt);
-    console.log("Character reference image:", character_image_url);
+    // Call Grok Image Edit for character consistency
+    console.log("=== GROK IMAGE REGENERATION REQUEST ===");
+    console.log("Scene ID:", scene_id);
+    console.log("Character ID:", character_id);
+    console.log("Character reference image URL:", character_image_url);
+    console.log("Reference image URL (full):", character_image_url);
+    console.log("Grok settings:", JSON.stringify(settings, null, 2));
+    console.log("Image prompt:", image_prompt);
+    console.log("=======================================");
 
-    // Build request body with all Flux Pro settings
+    // Build request body for Grok Image Edit
     const requestBody = {
       prompt: image_prompt,
-      image_size: "portrait_16_9",
-      num_images: 1,
-      enable_safety_checker: false,
-
-      // Quality & Performance Settings (from flux_settings)
-      num_inference_steps: settings.num_inference_steps,
-      guidance_scale: settings.guidance_scale,
-
-      // Output Settings
+      image_url: character_image_url, // Character reference for editing
+      num_images: settings.num_images,
       output_format: settings.output_format,
       sync_mode: true,
     };
 
-    // Add character reference image for consistency (image-to-image)
-    if (character_image_url) {
-      requestBody.image_url = character_image_url;
-      requestBody.strength = settings.strength;
-    }
-
-    // Generate new image with Flux Pro
-    const imageResponse = await fetch(`https://fal.run/${process.env.FAL_FLUX_PRO_MODEL}`, {
+    // Generate new image with Grok
+    const imageResponse = await fetch("https://fal.run/xai/grok-imagine-image/edit", {
       method: "POST",
       headers: {
         Authorization: `Key ${process.env.FAL_API_KEY}`,
@@ -65,12 +82,17 @@ export async function POST(request) {
 
     if (!imageResponse.ok) {
       const errorText = await imageResponse.text();
-      console.error("FAL AI error response:", errorText);
-      throw new Error(`FAL AI error (${imageResponse.status}): ${errorText}`);
+      console.error("Grok API error response:", errorText);
+      throw new Error(`Grok API error (${imageResponse.status}): ${errorText}`);
     }
 
     const imageResult = await imageResponse.json();
-    console.log("FAL API response:", JSON.stringify(imageResult, null, 2));
+    console.log("=== GROK API RESPONSE ===");
+    console.log("Status:", imageResponse.status);
+    console.log("Image URL:", imageResult.images?.[0]?.url);
+    console.log("Revised prompt:", imageResult.revised_prompt);
+    console.log("Full response:", JSON.stringify(imageResult, null, 2));
+    console.log("=========================");
 
     const imageUrl = imageResult.images[0].url;
 
@@ -79,7 +101,7 @@ export async function POST(request) {
     const imageBuffer = await imageDataResponse.arrayBuffer();
 
     const bucket = getAdminStorage().bucket();
-    const imageFileName = `video-scenes/${session_id}/scene_${scene_id}_${Date.now()}.png`;
+    const imageFileName = `characters/${character_id}/projects/${project_id}/scene_${scene_id}_${Date.now()}.png`;
     const imageFile = bucket.file(imageFileName);
 
     await imageFile.save(Buffer.from(imageBuffer), {
@@ -89,8 +111,31 @@ export async function POST(request) {
     await imageFile.makePublic();
     const publicImageUrl = `https://storage.googleapis.com/${bucket.name}/${imageFileName}`;
 
-    // Track costs - Fetch from FAL Pricing API (NO FALLBACK)
-    const pricingResponse = await fetch(`https://api.fal.ai/v1/models/pricing?endpoint_id=${process.env.FAL_FLUX_PRO_MODEL}`, {
+    // Delete old image from storage if it exists
+    if (oldImageUrl) {
+      try {
+        const urlPattern = new RegExp(`https://storage\\.googleapis\\.com/${bucket.name}/(.+)`);
+        const match = oldImageUrl.match(urlPattern);
+
+        if (match) {
+          const oldFilePath = decodeURIComponent(match[1]);
+          const oldFile = bucket.file(oldFilePath);
+          const [exists] = await oldFile.exists();
+
+          if (exists) {
+            await oldFile.delete();
+            console.log(`Deleted old image from storage: ${oldFilePath}`);
+          }
+        }
+      } catch (deleteError) {
+        console.error("Error deleting old image from storage:", deleteError);
+        // Don't fail the whole request if deletion fails
+      }
+    }
+
+    // Track costs - Fetch from FAL Pricing API
+    const grokEndpoint = "xai/grok-imagine-image/edit";
+    const pricingResponse = await fetch(`https://api.fal.ai/v1/models/pricing?endpoint_id=${grokEndpoint}`, {
       headers: {
         Authorization: `Key ${process.env.FAL_API_KEY}`,
       },
@@ -103,25 +148,22 @@ export async function POST(request) {
 
     const pricingData = await pricingResponse.json();
 
-    // Find Flux Pro pricing
-    const fluxProPrice = pricingData.prices?.find(
-      (p) => p.endpoint_id === process.env.FAL_FLUX_PRO_MODEL
+    // Find Grok pricing
+    const grokPrice = pricingData.prices?.find(
+      (p) => p.endpoint_id === grokEndpoint
     );
 
-    if (!fluxProPrice) {
-      throw new Error("Flux Pro pricing not found in FAL API response");
+    if (!grokPrice) {
+      throw new Error("Grok pricing not found in FAL API response");
     }
 
-    const imageCost = fluxProPrice.unit_price;
+    const imageCost = grokPrice.unit_price;
 
     if (!imageCost || imageCost <= 0) {
-      throw new Error(`Invalid Flux Pro price: ${imageCost}`);
+      throw new Error(`Invalid Grok price: ${imageCost}`);
     }
 
-    console.log(`Flux Pro cost: $${imageCost} per image (from FAL API)`);
-
-    // Update Firestore
-    const db = getAdminDb();
+    console.log(`Grok Image Edit cost: $${imageCost} per image (from FAL API)`);
 
     // Update project costs if project_id is provided
     if (project_id) {
@@ -177,6 +219,7 @@ export async function POST(request) {
       console.warn("No project_id provided, skipping cost tracking");
     }
 
+    // Update video_sessions collection
     const docRef = db.collection("video_sessions").doc(session_id);
     const doc = await docRef.get();
 
@@ -190,6 +233,155 @@ export async function POST(request) {
         images: updatedImages,
         updated_at: new Date().toISOString(),
       });
+    }
+
+    // Update scenes subcollection
+    if (project_id) {
+      const sceneRef = db
+        .collection("projects")
+        .doc(project_id)
+        .collection("scenes")
+        .doc(String(scene_id));
+
+      const sceneDoc = await sceneRef.get();
+      if (sceneDoc.exists) {
+        const existingImageUrls = sceneDoc.data()?.image_urls || [];
+        // Replace the last image with the new one
+        const updatedUrls =
+          existingImageUrls.length > 0
+            ? [...existingImageUrls.slice(0, -1), publicImageUrl]
+            : [publicImageUrl];
+
+        await sceneRef.update({
+          image_urls: updatedUrls,
+          updated_at: new Date().toISOString(),
+        });
+
+        // Update character's project document with regenerated image
+        if (character_id) {
+          const characterRef = db.collection("characters").doc(character_id);
+          const characterProjectRef = characterRef.collection("projects").doc(project_id);
+
+          // Get current character project data
+          const characterProjectDoc = await characterProjectRef.get();
+          const existingImages = characterProjectDoc.data()?.images || [];
+
+          // Update the image for this scene
+          const updatedImages = existingImages.map(img =>
+            img.scene_id === scene_id
+              ? {
+                  scene_id,
+                  image_url: publicImageUrl,
+                  storage_path: `characters/${character_id}/projects/${project_id}/scene_${scene_id}_${Date.now()}.png`,
+                }
+              : img
+          );
+
+          // If scene wasn't in images array, add it
+          if (!existingImages.some(img => img.scene_id === scene_id)) {
+            updatedImages.push({
+              scene_id,
+              image_url: publicImageUrl,
+              storage_path: `characters/${character_id}/projects/${project_id}/scene_${scene_id}_${Date.now()}.png`,
+            });
+          }
+
+          await characterProjectRef.set({
+            images: updatedImages,
+            image_count: updatedImages.length,
+            status: "images_updated",
+            updated_at: new Date().toISOString(),
+          }, { merge: true });
+        }
+      }
+    }
+
+    // Tag the location with this sample image (and remove old image)
+    if (project_id) {
+      try {
+        const projectRef = db.collection("projects").doc(project_id);
+        const projectDoc = await projectRef.get();
+
+        if (projectDoc.exists) {
+          const locationMapping = projectDoc.data()?.location_mapping || {};
+          const locationId = locationMapping[scene_id];
+
+          if (locationId) {
+            const locationRef = db.collection("locations").doc(locationId);
+            const locationDoc = await locationRef.get();
+
+            if (locationDoc.exists) {
+              const existingSamples = locationDoc.data()?.sample_images || [];
+
+              // Remove old image URL if it exists
+              const samplesWithoutOld = oldImageUrl
+                ? existingSamples.filter(url => url !== oldImageUrl)
+                : existingSamples;
+
+              // Add new image to samples (limit to 10 most recent)
+              const updatedSamples = [publicImageUrl, ...samplesWithoutOld].slice(0, 10);
+
+              await locationRef.update({
+                sample_images: updatedSamples,
+                updated_at: new Date().toISOString(),
+              });
+
+              console.log(`Updated location ${locationId} samples: removed old image, added new image`);
+            }
+          }
+        }
+      } catch (tagError) {
+        console.error("Error updating location samples:", tagError);
+        // Don't fail the request if tagging fails
+      }
+    }
+
+    // Save generation metadata to scene document
+    if (project_id && scene_id) {
+      try {
+        const generationMetadata = {
+          timestamp: new Date().toISOString(),
+          image_url: publicImageUrl,
+          image_prompt: image_prompt,
+          character_reference_url: character_image_url,
+          character_id: character_id,
+          grok_settings: settings,
+          location: location ? {
+            id: location.id,
+            name: location.name,
+            description: location.description,
+            type: location.type,
+            category: location.category,
+          } : null,
+          action: action ? {
+            id: action.id,
+            name: action.name,
+            description: action.description,
+            pose_variations: action.pose_variations,
+            expression: action.expression,
+          } : null,
+          grok_response: {
+            revised_prompt: imageResult.revised_prompt || null,
+          },
+          regenerated: true,
+        };
+
+        const sceneRef = db.collection("projects").doc(project_id).collection("scenes").doc(scene_id.toString());
+        const sceneDoc = await sceneRef.get();
+
+        if (sceneDoc.exists) {
+          const existingGenerations = sceneDoc.data()?.generation_history || [];
+          await sceneRef.update({
+            generation_history: [...existingGenerations, generationMetadata],
+            last_generation_metadata: generationMetadata,
+            updated_at: new Date().toISOString(),
+          });
+          console.log(`Saved regeneration metadata for scene ${scene_id}`);
+        }
+      } catch (metadataError) {
+        console.error("Error saving generation metadata:", metadataError);
+        // Don't fail the request if metadata saving fails
+      }
     }
 
     return NextResponse.json({

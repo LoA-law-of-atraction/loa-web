@@ -1,0 +1,40 @@
+Generate a DARK CINEMATIC image prompt for a video scene based on this voiceover:
+
+"{{voiceover}}"
+
+CRITICAL STRUCTURE - Follow this EXACT format:
+1. CHARACTER FIRST: "The same character [VARIED POSE/ACTIVITY + expression matching voiceover]"
+2. THEN LOCATION: "in [location setting]"
+3. BACKGROUND DETAILS: Describe the environment/lighting AROUND the character, not ON the character
+
+POSE/ACTIVITY VARIETY (CRITICAL - VARY THESE, DON'T ALWAYS USE "STANDING"):
+- Sitting: on bench, at table, on steps, in booth, on ledge, cross-legged
+- Leaning: against wall, on railing, against door frame, on counter
+- Looking/Watching: gazing out window, watching rain, looking at phone, examining object, staring into distance
+- Listening: head tilted listening to rain, listening to old jukebox, contemplative listening
+- Interacting: hands on railing, touching glass, holding cup, resting hand on wall
+- Contemplative: sitting with chin on hand, leaning with arms crossed, standing but slouched
+- Waiting: seated waiting, leaning while waiting, looking down the street
+- DO NOT default to "standing with hands in pockets" - use creative varied poses!
+
+LOCATION FOR BACKGROUND:
+{{location_description}}
+
+CRITICAL REQUIREMENTS:
+- The character's APPEARANCE (clothing, colors, design) must stay EXACTLY the same as reference
+- Character's DARK COAT must remain DARK (charcoal/dark gray) - NOT pink, NOT purple, NOT magenta
+- Rim lighting (pink/magenta/cyan) is ONLY edge highlights/glow on character outline - NOT the coat color itself
+- Location lighting and colors affect ONLY the background/environment, NOT the character's clothing colors
+- {{consistency_instruction}}
+- Describe a STATIC frozen moment (no motion words like "walking" or "moving")
+- VARY THE POSE/ACTIVITY - don't repeat the same pose across scenes
+- Include character's expression that matches the voiceover emotion
+- Match activity to location (sitting in diner, leaning in phone booth, waiting at bus stop)
+- Focus on MOOD and ATMOSPHERE in the BACKGROUND
+- Keep compositions CLEAN and SIMPLE - avoid cluttered props
+- NO holographic displays, NO floating interfaces, NO tech panels
+- FLAT GRAPHIC ANIME style with HARD EDGES and SIMPLE CEL-SHADING - NOT painterly, NOT soft
+
+{{include:image-prompt-shared-rules}}
+
+Return ONLY a single image prompt as plain text (including the mandatory style suffix), no explanations or formatting.

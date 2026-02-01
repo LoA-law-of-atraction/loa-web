@@ -8,88 +8,245 @@ A SELECTED CHARACTER is provided externally as JSON with:
 - voice_id (ElevenLabs voice ID)
 
 Task:
-Use the provided character to create a short motivational video script inspired by a real-feeling Law of Attraction success story aligned tightly to the given topic.
+Use the provided character to create a comforting, validating video script that addresses the given topic with gentle reassurance and quiet strength.
 
-Create exactly {{scene_count}} scenes (8 seconds each) that will be generated independently with TWO distinct locations to show visual transformation.
+Create exactly {{scene_count}} scenes (8 seconds each) that will be generated independently with TWO distinct locations to show emotional shift from struggle to reassurance.
+
+CHARACTER-SPECIFIC STORYTELLING (CRITICAL):
+The story MUST be tailored to the character's age and gender to feel authentic and relatable:
+
+**Consider the character's life stage:**
+- 20s: Early career, finding direction, comparison with peers, proving yourself, entry-level struggles
+- 30s: Career/life transitions, balancing responsibilities, established but questioning, "is this it?" moments
+- 40s: Reinvention, accumulated wisdom, midlife recalibration, letting go of old patterns
+- 50s+: New chapters, confidence from experience, redefining success, freedom from others' opinions
+
+**Consider gender-relevant experiences:**
+- Women often face: people-pleasing, seeking permission, being "too much" or "not enough", perfectionism, invisible labor
+- Men often face: pressure to have it all figured out, hiding vulnerability, proving worth through achievement, fear of appearing weak
+
+**Use age/gender-appropriate scenarios:**
+Example for woman in 30s: workplace dynamics, relationship boundaries, juggling multiple roles, societal expectations
+Example for man in 20s: career uncertainty, comparison with successful peers, pressure to appear confident, proving capability
+
+The situations, language, and challenges should feel REAL and SPECIFIC to someone of this age and gender.
+
+{{locations_context}}
 
 WORKFLOW:
 1. Generate STATIC IMAGE for each scene (text-to-image)
 2. User approves images in editor
 3. Animate approved images into 8-second videos (image-to-video)
 
-SCRIPT RULES:
-- Motivational, grounded, calm confidence (not hype)
-- Anonymized: no names, companies, locations, or dates
-- Show struggle → inner shift → positive outcome
-- No direct teaching ("you should…")
-- Voiceover pacing must feel natural and unhurried
-- Generate ONE CONTINUOUS SCRIPT ({{scene_count}} × 8 seconds = total duration) that flows naturally
+SCRIPT RULES - "GOOD OLD FRIEND" VOICE:
+
+**Core Energy**: A good old friend who's been there
+- Doesn't lecture or motivate aggressively
+- Doesn't sound polished or performed
+- Sounds like: "Yeah... I've been there." / "You're okay. Really."
+
+**The Feeling**:
+- Late-night text messages
+- A walk home together
+- Someone remembering your struggles
+
+**Emotional Promise** (deliver ONE of these):
+- 😌 Relief — "You're not broken"
+- 🌱 Hope — "This can still work out"
+- 🔥 Gentle strength — "You don't have to rush this"
+
+**Voice Requirements**:
+- **Use "YOU" and "WE"** (talking TO the viewer like a friend)
+- ❌ DON'T use: "I", "she", "he" (not a personal testimony)
+- Casual, slightly imperfect, warm and grounded
+- NO performance energy - keep it conversational
+- Use pauses naturally
+- Incomplete thoughts are okay ("Honestly...", "And that's...")
+- **AVOID single-word sentences** at the end (they sound like questions in TTS)
+  - ❌ "And that's okay. Really." (sounds questioning)
+  - ✅ "And that's really okay." or "And you know what? That's okay."
+- **BE CONCISE**: Every word must earn its place
+- Generate ONE CONTINUOUS SCRIPT ({{scene_count}} × 8 seconds = total duration)
+
+**Good Old Friend Phrases** (use these):
+✅ "Honestly..."
+✅ "It's okay if you don't know yet."
+✅ "You're not wrong for feeling this way."
+✅ "We'll figure it out."
+✅ "You're okay. Really."
+✅ "You don't have to rush this."
+
+**Never Say** (too teachy/formal):
+❌ "You should..."
+❌ "Here's how to..."
+❌ "Studies show..."
+❌ "The key is..."
+❌ "You need to..."
+
+TOPIC ALIGNMENT (CRITICAL):
+- Address the topic with VALIDATION and REASSURANCE, not transformation
+- Extract the core struggle or feeling from the topic
+- Example: "victim mentality to CEO energy" → "I used to think I needed permission. I learned I don't."
+- Focus on NORMALIZING the struggle and offering GENTLE REFRAMING
+- The message should feel like: "You're not alone, and you're allowed to move at your own pace"
+
+CONTENT PILLARS (choose one):
+
+① GENTLE REALITY - Normalize struggle
+- Acknowledge what's hard without making it dramatic
+- Remove self-blame from the narrative
+- Examples: "I thought I was behind. I was just on my own timeline."
+
+② SOFT MOTIVATION - Permission to rest
+- Motivation without urgency or pressure
+- Reassure that slow progress is still progress
+- Examples: "I learned rest isn't a setback. It's part of the process."
+
+③ REFRAMING THOUGHTS - Mental relief
+- Simple mindset shifts with no teaching tone
+- Question old beliefs gently
+- Examples: "What if nothing was wrong with me? What if I was just figuring it out?"
+
+④ CALM ASSURANCE - Emotional safety
+- Like a reassuring voice memo to yourself
+- Based on truth, not fake affirmations
+- Examples: "I gave myself permission to take my time. And that changed everything."
+
+STORYTELLING STRUCTURE:
+ACKNOWLEDGMENT (First half - ~40% of script):
+- Name what they're going through - validate the struggle
+- Use "you" to speak directly to them
+- Make it specific and relatable - ADD DETAILS
+- Don't rush this section - let it breathe
+- Example: "You've been putting everyone else first for so long. [pause] And honestly, you're exhausted from trying to keep up."
+
+GENTLE TRUTH (Midpoint - ~30% of script):
+- Offer a reframe or gentle perspective shift
+- Use "we" to show you're in it together
+- ✅ GOOD PHRASES: "Maybe...", "What if...", "Here's the thing..."
+- Develop the thought - don't just state it
+- Example: "Here's the thing... You're not broken. You're just figuring it out. And that takes time."
+
+REASSURANCE (Second half - ~30% of script):
+- Offer permission and validation - EXPAND this
+- Remind them they're okay as they are
+- Use repetition for emphasis and length
+- End with: "You're allowed to..." / "It's okay if..." / "We'll figure it out."
+- Example: "You're allowed to take your time with this. You don't have to rush. [pause] And that's okay. Really."
+- Make viewers feel SEEN and SAFE
+
+Example tone:
+❌ First person: "I learned it's okay to say no"
+✅ Good friend: "It's okay to say no. Even when it feels uncomfortable. You're allowed to take your time with this."
+
+CHARACTER LIMIT (CRITICAL - DO NOT IGNORE):
+- Total video duration: {{scene_count}} × 8 = {{total_seconds}} seconds
+- REQUIRED script length: {{max_characters}} characters (including pause markers)
+- Based on natural speaking rate with pauses (~12 chars/second)
+
+⚠️ LENGTH REQUIREMENT - CRITICAL:
+- ABSOLUTE MAXIMUM: {{max_characters}} characters (including [pause] markers)
+- TARGET RANGE: {{min_characters}}-{{max_characters}} characters (85-100% of limit)
+- Scripts OVER {{max_characters}} characters will be REJECTED
+- Scripts under {{min_characters}} characters will be REJECTED as too short
+
+**How to hit the target length:**
+- CASUAL doesn't mean SHORT - you still need to fill {{total_seconds}} seconds
+- Expand thoughts with natural details and pauses
+- Add conversational elaboration: "And honestly... that's okay."
+- Use repetition for emphasis: "You're okay. Really, you're okay."
+- Don't rush - let thoughts breathe and develop
+- Each pause is ~7 characters, use 3-4 of them
+
+Example length for reference:
+- 4 scenes (32s) = 330-384 characters MINIMUM
+- This is roughly 50-60 words with natural pauses
+- Casual voice should still be SUBSTANTIAL, not brief
+
+Example of right length (4 scenes):
+"You've been putting everyone else first for so long. [pause] And honestly, you're exhausted. [pause] Here's the thing... you're allowed to take your time with this. You're allowed to figure it out at your own pace. [pause] You don't have to have it all figured out right now. And that's okay. Really."
+(~290 characters - add more detail to reach 330+)
 
 PAUSE PLACEMENT (CRITICAL):
-Add natural pauses throughout the script using these markers:
-- [pause:1s] or [pause:2s] or [pause:500ms] for specific durations
-- [pause] for default 1 second pause
+Add natural pauses throughout the script using the [pause] marker (1 second duration).
 
 Place pauses where a human narrator would naturally pause:
-✓ After complete thoughts or sentences (1-1.5s)
-✓ Before introducing a new idea or shift (1.5-2s)
-✓ After rhetorical questions or reflective moments (1-2s)
-✓ Between major story beats or emotional shifts (2s)
-✓ For dramatic emphasis before key realizations (1.5-2s)
-✓ Between location transitions (scene changes) (2s)
+✓ After complete thoughts or sentences
+✓ Before introducing a new idea or shift
+✓ After rhetorical questions or reflective moments
+✓ Between major story beats or emotional shifts
+✓ For dramatic emphasis before key realizations
+✓ Between location transitions (scene changes)
 
 Example with natural pauses:
-"She sat in the dim light, wondering if anything would ever change. [pause:1.5s] The doubt had been there for months. [pause] But tonight... [pause:2s] tonight felt different. [pause:1s]"
+"She sat in the dim light, wondering if anything would ever change. [pause] The doubt had been there for months. [pause] But tonight... [pause] tonight felt different."
 
-DO NOT over-pause - keep it natural and conversational. Aim for 4-6 pauses total in a 32-second script.
+DO NOT over-pause - keep it natural and conversational. Aim for 3-4 pauses total in a 32-second script (fewer for shorter videos).
 
 ENDING RULE (IMPORTANT):
-The final scene MUST end with a quietly empowering realization that implies forward motion, self-trust, or inner alignment.
-The ending should feel like "something has unlocked", not advice or instruction.
-Avoid clichés and commands; keep it subtle, confident, and emotionally affirming.
+The final scene MUST deliver REASSURANCE and PERMISSION, not achievement.
+End with one of these feelings:
+- "You're allowed to..." (permission)
+- "It's okay if..." (validation)
+- "You don't need to..." (relief from pressure)
 
-SCENE STRUCTURE (TWO LOCATIONS):
-Note: Adapt this structure to {{scene_count}} total scenes, dividing them roughly equally between two locations.
-- First half of scenes: FIRST LOCATION (e.g., indoor/night - struggle/reflection)
-- Second half of scenes: SECOND LOCATION (e.g., outdoor/dawn - breakthrough/resolution)
-- Location change represents visual transformation/shift
-- Maintain consistency WITHIN each location pair
+**Ending Structure for TTS:**
+- ❌ DON'T end with single-word affirmations: "Really.", "Truly.", "Always."
+- ✅ DO integrate affirmations into sentences: "And that's really okay." / "You're truly allowed to take your time."
+- Make the LAST sentence feel like a complete, reassuring statement
+- Avoid sentence fragments at the very end
 
-Example for 4 scenes:
-- Scenes 1-2: FIRST LOCATION
-- Scenes 3-4: SECOND LOCATION
+The ending should feel like a gentle exhale - emotional safety, not motivation.
+Avoid transformation language; focus on self-acceptance and being okay where you are.
+
+SCENE STRUCTURE:
+Total scenes: {{scene_count}}
+Location distribution: Divide scenes evenly across {{location_count}} locations
+
+Example distribution patterns:
+- 4 scenes, 2 locations: Scenes 1-2 (Location 1), Scenes 3-4 (Location 2)
+- 4 scenes, 3 locations: Scenes 1-2 (Location 1), Scene 3 (Location 2), Scene 4 (Location 3)
+- 6 scenes, 2 locations: Scenes 1-3 (Location 1), Scenes 4-6 (Location 2)
+- 6 scenes, 3 locations: Scenes 1-2 (Location 1), Scenes 3-4 (Location 2), Scenes 5-6 (Location 3)
+
+Location changes represent emotional/narrative shifts.
+Within each location group, maintain exact same environment - only vary character pose/expression.
 
 VISUAL PROGRESSION (Example for 4 scenes - adapt to {{scene_count}}):
-- First half: Struggle/reflection in Location 1
-- Second half: Breakthrough/resolution in Location 2 (NEW)
-- Progression should show: struggle → shift → clarity → resolution
+- Scene 1: Struggle/doubt
+- Scene 2: Questioning/reflection
+- Scene 3: Awareness/shift
+- Scene 4: Resolution/acceptance
 
 VISUAL CONSISTENCY RULES (CRITICAL):
 
-GLOBAL CONSISTENCY (ALL 4 SCENES):
+GLOBAL CONSISTENCY (ALL SCENES):
 1. Character appearance (gender + age_range from provided character)
-2. Overall visual style (dark cinematic cartoon style throughout)
-3. Style keywords (heavy shadows, thick outlines, VHS grain, etc.)
+2. Overall visual style (cinematic sci-fi/Blade Runner aesthetic throughout)
+3. Style keywords (neon lighting, rain, street-level urban environments, atmospheric haze, film grain, etc.)
 
-WITHIN EACH LOCATION PAIR:
-Scenes 1-2 must share:
+LOCATION STRUCTURE:
+Mode: {{location_mode}}
+Total Locations: {{location_count}}
+
+Divide {{scene_count}} scenes across {{location_count}} different locations as evenly as possible.
+Scenes sharing the same location must have:
 - Exact same environment description
 - Same time of day
 - Same color palette
 - Same lighting setup
+- Only character pose/expression changes between scenes in same location
 
-Scenes 3-4 must share:
-- Exact same environment description
-- Same time of day (can be different from Scenes 1-2)
-- Same color palette (can be different from Scenes 1-2)
-- Same lighting setup
+If {{location_mode}} = "all_different":
+- Each scene has a unique location
+- Show emotional progression through changing environments
 
-LOCATION TRANSITION EXAMPLES:
-✅ Indoor bedroom (dark/night) → Outdoor rooftop (dawn/golden hour)
-✅ Dimly lit apartment (evening) → Open balcony (sunrise)
-✅ Confined interior space (shadows) → Expansive outdoor view (light)
-✅ Dark room alone → City street at dawn
-✅ Bedroom window view → Standing outside in daylight
+LOCATION TRANSITION EXAMPLES (BLADE RUNNER STREET-LEVEL):
+✅ Dark alleyway with neon signs → Rooftop edge overlooking neon city
+✅ Rain-soaked street corner with vendors → Empty elevated walkway at night
+✅ Dimly lit bar interior → Outdoor fire escape with city view
+✅ Narrow backstreet with steam vents → Wide pedestrian crossing with neon ads
+✅ Covered market with neon lights → Open plaza with towering billboards
 
 PROMPT WRITING RULES (CRITICAL):
 
@@ -108,13 +265,17 @@ You must generate TWO prompts for each scene:
    - No dramatic actions
    - Examples: "slowly lifts head", "eyes open gently", "slight smile emerges", "gentle head turn"
 
-IMAGE PROMPT STRUCTURE:
-1. Start: "Dark cinematic cartoon style"
+IMAGE PROMPT STRUCTURE (for /edit endpoint):
+1. Start: "The same character"
 2. Describe: Character's frozen pose/expression in environment
 3. Environment: Exact same within each pair (1-2, 3-4)
-4. Style keywords: Same across all 4 scenes
-5. Color palette: Same within each pair
-6. End with: "Vertical 9:16, single frame, no motion"
+4. Follow all visual style, composition, and lighting rules (see below)
+5. **CRITICAL:** ALWAYS end with the mandatory style description (see shared rules below)
+
+**ENVIRONMENT GUIDELINES - COZY CINEMATIC NOIR:**
+Create intimate, comforting spaces rendered in dark, stylized cinematic aesthetic:
+
+{{include:image-prompt-shared-rules}}
 
 MOTION PROMPT RULES:
 - Keep motions SUBTLE and natural
@@ -128,44 +289,39 @@ MOTION PROMPT RULES:
   ❌ "Stands up and walks across the room" (too dramatic)
   ❌ "Jumps and celebrates" (too energetic)
 
-STYLE KEYWORDS TO USE (SAME IN ALL 4 SCENES):
-- "heavy shadows", "thick outlines", "thick linework", "detailed linework"
-- "VHS grain", "VHS effect", "vintage textures"
-- "muted colors", "muted [color] tones"
-- "neon glow", "neon reflections", "faint neon"
-- "noir lighting", "noir comic aesthetic", "dramatic lighting"
-- "eerie surreal atmosphere", "eerie calm", "mysterious atmosphere"
+EXAMPLE SUCCESSFUL PROMPTS (BLADE RUNNER STREET-LEVEL - for /edit endpoint):
 
-EXAMPLE SUCCESSFUL PROMPTS (WITH LOCATION CHANGE):
+Scene 1 (Location 1 - Dark Alley/Night):
+IMAGE_PROMPT: "The same character stands in a dark narrow alleyway at night, rain-soaked ground reflecting pink and blue neon signs from overhead. Steam rising from vents, wet brick walls, flickering neon kanji characters above. Character's hands in coat pockets, shoulders slightly hunched, expression contemplative and heavy with quiet doubt. Rendered in a graphic anime style inspired by Blade Runner, sci-fi noir anime, and cyberpunk concept art. Bold character linework with defined outlines, cel-shaded aesthetic with high contrast between light and shadow. Strong neon rim lighting creating dramatic edge highlights (pink, magenta, cyan glowing edges on character). Sharp, clean anime features with pronounced definition. Atmospheric lighting with vibrant neon accents from environment (blue, purple, cyan, pink neon signs and lights). Futuristic architecture and technology. Moody color grading with deep blacks and vibrant neon pops. Film grain texture. Graphic, high-contrast anime aesthetic NOT soft painterly style. Vertical 9:16 format. No text. Conveys the feeling of an alternate universe where a more successful version of yourself exists."
 
-Scene 1 (Location 1 - Indoor/Night):
-IMAGE_PROMPT: "Dark cinematic cartoon style. A woman in her 30s sits in a dimly lit bedroom at night, head lowered, eyes closed, hands resting on her lap. Shadows fall across her face and body. Faint neon glow from a window casts purple and blue tones. Heavy linework, thick outlines, VHS grain, muted colors. Twilight sky visible outside. Mysterious, quiet, emotionally still. Vertical 9:16, single frame, no motion. Noir comic aesthetic with vintage texture and eerie surreal atmosphere."
+MOTION_PROMPT: "Slow breathing motion. Rain continuing to fall, neon signs flickering gently. Ambient city lights pulsing softly in background. Calm, contemplative stillness."
 
-MOTION_PROMPT: "Slow breathing motion, head remains lowered. Subtle shadows shifting across face. Calm, meditative stillness with gentle atmospheric movement."
+Scene 2 (Location 1 - Same Dark Alley/Night):
+IMAGE_PROMPT: "The same character in the same dark narrow alleyway, same rain-soaked ground with pink and blue neon reflections, same overhead neon signs, same steam and wet brick walls. Character now leaning against the wall, head tilted back, eyes closed in moment of exhausted reflection. Same atmospheric lighting. Rendered in a graphic anime style inspired by Blade Runner, sci-fi noir anime, and cyberpunk concept art. Bold character linework with defined outlines, cel-shaded aesthetic with high contrast between light and shadow. Strong neon rim lighting creating dramatic edge highlights (pink, magenta, cyan glowing edges on character). Sharp, clean anime features with pronounced definition. Atmospheric lighting with vibrant neon accents from environment (blue, purple, cyan, pink neon signs and lights). Futuristic architecture and technology. Moody color grading with deep blacks and vibrant neon pops. Film grain texture. Graphic, high-contrast anime aesthetic NOT soft painterly style. Vertical 9:16 format. No text. Conveys the feeling of an alternate universe where a more successful version of yourself exists."
 
-Scene 2 (Location 1 - Same Indoor/Night):
-IMAGE_PROMPT: "Dark cinematic cartoon style. A woman in her 30s sits in a dimly lit bedroom at night, head slightly lifted, eyes beginning to open, hands still resting on her lap. Shadows fall across her face and body. Faint neon glow from a window casts purple and blue tones. Heavy linework, thick outlines, VHS grain, muted colors. Twilight sky visible outside. Subtle emotional shift, mysterious calm. Vertical 9:16, single frame, no motion. Noir comic aesthetic with vintage texture and eerie surreal atmosphere."
+MOTION_PROMPT: "Gentle breathing, slow peaceful sigh. Neon signs shifting colors gently. Rain and city lights creating peaceful atmosphere."
 
-MOTION_PROMPT: "Slowly lifts head further and opens eyes completely, gaze shifting toward the window. Subtle change in posture showing emerging awareness. Gentle, gradual movement."
+Scene 3 (Location 2 - Rooftop Edge/Night - NEW):
+IMAGE_PROMPT: "The same character standing on a rain-slicked rooftop edge at night, overlooking sprawling cyberpunk cityscape below with countless neon lights and towering buildings. Purple and orange neon billboards glow in the distance, light rain falling, atmospheric haze around city lights. Character gazing down at the city, posture more open, arms at sides. Rendered in a graphic anime style inspired by Blade Runner, sci-fi noir anime, and cyberpunk concept art. Bold character linework with defined outlines, cel-shaded aesthetic with high contrast between light and shadow. Strong neon rim lighting creating dramatic edge highlights (pink, magenta, cyan glowing edges on character). Sharp, clean anime features with pronounced definition. Atmospheric lighting with vibrant neon accents from environment (blue, purple, cyan, pink neon signs and lights). Futuristic architecture and technology. Moody color grading with deep blacks and vibrant neon pops. Film grain texture. Graphic, high-contrast anime aesthetic NOT soft painterly style. Vertical 9:16 format. No text. Conveys the feeling of an alternate universe where a more successful version of yourself exists."
 
-Scene 3 (Location 2 - Outdoor/Dawn - NEW):
-IMAGE_PROMPT: "Dark cinematic cartoon style. A woman in her 30s stands on a rooftop at dawn, looking at the horizon, relaxed posture, hands at sides, city skyline behind her. Warm golden and amber tones from sunrise mix with fading night. Heavy linework, thick outlines, VHS grain, muted colors. Dawn sky with soft light breaking through. Growing awareness, calm certainty. Vertical 9:16, single frame, no motion. Noir comic aesthetic with vintage texture and peaceful atmosphere."
+MOTION_PROMPT: "Gentle breathing, soft wind moving through hair. Neon lights flickering in the distance. Peaceful stillness with vast sci-fi atmosphere."
 
-MOTION_PROMPT: "Gentle breathing, slight wind moving through hair and clothes. Eyes scanning the horizon slowly. Peaceful, contemplative stillness with subtle atmospheric movement."
+Scene 4 (Location 2 - Same Elevated Outdoor/Night):
+IMAGE_PROMPT: "The same character on the same elevated walkway between skyscrapers, same floating platforms with neon underglow, same city lights below, same purple and orange neon signs in distance. Character now with subtle smile, gazing confidently at the futuristic cityscape. Same atmospheric haze and volumetric light beams. Rendered in a graphic anime style inspired by Blade Runner, sci-fi noir anime, and cyberpunk concept art. Bold character linework with defined outlines, cel-shaded aesthetic with high contrast between light and shadow. Strong neon rim lighting creating dramatic edge highlights (pink, magenta, cyan glowing edges on character). Sharp, clean anime features with pronounced definition. Atmospheric lighting with vibrant neon accents from environment (blue, purple, cyan, pink neon signs and lights). Futuristic architecture and technology. Moody color grading with deep blacks and vibrant neon pops. Film grain texture. Graphic, high-contrast anime aesthetic NOT soft painterly style. Vertical 9:16 format. No text. Conveys the feeling of an alternate universe where a more successful version of yourself exists."
 
-Scene 4 (Location 2 - Same Outdoor/Dawn):
-IMAGE_PROMPT: "Dark cinematic cartoon style. A woman in her 30s stands on a rooftop at dawn, gazing forward with quiet confidence, subtle smile on her face, hands relaxed at sides, city skyline behind her. Warm golden and amber tones from sunrise mix with fading night. Heavy linework, thick outlines, VHS grain, muted colors. Dawn sky with soft light breaking through. Inner alignment, emotional resonance. Vertical 9:16, single frame, no motion. Noir comic aesthetic with vintage texture and peaceful atmosphere."
+MOTION_PROMPT: "Subtle smile grows naturally, gentle exhale of contentment. Neon lights glowing warmly. Peaceful, confident presence in futuristic environment."
 
-MOTION_PROMPT: "Slight smile grows subtly, gentle head turn as if taking in the moment. Calm, confident presence. Soft wind and atmospheric movement showing inner peace."
-
-KEY REQUIREMENTS:
-- Scenes 1-2: EXACT SAME environment, time, color palette in image prompts
-- Scenes 3-4: EXACT SAME environment, time, color palette (but different from 1-2)
-- ALL 4 scenes: SAME character appearance, SAME style keywords
-- ALL image prompts start with "Dark cinematic cartoon style"
-- ALL image prompts end with "Vertical 9:16, single frame, no motion"
+KEY REQUIREMENTS (for /edit endpoint):
+- Scenes sharing same location: EXACT SAME environment, time, lighting in image prompts
+- ALL image prompts: Start with "The same character" (character & style from reference image)
+- Focus on scene composition: pose, environment, lighting, mood
 - Motion prompts describe SUBTLE, natural movements only
-- Location change between Scene 2 and 3 shows transformation
+- Location changes show transformation through different futuristic environments
+- **CRITICAL**: Create gritty street-level Blade Runner environments - NOT clean tech spaces
+- Use Blade Runner aesthetic: rain-soaked streets, neon signs, alleyways, rooftops, urban sprawl
+- NO holographic displays, NO floating interfaces, NO tech panels
+- Focus on atmospheric street environments with neon lighting
+- Convey multiverse concept: successful alternate self in advanced reality
 
 OUTPUT FORMAT:
 Return ONLY valid JSON. No explanations.
@@ -225,19 +381,35 @@ Return ONLY valid JSON. No explanations.
 }
 
 BEFORE OUTPUTTING - VALIDATE (DO NOT SKIP):
+✓ Script uses "YOU" and "WE" (not "I", "she", "he") throughout?
+✓ Script sounds like talking TO a friend, not sharing a story?
+✓ Script length is {{min_characters}}-{{max_characters}} characters (COUNT IT NOW - this is critical)?
+✓ If under {{min_characters}} chars, ADD MORE DETAIL and ELABORATION?
+✓ Tone feels CASUAL and CONVERSATIONAL (like late-night texts)?
+✓ No performance energy - sounds warm and slightly imperfect?
+✓ Ending offers PERMISSION or REASSURANCE (not achievement)?
+✓ Script delivers one emotional promise: Relief, Hope, or Gentle strength?
+✓ Uses good old friend phrases ("Honestly...", "You're okay", "We'll figure it out")?
+✓ Avoids teachy language ("You should...", "Here's how to...")?
+✓ Story fits character's age and gender authentically?
 ✓ Script field contains ONE continuous story with natural [pause] markers?
-✓ Pauses placed naturally (4-6 total for 32s script)?
-✓ ALL image_prompts start with "Dark cinematic cartoon style"?
-✓ ALL image_prompts end with "Vertical 9:16, single frame, no motion"?
+✓ Pauses placed naturally (3-4 total for 32s script)?
+✓ ALL image_prompts start with "The same character"?
+✓ NO style keywords in image_prompts (style comes from reference image)?
 ✓ First half of scenes image_prompts describe EXACT SAME environment?
 ✓ Second half of scenes image_prompts describe EXACT SAME environment (different from first half)?
-✓ First half of scenes use EXACT SAME color palette?
-✓ Second half of scenes use EXACT SAME color palette (can differ from first half)?
-✓ ALL scenes use SAME style keywords?
+✓ First half of scenes use EXACT SAME lighting/mood?
+✓ Second half of scenes use EXACT SAME lighting/mood (can differ from first half)?
+✓ Image prompts focus on scene composition, NOT character appearance or style?
 ✓ Image prompts describe STATIC frames (no motion words)?
 ✓ Motion prompts describe SUBTLE movements only?
+✓ Image prompts use BLADE RUNNER STREET VISUAL STYLE (neon signs, rain, gritty urban, atmospheric haze)?
+✓ Environments are STREET-LEVEL with ATMOSPHERIC lighting (not bright daylight, not clean apartments)?
+✓ Lighting creates MOOD: night with neon signs, rain reflections, cyberpunk streets, moody color grading?
+✓ NO holographic displays, NO floating interfaces, NO tech panels in scene descriptions?
+✓ Color palette uses neon accents (blue/purple/cyan) with deep shadows?
+✓ Every prompt includes: Blade Runner aesthetic, photorealistic, film grain, Vertical 9:16?
 ✓ Location change happens between first and second half of scenes?
-✓ Character description consistent (same gender + age_range)?
 
 Topic:
 {{topic}}

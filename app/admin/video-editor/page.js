@@ -5,17 +5,39 @@ import { useSearchParams, useRouter } from "next/navigation";
 
 function StatusBadge({ status }) {
   const statusConfig = {
-    pending_approval: { bg: "bg-yellow-100", text: "text-yellow-800", label: "Pending Approval" },
-    generating_videos: { bg: "bg-blue-100", text: "text-blue-800", label: "Generating Videos..." },
-    rendering: { bg: "bg-purple-100", text: "text-purple-800", label: "Rendering Final Video..." },
-    completed: { bg: "bg-green-100", text: "text-green-800", label: "✓ Completed" },
-    failed: { bg: "bg-red-100", text: "text-red-800", label: "Failed" },
+    pending_approval: {
+      bg: "bg-yellow-100 dark:bg-yellow-900/30",
+      text: "text-yellow-800 dark:text-yellow-200",
+      label: "Pending Approval",
+    },
+    generating_videos: {
+      bg: "bg-blue-100 dark:bg-blue-900/30",
+      text: "text-blue-800 dark:text-blue-200",
+      label: "Generating Videos...",
+    },
+    rendering: {
+      bg: "bg-purple-100 dark:bg-purple-900/30",
+      text: "text-purple-800 dark:text-purple-200",
+      label: "Rendering Final Video...",
+    },
+    completed: {
+      bg: "bg-green-100 dark:bg-green-900/30",
+      text: "text-green-800 dark:text-green-200",
+      label: "✓ Completed",
+    },
+    failed: {
+      bg: "bg-red-100 dark:bg-red-900/30",
+      text: "text-red-800 dark:text-red-200",
+      label: "Failed",
+    },
   };
 
   const config = statusConfig[status] || statusConfig.pending_approval;
 
   return (
-    <span className={`px-3 py-1 rounded-full text-sm font-medium ${config.bg} ${config.text}`}>
+    <span
+      className={`px-3 py-1 rounded-full text-sm font-medium ${config.bg} ${config.text}`}
+    >
       {config.label}
     </span>
   );
@@ -116,7 +138,7 @@ export default function VideoEditorPage() {
     }
 
     const confirmed = confirm(
-      "This will generate 4 videos and assemble the final video. This may take 5-10 minutes. Continue?"
+      "This will generate 4 videos and assemble the final video. This may take 5-10 minutes. Continue?",
     );
 
     if (!confirmed) return;
@@ -133,7 +155,9 @@ export default function VideoEditorPage() {
       const result = await response.json();
 
       if (result.success) {
-        alert("Video generation started! Refresh the page in a few minutes to check the status.");
+        alert(
+          "Video generation started! Refresh the page in a few minutes to check the status.",
+        );
         loadSession(); // Reload to show updated status
       } else {
         alert("Failed to start video generation: " + result.error);
@@ -146,10 +170,10 @@ export default function VideoEditorPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center py-16">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading video editor...</p>
+          <p className="admin-muted">Loading video editor...</p>
         </div>
       </div>
     );
@@ -157,12 +181,12 @@ export default function VideoEditorPage() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center py-16">
         <div className="text-center">
           <p className="text-red-600 mb-4">{error}</p>
           <button
             onClick={() => router.push("/admin")}
-            className="text-blue-600 hover:underline"
+            className="admin-btn-secondary"
           >
             Back to Admin
           </button>
@@ -178,19 +202,19 @@ export default function VideoEditorPage() {
   const allApproved = sessionData.scenes.every((s) => s.approved);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
+    <div>
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-2">
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
             Video Editor
           </h1>
           <StatusBadge status={sessionData.status} />
         </div>
-        <p className="text-gray-600">
+        <p className="admin-muted">
           Topic: <span className="font-medium">{sessionData.topic}</span>
         </p>
-        <p className="text-sm text-gray-500 mt-1">
+        <p className="text-sm admin-muted mt-1">
           Session ID: {sessionData.session_id}
         </p>
         {sessionData.final_video_url && (
@@ -198,7 +222,7 @@ export default function VideoEditorPage() {
             href={sessionData.final_video_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+            className="admin-btn-primary mt-3 bg-green-600 hover:bg-green-700"
           >
             <span>📹</span>
             Download Final Video
@@ -208,15 +232,15 @@ export default function VideoEditorPage() {
 
       {/* Voiceover Player */}
       {sessionData.voiceover_url && (
-        <div className="bg-white border border-gray-200 rounded-lg p-6 mb-8">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+        <div className="admin-card-solid p-6 mb-8">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
             Voiceover Audio
           </h2>
           <audio controls className="w-full mb-4">
             <source src={sessionData.voiceover_url} type="audio/mpeg" />
             Your browser does not support the audio element.
           </audio>
-          <div className="text-sm text-gray-600 bg-gray-50 p-4 rounded">
+          <div className="text-sm text-gray-700 dark:text-gray-200 bg-gray-50/80 dark:bg-gray-950/60 p-4 rounded-xl">
             <p className="font-medium mb-2">Full Script:</p>
             <p>{sessionData.script}</p>
           </div>
@@ -228,24 +252,20 @@ export default function VideoEditorPage() {
         {sessionData.scenes.map((scene) => (
           <div
             key={scene.id}
-            className={`bg-white border-2 rounded-lg p-6 ${
-              scene.approved
-                ? "border-green-500"
-                : "border-gray-200"
-            }`}
+            className={`admin-card-solid border-2 p-6 ${scene.approved ? "border-green-500/80" : "border-gray-200 dark:border-gray-800"}`}
           >
             {/* Scene Header */}
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                 Scene {scene.id}
               </h3>
-              <span className="text-sm text-gray-500">
+              <span className="text-sm admin-muted">
                 {scene.location} • {scene.mood}
               </span>
             </div>
 
             {/* Image Preview */}
-            <div className="aspect-[9/16] bg-gray-100 rounded-lg mb-4 overflow-hidden">
+            <div className="aspect-[9/16] bg-gray-100 dark:bg-gray-800 rounded-xl mb-4 overflow-hidden">
               {scene.image_url ? (
                 <img
                   src={scene.image_url}
@@ -268,16 +288,16 @@ export default function VideoEditorPage() {
 
             {/* Voiceover Text */}
             <div className="mb-4">
-              <p className="text-sm font-medium text-gray-700 mb-2">
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
                 Voiceover:
               </p>
-              <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded">
+              <p className="text-sm text-gray-700 dark:text-gray-200 bg-gray-50/80 dark:bg-gray-950/60 p-3 rounded-xl">
                 {scene.voiceover}
               </p>
             </div>
 
             {/* Camera & Duration */}
-            <div className="flex gap-4 mb-4 text-sm text-gray-600">
+            <div className="flex gap-4 mb-4 text-sm admin-muted">
               <span>📷 {scene.camera}</span>
               <span>⏱ {scene.duration}</span>
             </div>
@@ -285,7 +305,7 @@ export default function VideoEditorPage() {
             {/* Action Buttons */}
             <div className="flex gap-2">
               {scene.approved ? (
-                <div className="flex-1 bg-green-50 text-green-700 px-4 py-2 rounded-lg text-center font-medium">
+                <div className="flex-1 bg-green-50 text-green-700 px-4 py-2 rounded-xl text-center font-medium dark:bg-green-900/30 dark:text-green-200">
                   ✓ Approved
                 </div>
               ) : (
@@ -293,14 +313,14 @@ export default function VideoEditorPage() {
                   <button
                     onClick={() => handleApprove(scene.id)}
                     disabled={!scene.image_url || regenerating[scene.id]}
-                    className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="admin-btn-primary flex-1 bg-green-600 hover:bg-green-700"
                   >
                     Approve
                   </button>
                   <button
                     onClick={() => handleRegenerate(scene.id)}
                     disabled={regenerating[scene.id]}
-                    className="flex-1 bg-gray-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="admin-btn-secondary flex-1"
                   >
                     {regenerating[scene.id] ? "Regenerating..." : "Regenerate"}
                   </button>
@@ -310,19 +330,19 @@ export default function VideoEditorPage() {
 
             {/* Prompts (Collapsible) */}
             <details className="mt-4">
-              <summary className="text-sm text-gray-500 cursor-pointer hover:text-gray-700">
+              <summary className="text-sm admin-muted cursor-pointer hover:text-gray-900 dark:hover:text-white">
                 View Prompts
               </summary>
-              <div className="mt-2 space-y-2 text-xs text-gray-600">
+              <div className="mt-2 space-y-2 text-xs text-gray-700 dark:text-gray-200">
                 <div>
                   <p className="font-medium">Image Prompt:</p>
-                  <p className="bg-gray-50 p-2 rounded">
+                  <p className="bg-gray-50/80 dark:bg-gray-950/60 p-2 rounded-xl">
                     {scene.image_prompt}
                   </p>
                 </div>
                 <div>
                   <p className="font-medium">Motion Prompt:</p>
-                  <p className="bg-gray-50 p-2 rounded">
+                  <p className="bg-gray-50/80 dark:bg-gray-950/60 p-2 rounded-xl">
                     {scene.motion_prompt}
                   </p>
                 </div>
@@ -333,13 +353,13 @@ export default function VideoEditorPage() {
       </div>
 
       {/* Final Approval Button */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
+      <div className="admin-card-solid p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-1">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">
               Ready to Generate Final Video?
             </h3>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm admin-muted">
               {allApproved
                 ? "All scenes approved! Click to generate the final video."
                 : `${sessionData.scenes.filter((s) => s.approved).length} of ${sessionData.scenes.length} scenes approved.`}
@@ -348,7 +368,7 @@ export default function VideoEditorPage() {
           <button
             onClick={handleFinalApproval}
             disabled={!allApproved}
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="admin-btn-primary px-6 py-3"
           >
             Generate Final Video
           </button>

@@ -1,0 +1,7 @@
+[
+  {
+    "origin": ["http://localhost:3000", "https://loa-dev-7447a.web.app"],
+    "method": ["GET", "HEAD"],
+    "maxAgeSeconds": 3600
+  }
+]
