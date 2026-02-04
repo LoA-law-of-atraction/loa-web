@@ -259,9 +259,7 @@ export default function VideoEditorPage() {
               <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                 Scene {scene.id}
               </h3>
-              <span className="text-sm admin-muted">
-                {scene.location} • {scene.mood}
-              </span>
+              <span className="text-sm admin-muted">{scene.duration}</span>
             </div>
 
             {/* Image Preview */}
@@ -296,9 +294,8 @@ export default function VideoEditorPage() {
               </p>
             </div>
 
-            {/* Camera & Duration */}
+            {/* Duration */}
             <div className="flex gap-4 mb-4 text-sm admin-muted">
-              <span>📷 {scene.camera}</span>
               <span>⏱ {scene.duration}</span>
             </div>
 

@@ -7,8 +7,11 @@ export async function POST(request) {
 
     if (!project_id || !location_count || !scene_count) {
       return NextResponse.json(
-        { error: "Missing required fields: project_id, location_count, scene_count" },
-        { status: 400 }
+        {
+          error:
+            "Missing required fields: project_id, location_count, scene_count",
+        },
+        { status: 400 },
       );
     }
 
@@ -19,8 +22,11 @@ export async function POST(request) {
 
     if (locationsSnapshot.empty) {
       return NextResponse.json(
-        { error: "No locations found in library. Run /api/locations/seed first." },
-        { status: 404 }
+        {
+          error:
+            "No locations found in library. Run /api/locations/seed first.",
+        },
+        { status: 404 },
       );
     }
 
@@ -29,10 +35,15 @@ export async function POST(request) {
       ...doc.data(),
     }));
 
-    console.log(`Selecting ${location_count} locations from ${allLocations.length} available`);
+    console.log(
+      `Selecting ${location_count} locations from ${allLocations.length} available`,
+    );
 
     // Select diverse locations - prioritize variety in types
-    const selectedLocations = selectDiverseLocations(allLocations, location_count);
+    const selectedLocations = selectDiverseLocations(
+      allLocations,
+      location_count,
+    );
 
     // Create location mapping: divide scenes evenly across locations
     const locationMapping = {};
@@ -40,19 +51,41 @@ export async function POST(request) {
 
     for (let sceneIndex = 0; sceneIndex < scene_count; sceneIndex++) {
       const locationIndex = Math.floor(sceneIndex / scenesPerLocation);
-      const location = selectedLocations[Math.min(locationIndex, selectedLocations.length - 1)];
+      const location =
+        selectedLocations[
+          Math.min(locationIndex, selectedLocations.length - 1)
+        ];
       locationMapping[sceneIndex + 1] = location.id; // scene_id is 1-indexed
     }
 
     console.log("Location mapping:", locationMapping);
 
-    // Update project with location mapping
+    // Update project timestamp (mapping is stored on per-scene docs)
     const projectRef = db.collection("projects").doc(project_id);
     await projectRef.update({
-      location_mapping: locationMapping,
-      locations_selected_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
+
+    // Persist on each scene doc as `location_id` (preferred)
+    try {
+      const batchScenes = db.batch();
+      const scenesCollection = projectRef.collection("scenes");
+      for (const [sceneId, locationId] of Object.entries(locationMapping)) {
+        const sceneRef = scenesCollection.doc(String(sceneId));
+        batchScenes.set(
+          sceneRef,
+          {
+            id: Number(sceneId),
+            location_id: String(locationId),
+            updated_at: new Date().toISOString(),
+          },
+          { merge: true },
+        );
+      }
+      await batchScenes.commit();
+    } catch (error) {
+      console.error("Failed to persist per-scene locations:", error);
+    }
 
     // Increment usage_count for selected locations
     const batch = db.batch();
@@ -73,7 +106,7 @@ export async function POST(request) {
     console.error("Error selecting locations:", error);
     return NextResponse.json(
       { error: "Failed to select locations", message: error.message },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -99,7 +132,7 @@ function selectDiverseLocations(allLocations, count) {
   while (selected.length < count && selected.length < allLocations.length) {
     const currentType = types[typeIndex % types.length];
     const availableInType = locationsByType[currentType].filter(
-      (loc) => !selected.find((s) => s.id === loc.id)
+      (loc) => !selected.find((s) => s.id === loc.id),
     );
 
     if (availableInType.length > 0) {
@@ -117,7 +150,7 @@ function selectDiverseLocations(allLocations, count) {
   // If we still need more, pick randomly from remaining
   while (selected.length < count && selected.length < allLocations.length) {
     const remaining = allLocations.filter(
-      (loc) => !selected.find((s) => s.id === loc.id)
+      (loc) => !selected.find((s) => s.id === loc.id),
     );
     if (remaining.length === 0) break;
 
@@ -127,7 +160,7 @@ function selectDiverseLocations(allLocations, count) {
 
   console.log(
     `Selected ${selected.length} diverse locations:`,
-    selected.map((l) => `${l.name} (${l.type})`).join(", ")
+    selected.map((l) => `${l.name} (${l.type})`).join(", "),
   );
 
   return selected;

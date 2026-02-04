@@ -8,22 +8,29 @@ const anthropic = new Anthropic({
 
 export async function POST(request) {
   try {
-    const { count = 1, keywords = null } = await request.json();
+    const {
+      count = 1,
+      keywords = null,
+      project_id = null,
+    } = await request.json();
 
     if (!keywords || !keywords.trim()) {
       return NextResponse.json(
         { error: "Keywords are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     console.log(`Generating ${count} action(s) with keywords: ${keywords}...`);
 
-    const keywordsList = keywords.split(',').map(k => k.trim()).filter(k => k);
+    const keywordsList = keywords
+      .split(",")
+      .map((k) => k.trim())
+      .filter((k) => k);
 
     const prompt = `Generate ${count} character action/pose definitions for a "SOFT DYSTOPIA" / "HUMAN SCI-FI" video project.
 
-KEYWORDS TO INCORPORATE: ${keywordsList.join(', ')}
+KEYWORDS TO INCORPORATE: ${keywordsList.join(", ")}
 
 AESTHETIC CONCEPT: "SOFT DYSTOPIA" / "HUMAN SCI-FI"
 🌌 DYSTOPIAN world: overwhelming megacity, rain-soaked, nighttime, industrial tech everywhere
@@ -104,13 +111,15 @@ Generate exactly ${count} action(s). Ensure IDs are unique and descriptive.`;
     // Calculate cost
     const inputTokens = message.usage.input_tokens;
     const outputTokens = message.usage.output_tokens;
-    const inputCostPerMillion = 3.00;
-    const outputCostPerMillion = 15.00;
+    const inputCostPerMillion = 3.0;
+    const outputCostPerMillion = 15.0;
     const inputCost = (inputTokens / 1_000_000) * inputCostPerMillion;
     const outputCost = (outputTokens / 1_000_000) * outputCostPerMillion;
     const totalCost = inputCost + outputCost;
 
-    console.log(`Action generation cost: $${totalCost.toFixed(4)} (${inputTokens} input + ${outputTokens} output tokens)`);
+    console.log(
+      `Action generation cost: $${totalCost.toFixed(4)} (${inputTokens} input + ${outputTokens} output tokens)`,
+    );
 
     // Extract JSON from response
     const jsonMatch = responseText.match(/\[[\s\S]*\]/);
@@ -153,7 +162,44 @@ Generate exactly ${count} action(s). Ensure IDs are unique and descriptive.`;
 
     await batch.commit();
 
-    console.log(`Successfully generated and saved ${savedActions.length} action(s)`);
+    console.log(
+      `Successfully generated and saved ${savedActions.length} action(s)`,
+    );
+
+    // Update costs (best-effort)
+    if (project_id) {
+      try {
+        const projectRef = db.collection("projects").doc(project_id);
+        const projectDoc = await projectRef.get();
+        if (projectDoc.exists) {
+          const existingCosts = projectDoc.data()?.costs || {};
+
+          const newClaudeCost = (existingCosts.claude || 0) + totalCost;
+          const newStep4ClaudeCost =
+            (existingCosts.step4?.claude || 0) + totalCost;
+          const newStep4Total = (existingCosts.step4?.total || 0) + totalCost;
+          const newTotal = (existingCosts.total || 0) + totalCost;
+
+          await projectRef.update({
+            costs: {
+              ...existingCosts,
+              // API-level
+              claude: newClaudeCost,
+              // Step-level
+              step4: {
+                ...existingCosts.step4,
+                claude: newStep4ClaudeCost,
+                total: newStep4Total,
+              },
+              total: newTotal,
+            },
+            updated_at: new Date().toISOString(),
+          });
+        }
+      } catch (error) {
+        console.error("Error updating costs:", error);
+      }
+    }
 
     return NextResponse.json({
       success: true,
@@ -165,7 +211,7 @@ Generate exactly ${count} action(s). Ensure IDs are unique and descriptive.`;
     console.error("Generate actions error:", error);
     return NextResponse.json(
       { error: "Failed to generate actions", message: error.message },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

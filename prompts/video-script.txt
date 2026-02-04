@@ -250,20 +250,18 @@ LOCATION TRANSITION EXAMPLES (BLADE RUNNER STREET-LEVEL):
 
 PROMPT WRITING RULES (CRITICAL):
 
-You must generate TWO prompts for each scene:
+You must generate an IMAGE_PROMPT for each scene:
 
 1. IMAGE_PROMPT (for text-to-image generation):
-   - Describes a STATIC FRAME (like a photograph)
-   - No motion words (no "walking", "moving", "turning")
-   - Describes a frozen moment in time
-   - Clear pose and expression
-   - Complete environment description
+  - Describes a STATIC FRAME (like a photograph)
+  - No motion words (no "walking", "moving", "turning")
+  - Describes a frozen moment in time
+  - Clear pose and expression
+  - Complete environment description
 
-2. MOTION_PROMPT (for image-to-video animation):
-   - Describes the SUBTLE MOVEMENT to animate
-   - Keep it simple and natural
-   - No dramatic actions
-   - Examples: "slowly lifts head", "eyes open gently", "slight smile emerges", "gentle head turn"
+IMPORTANT:
+- Do NOT generate a motion/video prompt here.
+- The motion/video prompt will be generated later in Step 4.
 
 IMAGE PROMPT STRUCTURE (for /edit endpoint):
 1. Start: "The same character"
@@ -277,45 +275,36 @@ Create intimate, comforting spaces rendered in dark, stylized cinematic aestheti
 
 {{include:image-prompt-shared-rules}}
 
-MOTION PROMPT RULES:
-- Keep motions SUBTLE and natural
-- 8-second duration
-- Avoid dramatic movements
-- Examples:
-  ✅ "Slowly lifts head and opens eyes, slight change in expression"
-  ✅ "Gentle head turn toward the window, eyes focusing"
-  ✅ "Subtle smile emerges, slight shift in posture showing confidence"
-  ✅ "Calm breathing motion, eyes opening gradually"
-  ❌ "Stands up and walks across the room" (too dramatic)
-  ❌ "Jumps and celebrates" (too energetic)
+NOTE:
+- Motion prompts are intentionally not generated at this step.
 
 EXAMPLE SUCCESSFUL PROMPTS (BLADE RUNNER STREET-LEVEL - for /edit endpoint):
 
 Scene 1 (Location 1 - Dark Alley/Night):
 IMAGE_PROMPT: "The same character stands in a dark narrow alleyway at night, rain-soaked ground reflecting pink and blue neon signs from overhead. Steam rising from vents, wet brick walls, flickering neon kanji characters above. Character's hands in coat pockets, shoulders slightly hunched, expression contemplative and heavy with quiet doubt. Rendered in a graphic anime style inspired by Blade Runner, sci-fi noir anime, and cyberpunk concept art. Bold character linework with defined outlines, cel-shaded aesthetic with high contrast between light and shadow. Strong neon rim lighting creating dramatic edge highlights (pink, magenta, cyan glowing edges on character). Sharp, clean anime features with pronounced definition. Atmospheric lighting with vibrant neon accents from environment (blue, purple, cyan, pink neon signs and lights). Futuristic architecture and technology. Moody color grading with deep blacks and vibrant neon pops. Film grain texture. Graphic, high-contrast anime aesthetic NOT soft painterly style. Vertical 9:16 format. No text. Conveys the feeling of an alternate universe where a more successful version of yourself exists."
 
-MOTION_PROMPT: "Slow breathing motion. Rain continuing to fall, neon signs flickering gently. Ambient city lights pulsing softly in background. Calm, contemplative stillness."
+MOTION_PROMPT: [INTENTIONALLY LEFT BLANK - generated later in Step 4]
 
 Scene 2 (Location 1 - Same Dark Alley/Night):
 IMAGE_PROMPT: "The same character in the same dark narrow alleyway, same rain-soaked ground with pink and blue neon reflections, same overhead neon signs, same steam and wet brick walls. Character now leaning against the wall, head tilted back, eyes closed in moment of exhausted reflection. Same atmospheric lighting. Rendered in a graphic anime style inspired by Blade Runner, sci-fi noir anime, and cyberpunk concept art. Bold character linework with defined outlines, cel-shaded aesthetic with high contrast between light and shadow. Strong neon rim lighting creating dramatic edge highlights (pink, magenta, cyan glowing edges on character). Sharp, clean anime features with pronounced definition. Atmospheric lighting with vibrant neon accents from environment (blue, purple, cyan, pink neon signs and lights). Futuristic architecture and technology. Moody color grading with deep blacks and vibrant neon pops. Film grain texture. Graphic, high-contrast anime aesthetic NOT soft painterly style. Vertical 9:16 format. No text. Conveys the feeling of an alternate universe where a more successful version of yourself exists."
 
-MOTION_PROMPT: "Gentle breathing, slow peaceful sigh. Neon signs shifting colors gently. Rain and city lights creating peaceful atmosphere."
+MOTION_PROMPT: [INTENTIONALLY LEFT BLANK - generated later in Step 4]
 
 Scene 3 (Location 2 - Rooftop Edge/Night - NEW):
 IMAGE_PROMPT: "The same character standing on a rain-slicked rooftop edge at night, overlooking sprawling cyberpunk cityscape below with countless neon lights and towering buildings. Purple and orange neon billboards glow in the distance, light rain falling, atmospheric haze around city lights. Character gazing down at the city, posture more open, arms at sides. Rendered in a graphic anime style inspired by Blade Runner, sci-fi noir anime, and cyberpunk concept art. Bold character linework with defined outlines, cel-shaded aesthetic with high contrast between light and shadow. Strong neon rim lighting creating dramatic edge highlights (pink, magenta, cyan glowing edges on character). Sharp, clean anime features with pronounced definition. Atmospheric lighting with vibrant neon accents from environment (blue, purple, cyan, pink neon signs and lights). Futuristic architecture and technology. Moody color grading with deep blacks and vibrant neon pops. Film grain texture. Graphic, high-contrast anime aesthetic NOT soft painterly style. Vertical 9:16 format. No text. Conveys the feeling of an alternate universe where a more successful version of yourself exists."
 
-MOTION_PROMPT: "Gentle breathing, soft wind moving through hair. Neon lights flickering in the distance. Peaceful stillness with vast sci-fi atmosphere."
+MOTION_PROMPT: [INTENTIONALLY LEFT BLANK - generated later in Step 4]
 
 Scene 4 (Location 2 - Same Elevated Outdoor/Night):
 IMAGE_PROMPT: "The same character on the same elevated walkway between skyscrapers, same floating platforms with neon underglow, same city lights below, same purple and orange neon signs in distance. Character now with subtle smile, gazing confidently at the futuristic cityscape. Same atmospheric haze and volumetric light beams. Rendered in a graphic anime style inspired by Blade Runner, sci-fi noir anime, and cyberpunk concept art. Bold character linework with defined outlines, cel-shaded aesthetic with high contrast between light and shadow. Strong neon rim lighting creating dramatic edge highlights (pink, magenta, cyan glowing edges on character). Sharp, clean anime features with pronounced definition. Atmospheric lighting with vibrant neon accents from environment (blue, purple, cyan, pink neon signs and lights). Futuristic architecture and technology. Moody color grading with deep blacks and vibrant neon pops. Film grain texture. Graphic, high-contrast anime aesthetic NOT soft painterly style. Vertical 9:16 format. No text. Conveys the feeling of an alternate universe where a more successful version of yourself exists."
 
-MOTION_PROMPT: "Subtle smile grows naturally, gentle exhale of contentment. Neon lights glowing warmly. Peaceful, confident presence in futuristic environment."
+MOTION_PROMPT: [INTENTIONALLY LEFT BLANK - generated later in Step 4]
 
 KEY REQUIREMENTS (for /edit endpoint):
 - Scenes sharing same location: EXACT SAME environment, time, lighting in image prompts
 - ALL image prompts: Start with "The same character" (character & style from reference image)
 - Focus on scene composition: pose, environment, lighting, mood
-- Motion prompts describe SUBTLE, natural movements only
+- Motion prompts are generated later in Step 4
 - Location changes show transformation through different futuristic environments
 - **CRITICAL**: Create gritty street-level Blade Runner environments - NOT clean tech spaces
 - Use Blade Runner aesthetic: rain-soaked streets, neon signs, alleyways, rooftops, urban sprawl
@@ -340,42 +329,26 @@ Return ONLY valid JSON. No explanations.
     {
       "id": 1,
       "duration": "8s",
-      "location": "location_1",
       "voiceover": "string (first ~8 seconds of script)",
-      "camera": "medium/wide",
-      "mood": "contemplative/struggle",
-      "image_prompt": "Static image description for text-to-image generation",
-      "motion_prompt": "Subtle animation description for image-to-video"
+      "image_prompt": "Static image description for text-to-image generation"
     },
     {
       "id": 2,
       "duration": "8s",
-      "location": "location_1",
       "voiceover": "string (next ~8 seconds of script)",
-      "camera": "medium/close-up",
-      "mood": "reflection/shift",
-      "image_prompt": "Same environment/time/colors as Scene 1, different pose",
-      "motion_prompt": "Subtle animation description for image-to-video"
+      "image_prompt": "Same environment/time/colors as Scene 1, different pose"
     },
     {
       "id": 3,
       "duration": "8s",
-      "location": "location_2",
       "voiceover": "string (next ~8 seconds of script)",
-      "camera": "medium/wide",
-      "mood": "awareness/breakthrough",
-      "image_prompt": "NEW location - different environment showing transformation",
-      "motion_prompt": "Subtle animation description for image-to-video"
+      "image_prompt": "NEW location - different environment showing transformation"
     },
     {
       "id": 4,
       "duration": "8s",
-      "location": "location_2",
       "voiceover": "string (final ~8 seconds of script)",
-      "camera": "close-up/medium",
-      "mood": "certainty/resolution",
-      "image_prompt": "Same environment/time/colors as Scene 3, different pose",
-      "motion_prompt": "Subtle animation description for image-to-video"
+      "image_prompt": "Same environment/time/colors as Scene 3, different pose"
     }
   ]
 }

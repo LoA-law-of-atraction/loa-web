@@ -9,18 +9,26 @@ const anthropic = new Anthropic({
 
 // Pricing for Claude 3.5 Sonnet (20241022)
 const CLAUDE_PRICING = {
-  input: 3.00 / 1_000_000,  // $3.00 per million input tokens
-  output: 15.00 / 1_000_000, // $15.00 per million output tokens
+  input: 3.0 / 1_000_000, // $3.00 per million input tokens
+  output: 15.0 / 1_000_000, // $15.00 per million output tokens
 };
 
 export async function POST(request) {
   try {
-    const { scene_id, voiceover, scene_index, total_scenes, project_id, location_count = null, action = null } = await request.json();
+    const {
+      scene_id,
+      voiceover,
+      scene_index,
+      total_scenes,
+      project_id,
+      location_count = null,
+      action = null,
+    } = await request.json();
 
     if (!scene_id || !voiceover || scene_index === undefined || !total_scenes) {
       return NextResponse.json(
         { error: "Missing required parameters" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -33,7 +41,7 @@ export async function POST(request) {
     }
     console.log("==============================");
 
-    // Fetch location from project's location_mapping
+    // Fetch location from per-scene `location_id` (preferred)
     const db = getAdminDb();
     let locationDescription = "";
     let groupInstruction = "NEW";
@@ -46,12 +54,47 @@ export async function POST(request) {
 
         if (projectDoc.exists) {
           const locationMapping = projectDoc.data()?.location_mapping || {};
-          const currentSceneId = (scene_index + 1).toString(); // scene_id is 1-indexed
-          const locationId = locationMapping[currentSceneId];
+
+          const currentSceneId = String(scene_id ?? scene_index + 1);
+          const prevSceneId = scene_index > 0 ? String(scene_index) : null;
+
+          let locationId = null;
+          let prevLocationId = null;
+
+          // Prefer per-scene selection
+          try {
+            const currentSceneDoc = await projectRef
+              .collection("scenes")
+              .doc(String(scene_id))
+              .get();
+            if (currentSceneDoc.exists) {
+              locationId = currentSceneDoc.data()?.location_id || null;
+            }
+
+            if (prevSceneId) {
+              const prevSceneDoc = await projectRef
+                .collection("scenes")
+                .doc(String(prevSceneId))
+                .get();
+              if (prevSceneDoc.exists) {
+                prevLocationId = prevSceneDoc.data()?.location_id || null;
+              }
+            }
+          } catch (error) {
+            console.error("Error fetching scene locations:", error);
+          }
+
+          // Legacy fallback
+          if (!locationId) locationId = locationMapping[currentSceneId];
+          if (!prevLocationId && prevSceneId)
+            prevLocationId = locationMapping[prevSceneId];
 
           if (locationId) {
             // Fetch location details
-            const locationDoc = await db.collection("locations").doc(locationId).get();
+            const locationDoc = await db
+              .collection("locations")
+              .doc(locationId)
+              .get();
 
             if (locationDoc.exists) {
               const location = locationDoc.data();
@@ -61,17 +104,15 @@ export async function POST(request) {
               locationDescription += `Atmosphere: ${location.visual_characteristics.atmosphere}\n`;
 
               // Check if previous scene used same location
-              if (scene_index > 0) {
-                const prevSceneId = scene_index.toString();
-                const prevLocationId = locationMapping[prevSceneId];
-
-                if (prevLocationId === locationId) {
-                  groupInstruction = "SAME";
-                  consistencyInstruction = "Keep EXACT same environment, time, and lighting as the previous scene. Only change the character's pose/expression.";
-                }
+              if (scene_index > 0 && prevLocationId === locationId) {
+                groupInstruction = "SAME";
+                consistencyInstruction =
+                  "Keep EXACT same environment, time, and lighting as the previous scene. Only change the character's pose/expression.";
               }
 
-              console.log(`Using location ${location.name} for scene ${currentSceneId}`);
+              console.log(
+                `Using location ${location.name} for scene ${currentSceneId}`,
+              );
             }
           }
         }
@@ -83,7 +124,8 @@ export async function POST(request) {
 
     // Fallback if no location found
     if (!locationDescription) {
-      locationDescription = "Blade Runner-style gritty urban environment at night with neon lighting";
+      locationDescription =
+        "Blade Runner-style gritty urban environment at night with neon lighting";
     }
 
     // Prepare action-specific pose guidance
@@ -129,9 +171,12 @@ export async function POST(request) {
     // Calculate cost based on token usage
     const inputTokens = message.usage.input_tokens;
     const outputTokens = message.usage.output_tokens;
-    const cost = (inputTokens * CLAUDE_PRICING.input) + (outputTokens * CLAUDE_PRICING.output);
+    const cost =
+      inputTokens * CLAUDE_PRICING.input + outputTokens * CLAUDE_PRICING.output;
 
-    console.log(`Claude API usage: ${inputTokens} input tokens, ${outputTokens} output tokens = $${cost.toFixed(6)}`);
+    console.log(
+      `Claude API usage: ${inputTokens} input tokens, ${outputTokens} output tokens = $${cost.toFixed(6)}`,
+    );
 
     // Update project costs if project_id is provided
     if (project_id) {
@@ -164,10 +209,15 @@ export async function POST(request) {
             updated_at: new Date().toISOString(),
           });
 
-          console.log(`Updated costs for project ${project_id}: Claude $${newClaudeCost.toFixed(6)}`);
+          console.log(
+            `Updated costs for project ${project_id}: Claude $${newClaudeCost.toFixed(6)}`,
+          );
         }
       } catch (costError) {
-        console.error(`Error updating costs for project ${project_id}:`, costError);
+        console.error(
+          `Error updating costs for project ${project_id}:`,
+          costError,
+        );
         // Don't fail the whole request if cost tracking fails
       }
     }
@@ -181,7 +231,7 @@ export async function POST(request) {
     console.error("Regenerate image prompt error:", error);
     return NextResponse.json(
       { error: "Failed to regenerate image prompt", message: error.message },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

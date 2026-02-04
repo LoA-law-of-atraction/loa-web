@@ -23,6 +23,7 @@ export default function VideoGeneratorPage() {
   const [step, setStep] = useState(initialStep);
   const [maxStepReached, setMaxStepReached] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [continuingToVideos, setContinuingToVideos] = useState(false);
 
   // Step 1: Topic & Character Selection
   const [topic, setTopic] = useState("");
@@ -50,6 +51,9 @@ export default function VideoGeneratorPage() {
   const [currentProjectId, setCurrentProjectId] = useState(null);
   const [currentProjectName, setCurrentProjectName] = useState("");
   const [editingProjectName, setEditingProjectName] = useState(false);
+  const [openProjectMenuId, setOpenProjectMenuId] = useState(null);
+  const [deletingProjectId, setDeletingProjectId] = useState(null);
+  const projectMenuRef = useRef(null);
   const [sceneCount, setSceneCount] = useState(4); // Default 4 scenes
   const [locationCount, setLocationCount] = useState(null); // null = all different, number = that many locations
   const [selectedLocations, setSelectedLocations] = useState([]);
@@ -65,6 +69,24 @@ export default function VideoGeneratorPage() {
   const [showActionGenerateModal, setShowActionGenerateModal] = useState(false);
   const [actionGenerateSceneId, setActionGenerateSceneId] = useState(null);
   const [actionGenerationKeywords, setActionGenerationKeywords] = useState("");
+  const [showCameraMovementGenerateModal, setShowCameraMovementGenerateModal] =
+    useState(false);
+  const [cameraMovementGenerateSceneId, setCameraMovementGenerateSceneId] =
+    useState(null);
+  const [
+    cameraMovementGenerationKeywords,
+    setCameraMovementGenerationKeywords,
+  ] = useState("");
+  const [
+    showCharacterMotionGenerateModal,
+    setShowCharacterMotionGenerateModal,
+  ] = useState(false);
+  const [characterMotionGenerateSceneId, setCharacterMotionGenerateSceneId] =
+    useState(null);
+  const [
+    characterMotionGenerationKeywords,
+    setCharacterMotionGenerationKeywords,
+  ] = useState("");
   const [locationFilters, setLocationFilters] = useState({
     category: null, // 'indoor' or 'outdoor' or null
     lighting: [],
@@ -73,11 +95,33 @@ export default function VideoGeneratorPage() {
   });
   const [showFilterModal, setShowFilterModal] = useState(null); // 'lighting', 'atmosphere', 'key_elements', or null
 
+  // Prompt generation review (Step 3 + Step 4)
+  // We show a confirm dialog before calling AI, then a review modal after.
+  const [promptReviewModal, setPromptReviewModal] = useState(null);
+  const [promptReviewDraft, setPromptReviewDraft] = useState("");
+  const [applyingPromptReview, setApplyingPromptReview] = useState(false);
+
   // Actions
   const [actionMapping, setActionMapping] = useState({}); // { scene_id: action_id }
   const [showActionPicker, setShowActionPicker] = useState(false);
   const [actionPickerSceneId, setActionPickerSceneId] = useState(null);
   const [availableActions, setAvailableActions] = useState([]);
+
+  // Step 4 libraries
+  const [cameraMovementMapping, setCameraMovementMapping] = useState({}); // { scene_id: movement_id }
+  const [characterMotionMapping, setCharacterMotionMapping] = useState({}); // { scene_id: motion_id }
+  const [availableCameraMovements, setAvailableCameraMovements] = useState([]);
+  const [availableCharacterMotions, setAvailableCharacterMotions] = useState(
+    [],
+  );
+  const [showCameraMovementPicker, setShowCameraMovementPicker] =
+    useState(false);
+  const [cameraMovementPickerSceneId, setCameraMovementPickerSceneId] =
+    useState(null);
+  const [showCharacterMotionPicker, setShowCharacterMotionPicker] =
+    useState(false);
+  const [characterMotionPickerSceneId, setCharacterMotionPickerSceneId] =
+    useState(null);
 
   // Step 2: Script Generation
   const [scriptData, setScriptData] = useState(null);
@@ -99,6 +143,7 @@ export default function VideoGeneratorPage() {
   const [generatingSceneId, setGeneratingSceneId] = useState(null);
   const [regeneratingPromptSceneId, setRegeneratingPromptSceneId] =
     useState(null);
+  const [images, setImages] = useState([]); // [{ scene_id, image_url }]
   const [fluxProCost, setFluxProCost] = useState(null); // Dynamic cost from API (NO FALLBACK)
   const [showFluxSettings, setShowFluxSettings] = useState(false);
   const [fluxSettings, setFluxSettings] = useState({
@@ -106,6 +151,8 @@ export default function VideoGeneratorPage() {
     num_images: 1,
   });
   const imagePromptSaveTimers = useRef({});
+  const motionPromptSaveTimers = useRef({});
+  const videoDurationSaveTimers = useRef({});
   const [selectedReferenceImages, setSelectedReferenceImages] = useState({}); // Track selected reference per scene: { sceneId: imageUrl }
   const [selectedSceneImages, setSelectedSceneImages] = useState({}); // Track selected generated image index per scene: { sceneId: imageIndex }
   const [expandedImage, setExpandedImage] = useState(null); // Track expanded full-size image { sceneId, imageIndex, url }
@@ -119,7 +166,142 @@ export default function VideoGeneratorPage() {
 
   // Step 4: Video Generation
   const [videos, setVideos] = useState([]);
+  const [generatingVideoSceneId, setGeneratingVideoSceneId] = useState(null);
+  const [generatingVideoPromptSceneId, setGeneratingVideoPromptSceneId] =
+    useState(null);
+  const [expandedI2VSceneId, setExpandedI2VSceneId] = useState(null);
   const [voiceoverUrl, setVoiceoverUrl] = useState(null);
+  const [falVideoUnitCost, setFalVideoUnitCost] = useState(null);
+  const [falVideoPricingUnit, setFalVideoPricingUnit] = useState(null);
+  const [loadingFalVideoPricing, setLoadingFalVideoPricing] = useState(false);
+
+  const clampDurationSeconds = (value, fallback = 8) => {
+    const n = Number(value);
+    const numeric = Number.isFinite(n) ? n : fallback;
+    return Math.max(1, Math.min(15, Math.round(numeric)));
+  };
+
+  const isPerSecondUnit = (unit) => {
+    if (!unit) return false;
+    const normalized = String(unit).toLowerCase();
+    return (
+      normalized === "s" ||
+      normalized === "sec" ||
+      normalized === "second" ||
+      normalized === "seconds" ||
+      normalized.includes("second")
+    );
+  };
+
+  const getEstimatedI2VCostForScene = (durationSeconds) => {
+    if (falVideoUnitCost == null) return null;
+    const multiplier = isPerSecondUnit(falVideoPricingUnit)
+      ? clampDurationSeconds(durationSeconds, 8)
+      : 1;
+    return falVideoUnitCost * multiplier;
+  };
+
+  const getSceneDurationSeconds = (scene) => {
+    return clampDurationSeconds(scene?.duration, 8);
+  };
+
+  const uniqueStringsPreserveOrder = (values) => {
+    const out = [];
+    const seen = new Set();
+    for (const v of values || []) {
+      if (!v || typeof v !== "string") continue;
+      if (seen.has(v)) continue;
+      seen.add(v);
+      out.push(v);
+    }
+    return out;
+  };
+
+  const getAllVideoUrlsForScene = (scene, fallbackSelectedVideoUrl) => {
+    const urls = Array.isArray(scene?.video_urls) ? scene.video_urls : [];
+    return uniqueStringsPreserveOrder([
+      ...(urls || []),
+      scene?.selected_video_url,
+      fallbackSelectedVideoUrl,
+    ]);
+  };
+
+  const getSelectedVideoUrlForScene = (scene) => {
+    const sceneId = scene?.id;
+    if (!sceneId) return null;
+    const fromVideosState = videos.find(
+      (v) => v.scene_id === sceneId,
+    )?.video_url;
+
+    const allUrls = getAllVideoUrlsForScene(scene, fromVideosState);
+
+    if (
+      scene?.selected_video_url &&
+      allUrls.includes(scene.selected_video_url)
+    ) {
+      return scene.selected_video_url;
+    }
+
+    if (fromVideosState && allUrls.includes(fromVideosState)) {
+      return fromVideosState;
+    }
+
+    return allUrls.length > 0 ? allUrls[allUrls.length - 1] : null;
+  };
+
+  const deriveSelectedVideosFromScenes = (scenes) => {
+    const out = [];
+    for (const scene of scenes || []) {
+      const url =
+        scene?.selected_video_url ||
+        (Array.isArray(scene?.video_urls) && scene.video_urls.length > 0
+          ? scene.video_urls[scene.video_urls.length - 1]
+          : null);
+      if (scene?.id && url) out.push({ scene_id: scene.id, video_url: url });
+    }
+    return out.sort((a, b) => Number(a.scene_id) - Number(b.scene_id));
+  };
+
+  const handleSelectVideoForScene = async (sceneId, videoUrl) => {
+    if (!sceneId || !videoUrl) return;
+
+    setScriptData((prev) => {
+      if (!prev?.scenes) return prev;
+      const nextScenes = prev.scenes.map((s) => {
+        if (s.id !== sceneId) return s;
+        const existingUrls = Array.isArray(s.video_urls) ? s.video_urls : [];
+        const nextUrls = uniqueStringsPreserveOrder([
+          ...existingUrls,
+          videoUrl,
+        ]);
+        return {
+          ...s,
+          video_urls: nextUrls,
+          selected_video_url: videoUrl,
+        };
+      });
+      return { ...prev, scenes: nextScenes };
+    });
+
+    setVideos((prev) => {
+      const byScene = new Map((prev || []).map((v) => [v.scene_id, v]));
+      byScene.set(sceneId, { scene_id: sceneId, video_url: videoUrl });
+      return Array.from(byScene.values()).sort(
+        (a, b) => Number(a.scene_id) - Number(b.scene_id),
+      );
+    });
+
+    try {
+      if (!currentProjectId) return;
+      await fetch(`/api/projects/${currentProjectId}/scenes/${sceneId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ selected_video_url: videoUrl }),
+      });
+    } catch (error) {
+      console.error("Error saving selected video:", error);
+    }
+  };
 
   // Step 5: Final Video
   const [finalVideoUrl, setFinalVideoUrl] = useState(null);
@@ -128,6 +310,81 @@ export default function VideoGeneratorPage() {
   // Scene linking/grouping (persisted on project doc as `scene_group`)
   const [sceneGroups, setSceneGroups] = useState([]);
   const [savingSceneGroups, setSavingSceneGroups] = useState(false);
+  const [savingSceneLinkKey, setSavingSceneLinkKey] = useState(null);
+  const [sceneGroupsTouched, setSceneGroupsTouched] = useState(false);
+
+  function buildAutoSceneGroups(nextSceneCount, nextLocationCount) {
+    const total = Number(nextSceneCount);
+    if (!Number.isFinite(total) || total <= 0) return [];
+
+    // null means "all different" (no grouping)
+    const desiredLocations =
+      nextLocationCount === null || nextLocationCount === undefined
+        ? total
+        : Math.max(1, Math.min(total, Number(nextLocationCount)));
+
+    // If every scene has its own location, keep as singletons
+    if (desiredLocations >= total) {
+      return Array.from({ length: total }, (_, idx) => [idx + 1]);
+    }
+
+    // If only one location, group all scenes
+    if (desiredLocations === 1) {
+      return [Array.from({ length: total }, (_, idx) => idx + 1)];
+    }
+
+    // Otherwise, distribute scenes into consecutive groups as evenly as possible
+    const base = Math.floor(total / desiredLocations);
+    const remainder = total % desiredLocations;
+    const groups = [];
+    let current = 1;
+    for (let i = 0; i < desiredLocations; i++) {
+      const size = base + (i < remainder ? 1 : 0);
+      const group = [];
+      for (let j = 0; j < size; j++) {
+        group.push(current);
+        current++;
+      }
+      if (group.length) groups.push(group);
+    }
+    return groups;
+  }
+
+  function groupsSignature(groups) {
+    if (!Array.isArray(groups)) return "";
+    return groups
+      .map((g) =>
+        Array.isArray(g) ? g.map((id) => sceneKey(id)).join(",") : "",
+      )
+      .join("|");
+  }
+
+  function decodeSceneGroups(rawGroups) {
+    // Supports:
+    // - Legacy (desired) format: [[1,2],[3]]
+    // - Firestore-safe format: [{ scene_ids: [1,2] }, { scene_ids: [3] }]
+    if (!Array.isArray(rawGroups)) return [];
+    return rawGroups
+      .map((g) => {
+        if (Array.isArray(g)) return g;
+        if (g && typeof g === "object") {
+          if (Array.isArray(g.scene_ids)) return g.scene_ids;
+          if (Array.isArray(g.sceneIds)) return g.sceneIds;
+          if (Array.isArray(g.ids)) return g.ids;
+        }
+        return null;
+      })
+      .filter(Boolean);
+  }
+
+  function encodeSceneGroupsForFirestore(groups) {
+    // Firestore does not allow nested arrays, so we store as array of objects.
+    // Example: [[1,2],[3]] -> [{scene_ids:[1,2]},{scene_ids:[3]}]
+    if (!Array.isArray(groups)) return [];
+    return groups
+      .filter((g) => Array.isArray(g) && g.length > 0)
+      .map((g) => ({ scene_ids: g }));
+  }
 
   function normalizeSceneId(id) {
     const n = Number(id);
@@ -147,7 +404,7 @@ export default function VideoGeneratorPage() {
     const orderIndex = new Map(sceneIds.map((id, idx) => [sceneKey(id), idx]));
     const validKeys = new Set(orderIndex.keys());
 
-    const incomingGroups = Array.isArray(rawGroups) ? rawGroups : [];
+    const incomingGroups = decodeSceneGroups(rawGroups);
     const seen = new Set();
     const cleanedGroups = [];
 
@@ -212,6 +469,25 @@ export default function VideoGeneratorPage() {
     );
   }
 
+  function getSceneGroupInfo(groups, sceneId, sceneIdsInOrder) {
+    const sceneKeyId = sceneKey(sceneId);
+    const normalized = normalizeSceneGroups(groups, sceneIdsInOrder);
+    const group = normalized.find((g) =>
+      g.some((x) => sceneKey(x) === sceneKeyId),
+    );
+    if (!group || group.length === 0) {
+      const id = normalizeSceneId(sceneId);
+      return { leaderId: id, isChild: false, group: [id] };
+    }
+
+    const leaderId = group[0];
+    return {
+      leaderId,
+      isChild: sceneKey(leaderId) !== sceneKeyId,
+      group,
+    };
+  }
+
   function toggleAdjacentSceneLink(groups, aId, bId, sceneIdsInOrder) {
     const sceneIds = Array.isArray(sceneIdsInOrder)
       ? sceneIdsInOrder.map(normalizeSceneId)
@@ -228,6 +504,18 @@ export default function VideoGeneratorPage() {
     const bi = findGroupIndex(bKey);
     if (ai === -1 || bi === -1) return normalized;
 
+    const sortGroupsByOrder = (groupsToSort) => {
+      groupsToSort.sort((ga, gb) => {
+        const aMin = Math.min(
+          ...ga.map((id) => orderIndex.get(sceneKey(id)) ?? 0),
+        );
+        const bMin = Math.min(
+          ...gb.map((id) => orderIndex.get(sceneKey(id)) ?? 0),
+        );
+        return aMin - bMin;
+      });
+    };
+
     // Merge if currently separate
     if (ai !== bi) {
       const merged = [...normalized[ai], ...normalized[bi]];
@@ -238,52 +526,67 @@ export default function VideoGeneratorPage() {
           (orderIndex.get(sceneKey(y)) ?? 0),
       );
       next.push(merged);
-      return normalizeSceneGroups(next, sceneIds);
+      sortGroupsByOrder(next);
+      return next;
     }
 
-    // Split if currently linked (only if they are adjacent in the group's order)
-    const group = [...normalized[ai]];
-    group.sort(
+    // Split if currently linked (same group)
+    const group = normalized[ai];
+    const groupSorted = [...group].sort(
       (x, y) =>
         (orderIndex.get(sceneKey(x)) ?? 0) - (orderIndex.get(sceneKey(y)) ?? 0),
     );
 
-    const aPos = group.findIndex((x) => sceneKey(x) === aKey);
-    const bPos = group.findIndex((x) => sceneKey(x) === bKey);
-    if (aPos === -1 || bPos === -1) return normalized;
-    if (Math.abs(aPos - bPos) !== 1) return normalized;
+    const aPos = orderIndex.get(aKey);
+    const bPos = orderIndex.get(bKey);
+    if (aPos === undefined || bPos === undefined) return normalized;
 
-    const splitAt = Math.max(aPos, bPos);
-    const left = group.slice(0, splitAt);
-    const right = group.slice(splitAt);
+    // Break the chain between these two adjacent scenes
+    const boundary = Math.min(aPos, bPos);
+    const left = groupSorted.filter(
+      (id) => (orderIndex.get(sceneKey(id)) ?? 0) <= boundary,
+    );
+    const right = groupSorted.filter(
+      (id) => (orderIndex.get(sceneKey(id)) ?? 0) > boundary,
+    );
     if (left.length === 0 || right.length === 0) return normalized;
 
     const next = normalized.filter((_, idx) => idx !== ai);
     next.push(left, right);
-    return normalizeSceneGroups(next, sceneIds);
+    sortGroupsByOrder(next);
+    return next;
   }
 
-  const handleToggleSceneLink = async (sceneId, nextSceneId) => {
+  const handleToggleSceneLink = async (sceneId, nextId) => {
     if (!currentProjectId) return;
-    if (!scriptData?.scenes) return;
-    if (savingSceneGroups) return;
+    if (!scriptData?.scenes?.length) return;
 
-    const sceneIds = scriptData.scenes.map((s) => normalizeSceneId(s.id));
+    const sceneIdsInOrder = scriptData.scenes.map((s) =>
+      normalizeSceneId(s.id),
+    );
+    const linkKey = `${sceneKey(sceneId)}-${sceneKey(nextId)}`;
+
     const previous = sceneGroups;
     const nextGroups = toggleAdjacentSceneLink(
-      sceneGroups,
+      previous,
       sceneId,
-      nextSceneId,
-      sceneIds,
+      nextId,
+      sceneIdsInOrder,
     );
+    if (groupsSignature(previous) === groupsSignature(nextGroups)) return;
 
+    setSceneGroupsTouched(true);
     setSceneGroups(nextGroups);
     setSavingSceneGroups(true);
+    setSavingSceneLinkKey(linkKey);
+
     try {
       const response = await fetch(`/api/projects/${currentProjectId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scene_group: nextGroups }),
+        body: JSON.stringify({
+          scene_group: encodeSceneGroupsForFirestore(nextGroups),
+        }),
       });
       const result = await response.json();
       if (!result.success) {
@@ -291,9 +594,13 @@ export default function VideoGeneratorPage() {
       }
     } catch (error) {
       setSceneGroups(previous);
-      await alert("Failed to save scene links: " + error.message, "error");
+      await alert(
+        "Failed to save scene links: " + (error?.message || String(error)),
+        "error",
+      );
     } finally {
       setSavingSceneGroups(false);
+      setSavingSceneLinkKey(null);
     }
   };
 
@@ -303,8 +610,54 @@ export default function VideoGeneratorPage() {
     loadCategories();
     loadProjects();
     loadAvailableActions();
+    loadAvailableCameraMovements();
+    loadAvailableCharacterMotions();
     loadFluxPricing();
+    loadFalVideoPricing();
   }, []);
+
+  // Close Step 0 project menu on outside click / Escape
+  useEffect(() => {
+    if (!openProjectMenuId) return;
+
+    const onMouseDown = (e) => {
+      if (!projectMenuRef.current) return;
+      if (!projectMenuRef.current.contains(e.target)) {
+        setOpenProjectMenuId(null);
+      }
+    };
+
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") setOpenProjectMenuId(null);
+    };
+
+    document.addEventListener("mousedown", onMouseDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onMouseDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [openProjectMenuId]);
+
+  // Step 1: Auto-group scenes based on user's Scene/Location counts.
+  // Only applies until the user manually edits links.
+  useEffect(() => {
+    if (!currentProjectId) return;
+    if (step !== 1) return;
+    if (sceneGroupsTouched) return;
+    if (!sceneCount) return;
+
+    const auto = buildAutoSceneGroups(sceneCount, locationCount);
+    const sceneIds = Array.from(
+      { length: Number(sceneCount) },
+      (_, idx) => idx + 1,
+    );
+    const normalized = normalizeSceneGroups(auto, sceneIds);
+    setSceneGroups(normalized);
+
+    // Persist to project so Step 3+ reflects the grouping.
+    autoSaveStep1({ scene_group: encodeSceneGroupsForFirestore(normalized) });
+  }, [sceneCount, locationCount, step, currentProjectId, sceneGroupsTouched]);
 
   // Ensure `sceneGroups` always matches the current scene list
   useEffect(() => {
@@ -404,12 +757,26 @@ export default function VideoGeneratorPage() {
 
   // Update URL when step changes (for persistence)
   useEffect(() => {
-    if (currentProjectId && step > 0) {
+    const urlStep = searchParams.get("step");
+    const urlProjectId = searchParams.get("project_id");
+
+    // Step 0 is the project list; keep the URL clean.
+    if (step === 0) {
+      if (urlStep || urlProjectId) {
+        router.replace("/admin/video-generator");
+      }
+      return;
+    }
+
+    if (!currentProjectId) return;
+
+    // Avoid replace loops by only updating when different.
+    if (urlProjectId !== String(currentProjectId) || urlStep !== String(step)) {
       router.replace(
         `/admin/video-generator?project_id=${currentProjectId}&step=${step}`,
       );
     }
-  }, [step, currentProjectId]);
+  }, [step, currentProjectId, searchParams, router]);
 
   // Update maxStepReached when user progresses forward
   useEffect(() => {
@@ -448,7 +815,7 @@ export default function VideoGeneratorPage() {
 
   const loadFluxPricing = async () => {
     try {
-      const response = await fetch("/api/video-generator/fal-pricing");
+      const response = await fetch("/api/video-generator/image2image-pricing");
       const result = await response.json();
       if (result.success && result.cost) {
         setFluxProCost(result.cost);
@@ -461,6 +828,29 @@ export default function VideoGeneratorPage() {
       alert(
         `Failed to load FAL AI pricing: ${error.message}. Cannot proceed with image generation.`,
       );
+    }
+  };
+
+  const loadFalVideoPricing = async () => {
+    setLoadingFalVideoPricing(true);
+    try {
+      const response = await fetch("/api/video-generator/image2video-pricing");
+      const result = await response.json();
+      if (result.success && result.cost) {
+        setFalVideoUnitCost(result.cost);
+        setFalVideoPricingUnit(result.unit || null);
+        console.log(
+          `Loaded FAL video pricing: $${result.cost}/${result.unit || "unit"}`,
+        );
+      } else {
+        throw new Error(result.error || "Failed to load FAL video pricing");
+      }
+    } catch (error) {
+      console.error("Failed to load FAL video pricing:", error);
+      setFalVideoUnitCost(null);
+      setFalVideoPricingUnit(null);
+    } finally {
+      setLoadingFalVideoPricing(false);
     }
   };
 
@@ -513,6 +903,89 @@ export default function VideoGeneratorPage() {
     }
   };
 
+  const handleRenameProjectFromList = async (project) => {
+    try {
+      const currentName = project?.project_name || "";
+      const nextName = window.prompt("Rename project", currentName);
+      if (nextName == null) return; // cancelled
+      const trimmed = String(nextName).trim();
+      if (!trimmed) {
+        await alert("Project name cannot be empty", "warning");
+        return;
+      }
+
+      const response = await fetch(`/api/projects/${project.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project_name: trimmed }),
+      });
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || "Failed to rename project");
+      }
+
+      setProjects((prev) =>
+        prev.map((p) =>
+          p.id === project.id ? { ...p, project_name: trimmed } : p,
+        ),
+      );
+
+      if (currentProjectId === project.id) {
+        setCurrentProjectName(trimmed);
+      }
+    } catch (error) {
+      await alert("Failed to rename project: " + error.message, "error");
+    } finally {
+      setOpenProjectMenuId(null);
+    }
+  };
+
+  const handleDeleteProjectFromList = async (project) => {
+    if (!project?.id) return;
+    if (deletingProjectId) return;
+
+    const label = project?.project_name || project?.topic || "this project";
+    const ok = await confirm(
+      `Delete ${label}? This will delete all scenes too.`,
+      "warning",
+    );
+    if (!ok) return;
+
+    try {
+      setDeletingProjectId(project.id);
+
+      const response = await fetch(`/api/projects/${project.id}`, {
+        method: "DELETE",
+      });
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || "Failed to delete project");
+      }
+
+      setProjects((prev) => prev.filter((p) => p.id !== project.id));
+
+      // If the deleted project was currently open, reset to Step 0 and clear URL
+      if (currentProjectId === project.id) {
+        setCurrentProjectId(null);
+        setCurrentProjectName("");
+        setScriptData(null);
+        setTopic("");
+        setTopicCategories([]);
+        setSelectedCharacter(null);
+        setSceneGroups([]);
+        setSceneGroupsTouched(false);
+        setStep(0);
+        setMaxStepReached(0);
+        router.replace("/admin/video-generator");
+      }
+    } catch (error) {
+      await alert("Failed to delete project: " + error.message, "error");
+    } finally {
+      setDeletingProjectId(null);
+      setOpenProjectMenuId(null);
+    }
+  };
+
   const loadAvailableActions = async () => {
     try {
       const response = await fetch("/api/actions/list");
@@ -522,6 +995,30 @@ export default function VideoGeneratorPage() {
       }
     } catch (error) {
       console.error("Failed to load actions:", error);
+    }
+  };
+
+  const loadAvailableCameraMovements = async () => {
+    try {
+      const response = await fetch("/api/camera-movements/list");
+      const result = await response.json();
+      if (result.success && result.camera_movements) {
+        setAvailableCameraMovements(result.camera_movements);
+      }
+    } catch (error) {
+      console.error("Failed to load camera movements:", error);
+    }
+  };
+
+  const loadAvailableCharacterMotions = async () => {
+    try {
+      const response = await fetch("/api/character-motions/list");
+      const result = await response.json();
+      if (result.success && result.character_motions) {
+        setAvailableCharacterMotions(result.character_motions);
+      }
+    } catch (error) {
+      console.error("Failed to load character motions:", error);
     }
   };
 
@@ -589,17 +1086,17 @@ export default function VideoGeneratorPage() {
           "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-200",
       },
       2: {
-        label: "Step 2: Script Ready",
+        label: "Step 2: Script & Voiceover",
         color:
           "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200",
       },
       3: {
-        label: "Step 3: Voiceover Done",
+        label: "Step 3: Scene images",
         color:
           "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-200",
       },
       4: {
-        label: "Step 4: Images Ready",
+        label: "Step 4: Scene videos",
         color:
           "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200",
       },
@@ -677,6 +1174,10 @@ export default function VideoGeneratorPage() {
           result.project.project_name || "Untitled Project",
         );
         setScriptData(result.scriptData);
+
+        // Initialize selected videos from scene docs so Step 4 can resume.
+        setVideos(deriveSelectedVideosFromScenes(result.scriptData?.scenes));
+
         setTopic(result.project.topic || "");
         setTopicCategories(result.project.categories || []);
 
@@ -730,42 +1231,131 @@ export default function VideoGeneratorPage() {
         );
         setProjectCosts(result.project.costs || null);
 
-        // Load selected locations if available
-        if (result.project.location_mapping) {
-          setLocationMapping(result.project.location_mapping);
-          const locationIds = [
-            ...new Set(Object.values(result.project.location_mapping)),
-          ];
-          if (locationIds.length > 0) {
-            try {
-              // Fetch all location details
-              const locationPromises = locationIds.map(async (locationId) => {
-                const locResponse = await fetch(`/api/locations/${locationId}`);
-                const locResult = await locResponse.json();
-                return locResult.success ? locResult.location : null;
-              });
+        // Load selected locations from scene docs.
+        // Backward-compatible: migrate legacy project.location_mapping -> scenes[].location_id.
+        const legacyLocationMapping = result.project.location_mapping || {};
+        const nextLocationMapping = {};
+        const locationMigrations = [];
 
-              const locations = await Promise.all(locationPromises);
-              const validLocations = locations.filter((loc) => loc !== null);
-              setSelectedLocations(validLocations);
-              console.log(
-                `Loaded ${validLocations.length} locations for project`,
-              );
-            } catch (locError) {
-              console.error("Error loading locations:", locError);
-              setSelectedLocations([]);
-            }
+        for (const scene of result.scriptData?.scenes || []) {
+          const sid = scene?.id;
+          if (sid == null) continue;
+
+          if (scene.location_id) {
+            nextLocationMapping[sid] = scene.location_id;
+            continue;
+          }
+
+          const legacyLocId =
+            legacyLocationMapping?.[sid] ??
+            legacyLocationMapping?.[String(sid)];
+          if (legacyLocId) {
+            nextLocationMapping[sid] = legacyLocId;
+            locationMigrations.push(
+              fetch(`/api/projects/${projectId}/scenes/${sid}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ location_id: legacyLocId }),
+              }),
+            );
+          }
+        }
+
+        setLocationMapping(nextLocationMapping);
+
+        const locationIds = [...new Set(Object.values(nextLocationMapping))];
+        if (locationIds.length > 0) {
+          try {
+            const locationPromises = locationIds.map(async (locationId) => {
+              const locResponse = await fetch(`/api/locations/${locationId}`);
+              const locResult = await locResponse.json();
+              return locResult.success ? locResult.location : null;
+            });
+
+            const locations = await Promise.all(locationPromises);
+            const validLocations = locations.filter((loc) => loc !== null);
+            setSelectedLocations(validLocations);
+            console.log(
+              `Loaded ${validLocations.length} locations for project`,
+            );
+          } catch (locError) {
+            console.error("Error loading locations:", locError);
+            setSelectedLocations([]);
           }
         } else {
           setSelectedLocations([]);
-          setLocationMapping({});
         }
 
-        // Load action mapping if available
-        if (result.project.action_mapping) {
-          setActionMapping(result.project.action_mapping);
-        } else {
-          setActionMapping({});
+        if (locationMigrations.length > 0) {
+          Promise.allSettled(locationMigrations).catch(() => {});
+        }
+
+        // Load action/camera/character selections from scene docs.
+        // Backward-compatible: if legacy project-level mappings exist, migrate them into scenes.
+        const scenes = result.scriptData?.scenes || [];
+
+        const legacyActionMapping = result.project.action_mapping || {};
+        const legacyCameraMovementMapping =
+          result.project.camera_movement_mapping || {};
+        const legacyCharacterMotionMapping =
+          result.project.character_motion_mapping || {};
+
+        const nextActionMapping = {};
+        const nextCameraMovementMapping = {};
+        const nextCharacterMotionMapping = {};
+
+        const migrations = [];
+
+        for (const scene of scenes) {
+          const sid = scene?.id;
+          if (sid == null) continue;
+
+          if (scene.action_id) nextActionMapping[sid] = scene.action_id;
+          if (scene.camera_movement_id)
+            nextCameraMovementMapping[sid] = scene.camera_movement_id;
+          if (scene.character_motion_id)
+            nextCharacterMotionMapping[sid] = scene.character_motion_id;
+
+          const legacyActionId =
+            legacyActionMapping?.[sid] ?? legacyActionMapping?.[String(sid)];
+          const legacyCamId =
+            legacyCameraMovementMapping?.[sid] ??
+            legacyCameraMovementMapping?.[String(sid)];
+          const legacyCharId =
+            legacyCharacterMotionMapping?.[sid] ??
+            legacyCharacterMotionMapping?.[String(sid)];
+
+          const updates = {};
+          if (!scene.action_id && legacyActionId) {
+            nextActionMapping[sid] = legacyActionId;
+            updates.action_id = legacyActionId;
+          }
+          if (!scene.camera_movement_id && legacyCamId) {
+            nextCameraMovementMapping[sid] = legacyCamId;
+            updates.camera_movement_id = legacyCamId;
+          }
+          if (!scene.character_motion_id && legacyCharId) {
+            nextCharacterMotionMapping[sid] = legacyCharId;
+            updates.character_motion_id = legacyCharId;
+          }
+
+          if (Object.keys(updates).length > 0) {
+            migrations.push(
+              fetch(`/api/projects/${projectId}/scenes/${sid}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(updates),
+              }),
+            );
+          }
+        }
+
+        setActionMapping(nextActionMapping);
+        setCameraMovementMapping(nextCameraMovementMapping);
+        setCharacterMotionMapping(nextCharacterMotionMapping);
+
+        if (migrations.length > 0) {
+          Promise.allSettled(migrations).catch(() => {});
         }
 
         // Resume from URL step if available, otherwise use saved position
@@ -1018,17 +1608,17 @@ export default function VideoGeneratorPage() {
     if (!currentProjectId || !locationPickerSceneId) return;
 
     try {
-      // Update location mapping in Firestore
-      const updateResponse = await fetch(`/api/projects/${currentProjectId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          location_mapping: {
-            ...locationMapping,
-            [locationPickerSceneId]: location.id,
-          },
-        }),
-      });
+      // Persist selection on the scene doc
+      const updateResponse = await fetch(
+        `/api/projects/${currentProjectId}/scenes/${locationPickerSceneId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            location_id: location.id,
+          }),
+        },
+      );
 
       const updateResult = await updateResponse.json();
       if (updateResult.success) {
@@ -1037,6 +1627,17 @@ export default function VideoGeneratorPage() {
           ...locationMapping,
           [locationPickerSceneId]: location.id,
         });
+
+        if (scriptData?.scenes) {
+          setScriptData({
+            ...scriptData,
+            scenes: scriptData.scenes.map((s) =>
+              s.id === locationPickerSceneId
+                ? { ...s, location_id: location.id }
+                : s,
+            ),
+          });
+        }
 
         // Add to selected locations if not already there
         if (!selectedLocations.find((loc) => loc.id === location.id)) {
@@ -1078,17 +1679,17 @@ export default function VideoGeneratorPage() {
     if (!currentProjectId || !actionPickerSceneId) return;
 
     try {
-      // Update action mapping in Firestore
-      const updateResponse = await fetch(`/api/projects/${currentProjectId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action_mapping: {
-            ...actionMapping,
-            [actionPickerSceneId]: action.id,
-          },
-        }),
-      });
+      // Persist selection on the scene doc
+      const updateResponse = await fetch(
+        `/api/projects/${currentProjectId}/scenes/${actionPickerSceneId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action_id: action.id,
+          }),
+        },
+      );
 
       const updateResult = await updateResponse.json();
       if (updateResult.success) {
@@ -1098,6 +1699,16 @@ export default function VideoGeneratorPage() {
           [actionPickerSceneId]: action.id,
         });
 
+        // Keep scriptData in sync
+        if (scriptData?.scenes) {
+          setScriptData({
+            ...scriptData,
+            scenes: scriptData.scenes.map((s) =>
+              s.id === actionPickerSceneId ? { ...s, action_id: action.id } : s,
+            ),
+          });
+        }
+
         setShowActionPicker(false);
         await alert(`Action selected: ${action.name}`, "success");
       } else {
@@ -1105,6 +1716,219 @@ export default function VideoGeneratorPage() {
       }
     } catch (error) {
       await alert("Error selecting action: " + error.message, "error");
+    }
+  };
+
+  const handleOpenCameraMovementPicker = async (sceneId) => {
+    try {
+      if (availableCameraMovements.length === 0) {
+        await alert(
+          "No camera movements available. Seeding defaults...",
+          "info",
+        );
+        const seedResponse = await fetch("/api/camera-movements/seed", {
+          method: "POST",
+        });
+        const seedResult = await seedResponse.json();
+        if (seedResult.success) {
+          await loadAvailableCameraMovements();
+        }
+      }
+
+      setCameraMovementPickerSceneId(sceneId);
+      setShowCameraMovementPicker(true);
+    } catch (error) {
+      await alert("Error loading camera movements: " + error.message, "error");
+    }
+  };
+
+  const handleSelectCameraMovementFromPicker = async (movement) => {
+    if (!currentProjectId || !cameraMovementPickerSceneId) return;
+
+    try {
+      const updateResponse = await fetch(
+        `/api/projects/${currentProjectId}/scenes/${cameraMovementPickerSceneId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            camera_movement_id: movement.id,
+          }),
+        },
+      );
+
+      const updateResult = await updateResponse.json();
+      if (updateResult.success) {
+        setCameraMovementMapping({
+          ...cameraMovementMapping,
+          [cameraMovementPickerSceneId]: movement.id,
+        });
+
+        if (scriptData?.scenes) {
+          setScriptData({
+            ...scriptData,
+            scenes: scriptData.scenes.map((s) =>
+              s.id === cameraMovementPickerSceneId
+                ? { ...s, camera_movement_id: movement.id }
+                : s,
+            ),
+          });
+        }
+        setShowCameraMovementPicker(false);
+        await alert(`Camera movement selected: ${movement.name}`, "success");
+      } else {
+        await alert("Failed to update camera movement", "error");
+      }
+    } catch (error) {
+      await alert("Error selecting camera movement: " + error.message, "error");
+    }
+  };
+
+  const handleClearCameraMovementForScene = async (sceneId) => {
+    if (!currentProjectId || !sceneId) return;
+    try {
+      const updateResponse = await fetch(
+        `/api/projects/${currentProjectId}/scenes/${sceneId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            camera_movement_id: null,
+          }),
+        },
+      );
+
+      const updateResult = await updateResponse.json();
+      if (updateResult.success) {
+        setCameraMovementMapping((prev) => {
+          const next = { ...prev };
+          delete next[sceneId];
+          return next;
+        });
+
+        if (scriptData?.scenes) {
+          setScriptData({
+            ...scriptData,
+            scenes: scriptData.scenes.map((s) =>
+              s.id === sceneId ? { ...s, camera_movement_id: null } : s,
+            ),
+          });
+        }
+
+        await alert("Camera movement cleared.", "success");
+      } else {
+        await alert("Failed to clear camera movement", "error");
+      }
+    } catch (error) {
+      await alert("Error clearing camera movement: " + error.message, "error");
+    }
+  };
+
+  const handleOpenCharacterMotionPicker = async (sceneId) => {
+    try {
+      if (availableCharacterMotions.length === 0) {
+        await alert(
+          "No character motions available. Seeding defaults...",
+          "info",
+        );
+        const seedResponse = await fetch("/api/character-motions/seed", {
+          method: "POST",
+        });
+        const seedResult = await seedResponse.json();
+        if (seedResult.success) {
+          await loadAvailableCharacterMotions();
+        }
+      }
+
+      setCharacterMotionPickerSceneId(sceneId);
+      setShowCharacterMotionPicker(true);
+    } catch (error) {
+      await alert("Error loading character motions: " + error.message, "error");
+    }
+  };
+
+  const handleSelectCharacterMotionFromPicker = async (motion) => {
+    if (!currentProjectId || !characterMotionPickerSceneId) return;
+
+    try {
+      const updateResponse = await fetch(
+        `/api/projects/${currentProjectId}/scenes/${characterMotionPickerSceneId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            character_motion_id: motion.id,
+          }),
+        },
+      );
+
+      const updateResult = await updateResponse.json();
+      if (updateResult.success) {
+        setCharacterMotionMapping({
+          ...characterMotionMapping,
+          [characterMotionPickerSceneId]: motion.id,
+        });
+
+        if (scriptData?.scenes) {
+          setScriptData({
+            ...scriptData,
+            scenes: scriptData.scenes.map((s) =>
+              s.id === characterMotionPickerSceneId
+                ? { ...s, character_motion_id: motion.id }
+                : s,
+            ),
+          });
+        }
+        setShowCharacterMotionPicker(false);
+        await alert(`Character motion selected: ${motion.name}`, "success");
+      } else {
+        await alert("Failed to update character motion", "error");
+      }
+    } catch (error) {
+      await alert(
+        "Error selecting character motion: " + error.message,
+        "error",
+      );
+    }
+  };
+
+  const handleClearCharacterMotionForScene = async (sceneId) => {
+    if (!currentProjectId || !sceneId) return;
+    try {
+      const updateResponse = await fetch(
+        `/api/projects/${currentProjectId}/scenes/${sceneId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            character_motion_id: null,
+          }),
+        },
+      );
+
+      const updateResult = await updateResponse.json();
+      if (updateResult.success) {
+        setCharacterMotionMapping((prev) => {
+          const next = { ...prev };
+          delete next[sceneId];
+          return next;
+        });
+
+        if (scriptData?.scenes) {
+          setScriptData({
+            ...scriptData,
+            scenes: scriptData.scenes.map((s) =>
+              s.id === sceneId ? { ...s, character_motion_id: null } : s,
+            ),
+          });
+        }
+
+        await alert("Character motion cleared.", "success");
+      } else {
+        await alert("Failed to clear character motion", "error");
+      }
+    } catch (error) {
+      await alert("Error clearing character motion: " + error.message, "error");
     }
   };
 
@@ -1154,17 +1978,17 @@ export default function VideoGeneratorPage() {
           Math.floor(Math.random() * availableLocations.length)
         ];
 
-      // Update location mapping in Firestore
-      const updateResponse = await fetch(`/api/projects/${currentProjectId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          location_mapping: {
-            ...locationMapping,
-            [sceneId]: newLocation.id,
-          },
-        }),
-      });
+      // Persist selection on the scene doc
+      const updateResponse = await fetch(
+        `/api/projects/${currentProjectId}/scenes/${sceneId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            location_id: newLocation.id,
+          }),
+        },
+      );
 
       const updateResult = await updateResponse.json();
       if (updateResult.success) {
@@ -1173,6 +1997,15 @@ export default function VideoGeneratorPage() {
           ...locationMapping,
           [sceneId]: newLocation.id,
         });
+
+        if (scriptData?.scenes) {
+          setScriptData({
+            ...scriptData,
+            scenes: scriptData.scenes.map((s) =>
+              s.id === sceneId ? { ...s, location_id: newLocation.id } : s,
+            ),
+          });
+        }
 
         // Add to selected locations if not already there
         if (!selectedLocations.find((loc) => loc.id === newLocation.id)) {
@@ -1198,6 +2031,16 @@ export default function VideoGeneratorPage() {
     setShowActionGenerateModal(true);
   };
 
+  const handleOpenCameraMovementGenerateModal = (sceneId) => {
+    setCameraMovementGenerateSceneId(sceneId);
+    setShowCameraMovementGenerateModal(true);
+  };
+
+  const handleOpenCharacterMotionGenerateModal = (sceneId) => {
+    setCharacterMotionGenerateSceneId(sceneId);
+    setShowCharacterMotionGenerateModal(true);
+  };
+
   const handleGenerateNewAction = async (sceneId, keywords = "") => {
     if (!currentProjectId) {
       await alert("No project selected.", "warning");
@@ -1211,6 +2054,7 @@ export default function VideoGeneratorPage() {
       // Generate 1 new action with AI
       const requestBody = {
         count: 1,
+        project_id: currentProjectId,
         keywords:
           keywords.trim() || "contemplative, quiet moment, introspective",
       };
@@ -1231,17 +2075,17 @@ export default function VideoGeneratorPage() {
       const newAction = result.actions[0];
       const cost = result.cost || 0;
 
-      // Update action mapping in Firestore
-      const updateResponse = await fetch(`/api/projects/${currentProjectId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action_mapping: {
-            ...actionMapping,
-            [sceneId]: newAction.id,
-          },
-        }),
-      });
+      // Persist selection on the scene doc
+      const updateResponse = await fetch(
+        `/api/projects/${currentProjectId}/scenes/${sceneId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action_id: newAction.id,
+          }),
+        },
+      );
 
       const updateResult = await updateResponse.json();
       if (updateResult.success) {
@@ -1251,8 +2095,26 @@ export default function VideoGeneratorPage() {
           [sceneId]: newAction.id,
         });
 
+        if (scriptData?.scenes) {
+          setScriptData({
+            ...scriptData,
+            scenes: scriptData.scenes.map((s) =>
+              s.id === sceneId ? { ...s, action_id: newAction.id } : s,
+            ),
+          });
+        }
+
         // Add to available actions
         setAvailableActions([...availableActions, newAction]);
+
+        // Reload project costs
+        const projectResponse = await fetch(
+          `/api/projects/${currentProjectId}`,
+        );
+        const projectResult = await projectResponse.json();
+        if (projectResult.success) {
+          setProjectCosts(projectResult.project.costs || null);
+        }
 
         await alert(
           `✨ New action generated: ${newAction.name}\nCost: $${cost.toFixed(4)}`,
@@ -1314,17 +2176,17 @@ export default function VideoGeneratorPage() {
       const newLocation = result.locations[0];
       const cost = result.cost || 0;
 
-      // Update location mapping in Firestore
-      const updateResponse = await fetch(`/api/projects/${currentProjectId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          location_mapping: {
-            ...locationMapping,
-            [sceneId]: newLocation.id,
-          },
-        }),
-      });
+      // Persist selection on the scene doc
+      const updateResponse = await fetch(
+        `/api/projects/${currentProjectId}/scenes/${sceneId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            location_id: newLocation.id,
+          }),
+        },
+      );
 
       const updateResult = await updateResponse.json();
       if (updateResult.success) {
@@ -1333,6 +2195,15 @@ export default function VideoGeneratorPage() {
           ...locationMapping,
           [sceneId]: newLocation.id,
         });
+
+        if (scriptData?.scenes) {
+          setScriptData({
+            ...scriptData,
+            scenes: scriptData.scenes.map((s) =>
+              s.id === sceneId ? { ...s, location_id: newLocation.id } : s,
+            ),
+          });
+        }
 
         // Add to selected locations
         setSelectedLocations([...selectedLocations, newLocation]);
@@ -1355,6 +2226,198 @@ export default function VideoGeneratorPage() {
       }
     } catch (error) {
       await alert("Error generating location: " + error.message, "error");
+    } finally {
+      setGeneratingSceneId(null);
+    }
+  };
+
+  const handleGenerateNewCameraMovement = async (sceneId, keywords = "") => {
+    if (!currentProjectId) {
+      await alert("No project selected.", "warning");
+      return;
+    }
+
+    setShowCameraMovementGenerateModal(false);
+    setCameraMovementGenerationKeywords("");
+    setGeneratingSceneId(sceneId);
+
+    try {
+      const requestBody = {
+        count: 1,
+        project_id: currentProjectId,
+        keywords: keywords.trim() || "slow, cinematic, intimate",
+      };
+
+      const response = await fetch("/api/camera-movements/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
+      });
+
+      const result = await response.json();
+
+      const newMovement =
+        (result.camera_movements && result.camera_movements[0]) ||
+        (result.movements && result.movements[0]);
+
+      if (!result.success || !newMovement) {
+        await alert(
+          result?.error || "Failed to generate camera movement",
+          "error",
+        );
+        return;
+      }
+
+      const cost = result.cost || 0;
+
+      const updateResponse = await fetch(
+        `/api/projects/${currentProjectId}/scenes/${sceneId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            camera_movement_id: newMovement.id,
+          }),
+        },
+      );
+
+      const updateResult = await updateResponse.json();
+      if (!updateResult.success) {
+        await alert("Failed to update camera movement mapping", "error");
+        return;
+      }
+
+      setCameraMovementMapping({
+        ...cameraMovementMapping,
+        [sceneId]: newMovement.id,
+      });
+
+      if (scriptData?.scenes) {
+        setScriptData({
+          ...scriptData,
+          scenes: scriptData.scenes.map((s) =>
+            s.id === sceneId ? { ...s, camera_movement_id: newMovement.id } : s,
+          ),
+        });
+      }
+
+      setAvailableCameraMovements((prev) => {
+        if (prev.some((m) => m.id === newMovement.id)) return prev;
+        return [...prev, newMovement];
+      });
+
+      // Reload project costs
+      const projectResponse = await fetch(`/api/projects/${currentProjectId}`);
+      const projectResult = await projectResponse.json();
+      if (projectResult.success) {
+        setProjectCosts(projectResult.project.costs || null);
+      }
+
+      await alert(
+        `✨ New camera movement generated: ${newMovement.name}\nCost: $${cost.toFixed(4)}`,
+        "success",
+      );
+    } catch (error) {
+      await alert(
+        "Error generating camera movement: " + error.message,
+        "error",
+      );
+    } finally {
+      setGeneratingSceneId(null);
+    }
+  };
+
+  const handleGenerateNewCharacterMotion = async (sceneId, keywords = "") => {
+    if (!currentProjectId) {
+      await alert("No project selected.", "warning");
+      return;
+    }
+
+    setShowCharacterMotionGenerateModal(false);
+    setCharacterMotionGenerationKeywords("");
+    setGeneratingSceneId(sceneId);
+
+    try {
+      const requestBody = {
+        count: 1,
+        project_id: currentProjectId,
+        keywords: keywords.trim() || "subtle, natural, gentle",
+      };
+
+      const response = await fetch("/api/character-motions/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
+      });
+
+      const result = await response.json();
+
+      const newMotion =
+        (result.character_motions && result.character_motions[0]) ||
+        (result.motions && result.motions[0]);
+
+      if (!result.success || !newMotion) {
+        await alert(
+          result?.error || "Failed to generate character motion",
+          "error",
+        );
+        return;
+      }
+
+      const cost = result.cost || 0;
+
+      const updateResponse = await fetch(
+        `/api/projects/${currentProjectId}/scenes/${sceneId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            character_motion_id: newMotion.id,
+          }),
+        },
+      );
+
+      const updateResult = await updateResponse.json();
+      if (!updateResult.success) {
+        await alert("Failed to update character motion mapping", "error");
+        return;
+      }
+
+      setCharacterMotionMapping({
+        ...characterMotionMapping,
+        [sceneId]: newMotion.id,
+      });
+
+      if (scriptData?.scenes) {
+        setScriptData({
+          ...scriptData,
+          scenes: scriptData.scenes.map((s) =>
+            s.id === sceneId ? { ...s, character_motion_id: newMotion.id } : s,
+          ),
+        });
+      }
+
+      setAvailableCharacterMotions((prev) => {
+        if (prev.some((m) => m.id === newMotion.id)) return prev;
+        return [...prev, newMotion];
+      });
+
+      // Reload project costs
+      const projectResponse = await fetch(`/api/projects/${currentProjectId}`);
+      const projectResult = await projectResponse.json();
+      if (projectResult.success) {
+        setProjectCosts(projectResult.project.costs || null);
+      }
+
+      await alert(
+        `✨ New character motion generated: ${newMotion.name}\nCost: $${cost.toFixed(4)}`,
+        "success",
+      );
+    } catch (error) {
+      await alert(
+        "Error generating character motion: " + error.message,
+        "error",
+      );
     } finally {
       setGeneratingSceneId(null);
     }
@@ -1454,75 +2517,6 @@ export default function VideoGeneratorPage() {
       await alert("Error: " + error.message, "error");
     } finally {
       setGeneratingVoiceover(false);
-    }
-  };
-
-  // Step 3: Generate Images
-  const handleGenerateImages = async () => {
-    if (!voiceoverUrl) {
-      await alert("Please generate voiceover first", "warning");
-      return;
-    }
-
-    if (!currentProjectId) {
-      await alert("No project selected. Please start from Step 0.", "warning");
-      return;
-    }
-
-    if (!sessionId) {
-      await alert(
-        "Session ID is missing. Please regenerate the voiceover first.",
-        "warning",
-      );
-      return;
-    }
-
-    if (!scriptData || !scriptData.scenes || scriptData.scenes.length === 0) {
-      await alert(
-        "Script data is missing. Please generate the script first.",
-        "warning",
-      );
-      return;
-    }
-
-    if (!selectedCharacter) {
-      await alert(
-        "Character is not selected. Please select a character first.",
-        "warning",
-      );
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const response = await fetch("/api/video-generator/generate-images", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          project_id: currentProjectId,
-          script_data: scriptData,
-          selected_character: selectedCharacter,
-          session_id: sessionId,
-          voiceover_url: voiceoverUrl,
-        }),
-      });
-
-      const result = await response.json();
-      if (result.success) {
-        // Reload project to get updated scriptData with image_urls
-        await handleSelectProject(currentProjectId);
-        // Don't auto-advance to next step - let user review images first
-        // setStep(3);
-      } else {
-        const errorMsg = result.message
-          ? `${result.error}: ${result.message}`
-          : result.error;
-        await alert("Failed to generate images: " + errorMsg, "error");
-      }
-    } catch (error) {
-      await alert("Error: " + error.message, "error");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -1737,10 +2731,39 @@ export default function VideoGeneratorPage() {
 
   // Step 3: Regenerate Image Prompt with AI
   const handleRegenerateImagePrompt = async (sceneId) => {
+    if (!currentProjectId) {
+      await alert("No project selected. Please start from Step 0.", "warning");
+      return;
+    }
+
+    if (!scriptData?.scenes || scriptData.scenes.length === 0) {
+      await alert(
+        "Script data is missing. Please generate the script first.",
+        "warning",
+      );
+      return;
+    }
+
+    const existingScene = scriptData.scenes.find((s) => s.id === sceneId);
+    if (!existingScene) {
+      await alert("Scene not found. Please refresh and try again.", "error");
+      return;
+    }
+
+    const ok = await confirm(
+      `Generate a new image prompt for Scene ${sceneId}?\n\nYou will review it before saving.`,
+      {
+        title: "Regenerate Image Prompt",
+        confirmText: "Generate",
+        cancelText: "Cancel",
+      },
+    );
+    if (!ok) return;
+
     setLoading(true);
     setRegeneratingPromptSceneId(sceneId);
     try {
-      const scene = scriptData.scenes.find((s) => s.id === sceneId);
+      const scene = existingScene;
 
       // Get selected action for this scene
       const actionId = actionMapping[sceneId];
@@ -1767,23 +2790,17 @@ export default function VideoGeneratorPage() {
 
       const result = await response.json();
       if (result.success) {
-        // Update local state with new image_prompt
-        const updatedScenes = scriptData.scenes.map((s) => {
-          if (s.id === sceneId) {
-            return { ...s, image_prompt: result.image_prompt };
-          }
-          return s;
-        });
-        setScriptData({ ...scriptData, scenes: updatedScenes });
+        const generatedPrompt = result.image_prompt || "";
 
-        // Save to Firestore
-        await fetch(`/api/projects/${currentProjectId}/scenes/${sceneId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            image_prompt: result.image_prompt,
-          }),
+        setPromptReviewModal({
+          kind: "image_prompt",
+          sceneId,
+          title: "Review New Image Prompt",
+          originalPrompt: scene?.image_prompt || "",
+          generatedPrompt,
+          cost: result.cost || 0,
         });
+        setPromptReviewDraft(generatedPrompt);
 
         // Reload project to get updated costs
         const projectResponse = await fetch(
@@ -1795,7 +2812,7 @@ export default function VideoGeneratorPage() {
           setProjectCosts(projectResult.project.costs || null);
         }
 
-        await alert("Image prompt regenerated successfully!", "success");
+        // Note: cost has already been incurred by generation.
       } else {
         await alert("Failed to regenerate prompt: " + result.error, "error");
       }
@@ -1804,6 +2821,52 @@ export default function VideoGeneratorPage() {
     } finally {
       setLoading(false);
       setRegeneratingPromptSceneId(null);
+    }
+  };
+
+  const handleDiscardPromptReview = () => {
+    setPromptReviewModal(null);
+    setPromptReviewDraft("");
+  };
+
+  const handleAcceptPromptReview = async () => {
+    if (!promptReviewModal) return;
+    if (!currentProjectId) {
+      await alert("No project selected.", "warning");
+      return;
+    }
+
+    const { kind, sceneId } = promptReviewModal;
+    const field = kind === "motion_prompt" ? "motion_prompt" : "image_prompt";
+    const nextValue = promptReviewDraft || "";
+
+    setApplyingPromptReview(true);
+    try {
+      // Update local state
+      setScriptData((prev) => {
+        if (!prev?.scenes) return prev;
+        return {
+          ...prev,
+          scenes: prev.scenes.map((s) =>
+            s.id === sceneId ? { ...s, [field]: nextValue } : s,
+          ),
+        };
+      });
+
+      // Persist to Firestore
+      await fetch(`/api/projects/${currentProjectId}/scenes/${sceneId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [field]: nextValue }),
+      });
+
+      setPromptReviewModal(null);
+      setPromptReviewDraft("");
+      await alert("Prompt saved.", "success");
+    } catch (error) {
+      await alert("Failed to save prompt: " + error.message, "error");
+    } finally {
+      setApplyingPromptReview(false);
     }
   };
 
@@ -1939,17 +3002,158 @@ export default function VideoGeneratorPage() {
     }
   };
 
-  // Step 3: Generate Videos
-  const handleGenerateVideos = async () => {
+  const getSelectedImageUrlForScene = (scene) => {
+    const sceneId = normalizeSceneId(scene?.id);
+    if (!sceneId) return null;
+
+    // If scenes are linked via `sceneGroups`, child scenes should inherit
+    // the leader scene's selected image.
+    const { leaderId } = getSceneGroupInfo(
+      sceneGroups,
+      sceneId,
+      sceneIdsInOrder,
+    );
+    const leaderKey = normalizeSceneId(leaderId);
+    const leaderScene =
+      scriptData?.scenes?.find((s) => normalizeSceneId(s.id) === leaderKey) ||
+      scene;
+
+    const imageUrls = leaderScene?.image_urls;
+    if (!Array.isArray(imageUrls) || imageUrls.length === 0) return null;
+
+    // Require explicit selection (either locally or persisted).
+    const selectedIndex =
+      selectedSceneImages[leaderKey] ?? leaderScene?.selected_image_index;
+    if (selectedIndex === undefined || selectedIndex === null) return null;
+
+    const numericIndex = Number(selectedIndex);
+    if (!Number.isFinite(numericIndex)) return null;
+
+    const safeIndex = Math.max(
+      0,
+      Math.min(imageUrls.length - 1, Math.floor(numericIndex)),
+    );
+    return imageUrls[safeIndex] || null;
+  };
+
+  const handleMotionPromptChange = async (sceneId, newMotionPrompt) => {
+    if (!scriptData?.scenes) return;
+
+    const updatedScenes = scriptData.scenes.map((scene) => {
+      if (scene.id === sceneId) {
+        return { ...scene, motion_prompt: newMotionPrompt };
+      }
+      return scene;
+    });
+    setScriptData({ ...scriptData, scenes: updatedScenes });
+
+    if (motionPromptSaveTimers.current[sceneId]) {
+      clearTimeout(motionPromptSaveTimers.current[sceneId]);
+    }
+
+    motionPromptSaveTimers.current[sceneId] = setTimeout(async () => {
+      try {
+        if (!currentProjectId) return;
+        await fetch(`/api/projects/${currentProjectId}/scenes/${sceneId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            motion_prompt: newMotionPrompt,
+          }),
+        });
+      } catch (error) {
+        console.error("Error auto-saving motion prompt:", error);
+      }
+    }, 750);
+  };
+
+  const handleVideoDurationChange = async (sceneId, nextDurationSeconds) => {
+    if (!scriptData?.scenes) return;
+
+    const clamped = clampDurationSeconds(nextDurationSeconds, 8);
+
+    const updatedScenes = scriptData.scenes.map((scene) => {
+      if (scene.id === sceneId) {
+        return { ...scene, duration: clamped };
+      }
+      return scene;
+    });
+    setScriptData({ ...scriptData, scenes: updatedScenes });
+
+    if (videoDurationSaveTimers.current[sceneId]) {
+      clearTimeout(videoDurationSaveTimers.current[sceneId]);
+    }
+
+    videoDurationSaveTimers.current[sceneId] = setTimeout(async () => {
+      try {
+        if (!currentProjectId) return;
+        await fetch(`/api/projects/${currentProjectId}/scenes/${sceneId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            duration: clamped,
+          }),
+        });
+      } catch (error) {
+        console.error("Error auto-saving video duration:", error);
+      }
+    }, 750);
+  };
+
+  const handleGenerateVideoForScene = async (sceneId) => {
+    if (!currentProjectId) {
+      await alert("No project selected. Please start from Step 0.", "warning");
+      return;
+    }
+
+    if (!sessionId) {
+      await alert(
+        "Session ID is missing. Please regenerate the voiceover first.",
+        "warning",
+      );
+      return;
+    }
+
+    if (!scriptData?.scenes || scriptData.scenes.length === 0) {
+      await alert(
+        "Script data is missing. Please generate the script first.",
+        "warning",
+      );
+      return;
+    }
+
+    const scene = scriptData.scenes.find((s) => s.id === sceneId);
+    if (!scene) {
+      await alert("Scene not found. Please refresh and try again.", "error");
+      return;
+    }
+
+    const selectedImageUrl = getSelectedImageUrlForScene(scene);
+    if (!selectedImageUrl) {
+      await alert(
+        `Scene ${sceneId} has no selected image. Generate/select an image first.`,
+        "warning",
+      );
+      return;
+    }
+
+    setGeneratingVideoSceneId(sceneId);
     setLoading(true);
     try {
+      const durationSeconds = getSceneDurationSeconds(scene);
       const response = await fetch("/api/video-generator/generate-videos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           project_id: currentProjectId,
           session_id: sessionId,
-          images,
+          images: [
+            {
+              scene_id: sceneId,
+              image_url: selectedImageUrl,
+              duration: durationSeconds,
+            },
+          ],
           script_data: scriptData,
           voiceover_url: voiceoverUrl,
         }),
@@ -1957,7 +3161,34 @@ export default function VideoGeneratorPage() {
 
       const result = await response.json();
       if (result.success) {
-        setVideos(result.videos);
+        const returnedVideos = result.videos || [];
+        const newVideoForScene = returnedVideos.find(
+          (v) => v.scene_id === sceneId,
+        );
+
+        // Fill missing selections from session (best-effort), then select the newly generated one.
+        setVideos((prev) => {
+          const byScene = new Map((prev || []).map((v) => [v.scene_id, v]));
+          for (const v of returnedVideos) {
+            if (!v?.scene_id || !v?.video_url) continue;
+            if (!byScene.has(v.scene_id)) byScene.set(v.scene_id, v);
+          }
+          if (newVideoForScene?.video_url) {
+            byScene.set(sceneId, {
+              scene_id: sceneId,
+              video_url: newVideoForScene.video_url,
+            });
+          }
+          return Array.from(byScene.values()).sort(
+            (a, b) => Number(a.scene_id) - Number(b.scene_id),
+          );
+        });
+
+        // Update local scene versions + selection, and persist the selection.
+        if (newVideoForScene?.video_url) {
+          await handleSelectVideoForScene(sceneId, newVideoForScene.video_url);
+        }
+
         // Reload project costs
         const projectResponse = await fetch(
           `/api/projects/${currentProjectId}`,
@@ -1966,6 +3197,221 @@ export default function VideoGeneratorPage() {
         if (projectResult.success) {
           setProjectCosts(projectResult.project.costs || null);
         }
+      } else {
+        await alert(
+          "Failed to generate video: " + (result.error || "Unknown error"),
+          "error",
+        );
+      }
+    } catch (error) {
+      await alert("Error: " + error.message, "error");
+    } finally {
+      setLoading(false);
+      setGeneratingVideoSceneId(null);
+    }
+  };
+
+  const handleGenerateVideoPromptForScene = async (sceneId) => {
+    if (!currentProjectId) {
+      await alert("No project selected. Please start from Step 0.", "warning");
+      return;
+    }
+
+    if (!scriptData?.scenes || scriptData.scenes.length === 0) {
+      await alert(
+        "Script data is missing. Please generate the script first.",
+        "warning",
+      );
+      return;
+    }
+
+    const scene = scriptData.scenes.find((s) => s.id === sceneId);
+    if (!scene) {
+      await alert("Scene not found. Please refresh and try again.", "error");
+      return;
+    }
+
+    // Get selected action for this scene (optional)
+    const actionId = actionMapping[sceneId];
+    const selectedAction = actionId
+      ? availableActions.find((a) => a.id === actionId)
+      : null;
+
+    const cameraMovementId = cameraMovementMapping[sceneId];
+    const selectedCameraMovement = cameraMovementId
+      ? availableCameraMovements.find((m) => m.id === cameraMovementId)
+      : null;
+
+    const characterMotionId = characterMotionMapping[sceneId];
+    const selectedCharacterMotion = characterMotionId
+      ? availableCharacterMotions.find((m) => m.id === characterMotionId)
+      : null;
+
+    const ok = await confirm(
+      `Generate a new video prompt for Scene ${sceneId}?\n\nYou will review it before saving.`,
+      {
+        title: "Generate Video Prompt",
+        confirmText: "Generate",
+        cancelText: "Cancel",
+      },
+    );
+    if (!ok) return;
+
+    setGeneratingVideoPromptSceneId(sceneId);
+    try {
+      const response = await fetch(
+        "/api/video-generator/generate-video-prompt",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            scene_id: sceneId,
+            voiceover: scene.voiceover,
+            image_prompt: scene.image_prompt || "",
+            scene_index: sceneId - 1,
+            total_scenes: scriptData.scenes.length,
+            project_id: currentProjectId,
+            action: selectedAction,
+            camera_movement: selectedCameraMovement,
+            character_motion: selectedCharacterMotion,
+          }),
+        },
+      );
+
+      const result = await response.json();
+      if (result.success) {
+        const generatedPrompt = result.motion_prompt || "";
+
+        setPromptReviewModal({
+          kind: "motion_prompt",
+          sceneId,
+          title: "Review New Video Prompt",
+          originalPrompt: scene?.motion_prompt || "",
+          generatedPrompt,
+          cost: result.cost || 0,
+        });
+        setPromptReviewDraft(generatedPrompt);
+
+        // Reload project costs
+        const projectResponse = await fetch(
+          `/api/projects/${currentProjectId}`,
+        );
+        const projectResult = await projectResponse.json();
+        if (projectResult.success) {
+          setProjectCosts(projectResult.project.costs || null);
+        }
+
+        // Note: cost has already been incurred by generation.
+      } else {
+        await alert(
+          "Failed to generate video prompt: " +
+            (result.error || "Unknown error"),
+          "error",
+        );
+      }
+    } catch (error) {
+      await alert("Error generating video prompt: " + error.message, "error");
+    } finally {
+      setGeneratingVideoPromptSceneId(null);
+    }
+  };
+
+  // Step 3: Generate Videos
+  const handleGenerateVideos = async () => {
+    setLoading(true);
+    try {
+      const imagesWithDuration = (images || []).map((img) => {
+        const scene = scriptData?.scenes?.find((s) => s.id === img.scene_id);
+        return {
+          ...img,
+          duration: getSceneDurationSeconds(scene),
+        };
+      });
+
+      const response = await fetch("/api/video-generator/generate-videos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project_id: currentProjectId,
+          session_id: sessionId,
+          images: imagesWithDuration,
+          script_data: scriptData,
+          voiceover_url: voiceoverUrl,
+        }),
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        const returnedVideos = result.videos || [];
+
+        // Treat the newly generated set as the default selected set.
+        setVideos(returnedVideos);
+
+        // Append versions locally and persist selected_video_url per scene.
+        try {
+          if (scriptData?.scenes) {
+            const bySceneId = new Map(
+              returnedVideos
+                .filter((v) => v?.scene_id && v?.video_url)
+                .map((v) => [v.scene_id, v.video_url]),
+            );
+
+            const nextScenes = scriptData.scenes.map((s) => {
+              const nextUrl = bySceneId.get(s.id);
+              if (!nextUrl) return s;
+              const existingUrls = Array.isArray(s.video_urls)
+                ? s.video_urls
+                : [];
+              const nextUrls = uniqueStringsPreserveOrder([
+                ...existingUrls,
+                nextUrl,
+              ]);
+              return {
+                ...s,
+                video_urls: nextUrls,
+                selected_video_url: nextUrl,
+              };
+            });
+            setScriptData({ ...scriptData, scenes: nextScenes });
+
+            if (currentProjectId) {
+              const persistPromises = returnedVideos
+                .filter((v) => v?.scene_id && v?.video_url)
+                .map((v) =>
+                  fetch(
+                    `/api/projects/${currentProjectId}/scenes/${v.scene_id}`,
+                    {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ selected_video_url: v.video_url }),
+                    },
+                  ),
+                );
+              Promise.allSettled(persistPromises).catch(() => {});
+            }
+          }
+        } catch (e) {
+          console.warn("Failed to persist selected videos after generation", e);
+        }
+
+        // Reload project costs
+        const projectResponse = await fetch(
+          `/api/projects/${currentProjectId}`,
+        );
+        const projectResult = await projectResponse.json();
+        if (projectResult.success) {
+          setProjectCosts(projectResult.project.costs || null);
+        }
+        // Best-effort: persist step transition for resume.
+        try {
+          if (currentProjectId) {
+            await fetch(`/api/projects/${currentProjectId}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ current_step: 4 }),
+            });
+          }
+        } catch {}
         setStep(4);
       } else {
         await alert("Failed to generate videos: " + result.error, "error");
@@ -1981,6 +3427,12 @@ export default function VideoGeneratorPage() {
   const handleAssembleVideo = async () => {
     setLoading(true);
     try {
+      const sceneDurations = Object.fromEntries(
+        (scriptData?.scenes || []).map((s) => [
+          s.id,
+          getSceneDurationSeconds(s),
+        ]),
+      );
       const response = await fetch("/api/video-generator/assemble-video", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1989,6 +3441,7 @@ export default function VideoGeneratorPage() {
           session_id: sessionId,
           videos,
           voiceover_url: voiceoverUrl,
+          scene_durations: sceneDurations,
         }),
       });
 
@@ -2003,6 +3456,16 @@ export default function VideoGeneratorPage() {
         if (projectResult.success) {
           setProjectCosts(projectResult.project.costs || null);
         }
+        // Best-effort: persist step transition for resume.
+        try {
+          if (currentProjectId) {
+            await fetch(`/api/projects/${currentProjectId}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ current_step: 5 }),
+            });
+          }
+        } catch {}
         setStep(5);
       } else {
         await alert("Failed to assemble video: " + result.error, "error");
@@ -2040,6 +3503,81 @@ export default function VideoGeneratorPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const sceneIdsInOrder = scriptData?.scenes
+    ? scriptData.scenes.map((s) => normalizeSceneId(s.id))
+    : [];
+
+  const requiredImageSceneIds = scriptData?.scenes
+    ? scriptData.scenes
+        .map((s) => normalizeSceneId(s.id))
+        .filter((id) => {
+          const { isChild } = getSceneGroupInfo(
+            sceneGroups,
+            id,
+            sceneIdsInOrder,
+          );
+          return !isChild;
+        })
+    : [];
+
+  const hasExplicitSelectedImageForScene = (sceneId) => {
+    const normalizedId = normalizeSceneId(sceneId);
+    const scene = scriptData?.scenes?.find(
+      (s) => normalizeSceneId(s.id) === normalizedId,
+    );
+    if (
+      !scene ||
+      !Array.isArray(scene.image_urls) ||
+      scene.image_urls.length === 0
+    ) {
+      return false;
+    }
+
+    const selectedIndex =
+      selectedSceneImages[normalizedId] ?? scene.selected_image_index;
+    if (selectedIndex === undefined || selectedIndex === null) return false;
+
+    const numericIndex = Number(selectedIndex);
+    if (!Number.isFinite(numericIndex)) return false;
+    const idx = Math.floor(numericIndex);
+    return idx >= 0 && idx < scene.image_urls.length;
+  };
+
+  const canContinueToVideos =
+    requiredImageSceneIds.length > 0 &&
+    requiredImageSceneIds.every((id) => hasExplicitSelectedImageForScene(id));
+
+  const updateProjectCurrentStep = async (nextStep) => {
+    if (!currentProjectId) return { ok: false, error: "No project selected" };
+    try {
+      const response = await fetch(`/api/projects/${currentProjectId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ current_step: nextStep }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result?.success) {
+        return { ok: false, error: result?.error || "Failed to update step" };
+      }
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error?.message || "Failed to update step" };
+    }
+  };
+
+  const handleContinueToVideos = async () => {
+    if (!canContinueToVideos) return;
+    setContinuingToVideos(true);
+    const { ok, error } = await updateProjectCurrentStep(4);
+    if (!ok) {
+      await alert("Could not save progress (current_step). " + error, "error");
+      setContinuingToVideos(false);
+      return;
+    }
+    setContinuingToVideos(false);
+    setStep(4);
   };
 
   return (
@@ -2290,8 +3828,15 @@ export default function VideoGeneratorPage() {
                 {projects.slice(0, 10).map((project) => (
                   <div
                     key={project.id}
-                    onClick={() => handleSelectProject(project.id)}
-                    className="border rounded-lg p-4 cursor-pointer transition hover:shadow-md hover:border-blue-400 bg-gray-50 dark:bg-gray-900/40 dark:border-gray-800"
+                    onClick={() => {
+                      if (deletingProjectId === project.id) return;
+                      handleSelectProject(project.id);
+                    }}
+                    className={`relative border rounded-lg p-4 transition hover:shadow-md hover:border-blue-400 bg-gray-50 dark:bg-gray-900/40 dark:border-gray-800 ${
+                      deletingProjectId === project.id
+                        ? "cursor-not-allowed opacity-60"
+                        : "cursor-pointer"
+                    }`}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
@@ -2361,22 +3906,66 @@ export default function VideoGeneratorPage() {
                             </div>
                           )}
                       </div>
-                      <div className="text-blue-600">
-                        <svg
-                          className="w-5 h-5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
+                      <div className="flex items-start gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (deletingProjectId === project.id) return;
+                            setOpenProjectMenuId((prev) =>
+                              prev === project.id ? null : project.id,
+                            );
+                          }}
+                          disabled={deletingProjectId === project.id}
+                          className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-200 transition dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800"
+                          aria-label="Project actions"
                         >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M9 5l7 7-7 7"
-                          />
-                        </svg>
+                          <svg
+                            className="w-5 h-5"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path d="M10 3a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm0 5.5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM10 14a1.5 1.5 0 110 3 1.5 1.5 0 010-3z" />
+                          </svg>
+                        </button>
                       </div>
                     </div>
+
+                    {openProjectMenuId === project.id && (
+                      <div
+                        ref={projectMenuRef}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        className="absolute right-3 top-12 z-20 w-44 rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden dark:border-gray-800 dark:bg-gray-900"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => handleRenameProjectFromList(project)}
+                          disabled={deletingProjectId === project.id}
+                          className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition dark:text-gray-200 dark:hover:bg-gray-800"
+                        >
+                          Rename
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteProjectFromList(project)}
+                          disabled={deletingProjectId === project.id}
+                          className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 transition disabled:opacity-60 disabled:cursor-not-allowed dark:text-red-300 dark:hover:bg-red-950/30"
+                        >
+                          {deletingProjectId === project.id ? (
+                            <span className="inline-flex items-center gap-2">
+                              <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-red-400 border-t-transparent" />
+                              Deleting...
+                            </span>
+                          ) : (
+                            "Delete"
+                          )}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -2637,7 +4226,7 @@ export default function VideoGeneratorPage() {
 
       {/* Success Modal */}
       {showSuccessModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl max-w-md w-full p-8 text-center shadow-2xl animate-in zoom-in duration-300 dark:bg-gray-900 dark:border dark:border-gray-800">
             <div className="mb-6">
               <div className="mx-auto w-20 h-20 bg-gradient-to-br from-green-400 to-emerald-600 rounded-full flex items-center justify-center shadow-lg animate-in zoom-in duration-500">
@@ -2674,7 +4263,7 @@ export default function VideoGeneratorPage() {
 
       {/* Step 1: Topic & Character Selection */}
       {step === 1 && (
-        <div className="admin-card p-8">
+        <div className="admin-card-solid p-8">
           <div className="mb-6">
             <h2 className="text-2xl font-bold mb-3">
               Step 1: Choose Topic & Character
@@ -2716,7 +4305,7 @@ export default function VideoGeneratorPage() {
                 </span>
               </div>
               {projectCosts?.step1?.claude > 0 && (
-                <div className="bg-gray-50 border border-gray-300 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 whitespace-nowrap dark:bg-gray-950/40 dark:border-gray-800">
+                <div className="bg-gray-50 border border-gray-300 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 whitespace-nowrap dark:bg-gray-900 dark:border-gray-800">
                   <span className="text-gray-700 dark:text-gray-300">
                     💰 Step 1 Cost:
                   </span>
@@ -2951,7 +4540,7 @@ export default function VideoGeneratorPage() {
                               onClick={() => handleAddCategory(categoryInput)}
                               className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm border-t text-blue-600 dark:hover:bg-gray-800 dark:border-gray-800"
                             >
-                              + Add "{categoryInput}" as new category
+                              + Add &quot;{categoryInput}&quot; as new category
                             </button>
                           )}
                       </div>
@@ -3097,7 +4686,7 @@ export default function VideoGeneratorPage() {
                   </button>
 
                   {generatingTopics && (
-                    <div className="mt-4 bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-purple-200">
+                    <div className="mt-4 bg-white dark:bg-gray-900 rounded-lg p-4 border border-purple-200 dark:border-purple-900/60">
                       <div className="flex items-center gap-3 mb-3">
                         <div className="flex-1">
                           <div className="w-full bg-purple-200 rounded-full h-2 overflow-hidden">
@@ -3111,7 +4700,7 @@ export default function VideoGeneratorPage() {
                           </div>
                         </div>
                       </div>
-                      <p className="text-xs text-purple-700 font-medium">
+                      <p className="text-xs text-purple-700 font-medium dark:text-purple-200">
                         ✨ Creating {aiGenerateCount} comforting topic
                         {aiGenerateCount !== 1 ? "s" : ""} for you...
                       </p>
@@ -3366,9 +4955,9 @@ export default function VideoGeneratorPage() {
                   Locations Per Scene
                 </h4>
                 <p className="text-xs text-gray-700 dark:text-gray-300">
-                  After generating the script, you'll assign locations to each
-                  scene individually in Step 3. You can either select from the
-                  library or generate new ones with AI.
+                  After generating the script, you&apos;ll assign locations to
+                  each scene individually in Step 3. You can either select from
+                  the library or generate new ones with AI.
                 </p>
               </div>
             </div>
@@ -3840,8 +5429,8 @@ export default function VideoGeneratorPage() {
                       <div className="flex items-center gap-3 mb-2">
                         <div className="animate-spin h-4 w-4 border-2 border-purple-600 border-t-transparent rounded-full"></div>
                         <span className="text-sm font-medium text-purple-900">
-                          Generating voiceover with {selectedCharacter?.name}'s
-                          voice...
+                          Generating voiceover with {selectedCharacter?.name}
+                          &apos;s voice...
                         </span>
                       </div>
                       <div className="w-full bg-purple-200 rounded-full h-2 overflow-hidden">
@@ -3898,7 +5487,7 @@ export default function VideoGeneratorPage() {
                         <div className="animate-spin h-4 w-4 border-2 border-purple-600 border-t-transparent rounded-full"></div>
                         <span className="text-sm font-medium text-purple-900">
                           Regenerating voiceover with {selectedCharacter?.name}
-                          's voice...
+                          &apos;s voice...
                         </span>
                       </div>
                       <div className="w-full bg-purple-200 rounded-full h-2 overflow-hidden">
@@ -3915,8 +5504,8 @@ export default function VideoGeneratorPage() {
                 </div>
               )}
               <p className="text-xs text-gray-500 mt-3">
-                The voiceover will use {selectedCharacter?.name}'s voice. Make
-                sure your script is finalized before generating.
+                The voiceover will use {selectedCharacter?.name}&apos;s voice.
+                Make sure your script is finalized before generating.
               </p>
             </div>
           </div>
@@ -3929,7 +5518,17 @@ export default function VideoGeneratorPage() {
               ← Back
             </button>
             <button
-              onClick={() => setStep(3)}
+              onClick={async () => {
+                const { ok, error } = await updateProjectCurrentStep(3);
+                if (!ok) {
+                  await alert(
+                    "Could not save progress (current_step). " + error,
+                    "error",
+                  );
+                  return;
+                }
+                setStep(3);
+              }}
               disabled={!voiceoverUrl}
               className="flex-1 bg-blue-600 text-white py-2 sm:py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
             >
@@ -3941,99 +5540,126 @@ export default function VideoGeneratorPage() {
 
       {/* Step 3: Scene Generation */}
       {step === 3 && (
-        <div className="admin-card-solid p-8">
+        <div className="admin-card-solid p-6 sm:p-8">
           {!scriptData || !scriptData.scenes ? (
-            <div className="text-center py-12">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
-              <p className="text-gray-600">Loading project data...</p>
+            <div className="flex flex-col items-center justify-center py-16">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4" />
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                Loading project data...
+              </p>
             </div>
           ) : (
             <>
-              <div className="mb-6">
-                <h2 className="text-2xl font-bold mb-3">
-                  Step 3: Scene Generation
-                </h2>
-                {topic && (
-                  <div className="mb-4">
-                    <span className="text-sm font-medium text-gray-600">
-                      Topic:{" "}
-                    </span>
-                    <span className="text-sm text-gray-900">{topic}</span>
+              <div className="mb-8">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                      Step 3: Scene Images
+                    </h2>
+                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                      Review prompts and generate/select one image per scene.
+                    </p>
+                    {topic && (
+                      <div className="mt-3">
+                        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                          Topic
+                        </span>
+                        <div className="mt-1 text-sm text-gray-900 dark:text-gray-100">
+                          {topic}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-                {voiceoverUrl && (
-                  <div className="mb-4 bg-purple-50 border border-purple-200 rounded-lg p-4">
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm font-medium text-purple-700">
-                        🎤 Voiceover:
+
+                  <div className="flex flex-wrap gap-2">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200">
+                      <span className="text-base">🎨</span>
+                      <span>{scriptData?.scenes?.length || 0} scenes</span>
+                    </div>
+                    <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200">
+                      <span className="text-base">🤖</span>
+                      <span className="text-gray-600 dark:text-gray-300">
+                        Model
                       </span>
+                      <span className="font-semibold text-gray-900 dark:text-gray-100">
+                        Grok Image Edit
+                      </span>
+                    </div>
+                    <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800 shadow-sm dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-200">
+                      <span className="text-base">💰</span>
+                      <span className="text-emerald-700 dark:text-emerald-200">
+                        $
+                        {fluxProCost !== null
+                          ? fluxProCost.toFixed(3)
+                          : "0.000"}
+                        /image
+                      </span>
+                    </div>
+                    {projectCosts?.step3?.claude > 0 && (
+                      <div className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-800 shadow-sm dark:border-violet-900/50 dark:bg-violet-950/30 dark:text-violet-200">
+                        <span className="text-base">🤖</span>
+                        <span>Claude</span>
+                        <span className="font-semibold">
+                          ${projectCosts.step3.claude.toFixed(4)}
+                        </span>
+                      </div>
+                    )}
+                    {projectCosts?.step3?.total > 0 && (
+                      <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-medium text-orange-900 shadow-sm dark:border-orange-900/50 dark:bg-orange-950/30 dark:text-orange-200">
+                        <span className="text-base">🧾</span>
+                        <span>Step 3</span>
+                        <span className="font-semibold">
+                          ${projectCosts.step3.total.toFixed(3)}
+                        </span>
+                      </div>
+                    )}
+                    <a
+                      href="https://fal.ai/dashboard/billing"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-gray-900"
+                    >
+                      💳 FAL balance
+                      <span className="text-gray-400 dark:text-gray-500">
+                        →
+                      </span>
+                    </a>
+                    <button
+                      onClick={() => setShowFluxSettings(!showFluxSettings)}
+                      className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-800 shadow-sm hover:bg-indigo-100 transition dark:border-indigo-900/50 dark:bg-indigo-950/30 dark:text-indigo-200 dark:hover:bg-indigo-950/40"
+                    >
+                      ⚙️ {showFluxSettings ? "Hide" : "Show"} settings
+                    </button>
+                  </div>
+                </div>
+
+                {topic && <div className="hidden" />}
+                {voiceoverUrl && (
+                  <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-950">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-gray-100">
+                        <span className="text-lg">🎤</span>
+                        Voiceover
+                      </div>
                       <audio
                         controls
                         src={voiceoverUrl}
-                        className="flex-1 h-8"
-                        style={{ maxWidth: "400px" }}
+                        className="w-full sm:w-auto sm:flex-1 h-9"
+                        style={{ maxWidth: "520px" }}
                       />
                     </div>
                   </div>
                 )}
-                <div className="flex flex-wrap gap-2">
-                  <div className="bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap">
-                    🎨 {scriptData?.scenes?.length || 0} scenes
-                  </div>
-                  <div className="bg-purple-50 border border-purple-200 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
-                    <span className="text-purple-700">🤖 Model:</span>
-                    <span className="font-semibold text-purple-900">
-                      Grok Image Edit
-                    </span>
-                  </div>
-                  <div className="bg-green-50 border border-green-200 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
-                    <span className="text-green-700">💰 Cost:</span>
-                    <span className="font-semibold text-green-900">
-                      ${fluxProCost !== null ? fluxProCost.toFixed(3) : "0.000"}
-                      /image
-                    </span>
-                  </div>
-                  {projectCosts?.step3?.claude > 0 && (
-                    <div className="bg-purple-50 border border-purple-200 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
-                      <span className="text-purple-700">🤖 Claude:</span>
-                      <span className="font-semibold text-purple-900">
-                        ${projectCosts.step3.claude.toFixed(4)}
-                      </span>
-                    </div>
-                  )}
-                  {projectCosts?.step3?.total > 0 && (
-                    <div className="bg-orange-50 border border-orange-200 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
-                      <span className="text-orange-700">💰 Step 3 Total:</span>
-                      <span className="font-semibold text-orange-900">
-                        ${projectCosts.step3.total.toFixed(3)}
-                      </span>
-                    </div>
-                  )}
-                  <a
-                    href="https://fal.ai/dashboard/billing"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium hover:bg-gray-200 transition whitespace-nowrap dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
-                  >
-                    💳 Check FAL Balance →
-                  </a>
-                  <button
-                    onClick={() => setShowFluxSettings(!showFluxSettings)}
-                    className="bg-indigo-50 border border-indigo-200 text-indigo-700 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium hover:bg-indigo-100 transition whitespace-nowrap"
-                  >
-                    ⚙️ {showFluxSettings ? "Hide" : "Show"} Model Settings
-                  </button>
-                </div>
               </div>
 
               {/* Grok Image Edit Settings Panel */}
               {showFluxSettings && (
-                <div className="mb-6 bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-200 rounded-lg p-6 dark:from-indigo-950/30 dark:to-purple-950/30 dark:border-indigo-900">
-                  <h3 className="font-semibold text-indigo-900 mb-4 flex items-center gap-2 dark:text-indigo-200">
-                    <span className="text-xl">⚙️</span>
-                    Grok Image Edit Settings
+                <div className="mb-8 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-950">
+                  <h3 className="font-semibold text-gray-900 mb-2 flex items-center gap-2 dark:text-gray-100">
+                    <span className="text-lg">⚙️</span>
+                    Model settings
                   </h3>
-                  <p className="text-sm text-gray-600 mb-4 dark:text-gray-300">
+                  <p className="text-sm text-gray-600 mb-5 dark:text-gray-300">
                     Grok uses image editing to maintain character consistency
                     automatically. Character appearance and style are preserved
                     from your reference image.
@@ -4053,7 +5679,7 @@ export default function VideoGeneratorPage() {
                             output_format: e.target.value,
                           })
                         }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100 dark:border-gray-700"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100 dark:border-gray-700"
                       >
                         <option value="png">
                           PNG (Lossless, Higher Quality)
@@ -4072,670 +5698,739 @@ export default function VideoGeneratorPage() {
               {/* Always show list view with editable scene details */}
               <div>
                 <div className="mb-6">
-                  <h3 className="font-semibold mb-3">Review Scene Concepts</h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Review and edit the scene details before generating images.
-                    Each scene will be created based on these prompts.
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-1">
+                    Scene list
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    Generate images from each scene prompt, then pick one image
+                    per scene for Step 4.
                   </p>
                 </div>
 
                 <div className="space-y-4 mb-8">
-                  {scriptData.scenes.map((scene, index) => (
-                    <Fragment key={scene.id}>
-                      <div className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-950/40 dark:border-gray-800">
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="font-medium text-lg">
-                            Scene {scene.id}
-                          </span>
-                        </div>
+                  {scriptData.scenes.map((scene, index) => {
+                    const { leaderId, isChild } = getSceneGroupInfo(
+                      sceneGroups,
+                      scene.id,
+                      sceneIdsInOrder,
+                    );
 
-                        {/* Location Info */}
-                        {(() => {
-                          const locationId = locationMapping[scene.id];
-                          const location = selectedLocations.find(
-                            (loc) => loc.id === locationId,
-                          );
-
-                          return location ? (
-                            <div className="mb-3 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg dark:from-blue-950/30 dark:to-indigo-950/30 dark:border-blue-900">
-                              <div className="flex items-start justify-between gap-3 mb-2">
-                                <div className="flex items-start gap-2 flex-1 min-w-0">
-                                  <span className="text-xl">📍</span>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="font-semibold text-blue-900 text-sm mb-1 dark:text-blue-200">
-                                      {location.name}
-                                    </div>
-                                    <div className="text-xs text-gray-700 mb-2 leading-relaxed dark:text-gray-300">
-                                      {location.description}
-                                    </div>
-                                    <div className="flex flex-wrap gap-2 text-xs">
-                                      {location.category && (
-                                        <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full font-medium dark:bg-purple-900/40 dark:text-purple-200">
-                                          {location.category === "indoor"
-                                            ? "🏢 Indoor"
-                                            : "🌃 Outdoor"}
-                                        </span>
-                                      )}
-                                      <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-medium dark:bg-blue-900/40 dark:text-blue-200">
-                                        {location.type.replace(/_/g, " ")}
-                                      </span>
-                                      {location.visual_characteristics
-                                        .lighting &&
-                                        (Array.isArray(
-                                          location.visual_characteristics
-                                            .lighting,
-                                        )
-                                          ? location.visual_characteristics
-                                              .lighting
-                                          : location.visual_characteristics.lighting
-                                              .split(",")
-                                              .map((s) => s.trim())
-                                        ).map((light, idx) => (
-                                          <span
-                                            key={`light-${idx}`}
-                                            className="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full dark:bg-yellow-900/40 dark:text-yellow-200"
-                                          >
-                                            {light}
-                                          </span>
-                                        ))}
-                                      {location.visual_characteristics
-                                        .atmosphere &&
-                                        (Array.isArray(
-                                          location.visual_characteristics
-                                            .atmosphere,
-                                        )
-                                          ? location.visual_characteristics
-                                              .atmosphere
-                                          : location.visual_characteristics.atmosphere
-                                              .split(",")
-                                              .map((s) => s.trim())
-                                        ).map((atm, idx) => (
-                                          <span
-                                            key={`atm-${idx}`}
-                                            className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full dark:bg-indigo-900/40 dark:text-indigo-200"
-                                          >
-                                            {atm}
-                                          </span>
-                                        ))}
-                                      {location.visual_characteristics
-                                        .key_elements &&
-                                        location.visual_characteristics.key_elements.map(
-                                          (element, idx) => (
-                                            <span
-                                              key={`elem-${idx}`}
-                                              className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full dark:bg-green-900/40 dark:text-green-200"
-                                            >
-                                              {element}
-                                            </span>
-                                          ),
-                                        )}
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                  <button
-                                    onClick={() =>
-                                      handleOpenLocationPicker(scene.id)
-                                    }
-                                    disabled={generatingSceneId === scene.id}
-                                    className="flex-shrink-0 text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 font-medium transition disabled:opacity-50"
-                                    title="Choose different location from library"
-                                  >
-                                    📍 Select
-                                  </button>
-                                  <button
-                                    onClick={() =>
-                                      handleOpenLocationTypeModal(scene.id)
-                                    }
-                                    disabled={generatingSceneId === scene.id}
-                                    className="flex-shrink-0 text-xs bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 font-medium transition disabled:opacity-50"
-                                    title="Generate a brand new location with AI"
-                                  >
-                                    {generatingSceneId === scene.id
-                                      ? "✨..."
-                                      : "✨ Generate"}
-                                  </button>
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <a
-                                  href="/admin/locations"
-                                  target="_blank"
-                                  className="text-xs text-blue-600 hover:text-blue-800 underline"
-                                >
-                                  Manage Locations
-                                </a>
-                              </div>
+                    return (
+                      <Fragment key={scene.id}>
+                        <div
+                          className={
+                            "rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-950 " +
+                            (isChild
+                              ? "opacity-60 pointer-events-none select-none"
+                              : "")
+                          }
+                          aria-disabled={isChild}
+                        >
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <span className="font-semibold text-gray-900 dark:text-gray-100">
+                                Scene {scene.id}
+                              </span>
+                              {typeof scene.image_urls?.length === "number" && (
+                                <span className="text-xs rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300">
+                                  {scene.image_urls.length} images
+                                </span>
+                              )}
                             </div>
-                          ) : (
-                            <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg dark:bg-yellow-950/30 dark:border-yellow-900">
-                              <div className="flex items-center justify-between gap-3 mb-2">
-                                <div className="flex items-center gap-2 text-sm text-yellow-800 dark:text-yellow-200">
-                                  <span>⚠️</span>
-                                  <span>No location assigned</span>
-                                </div>
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={() =>
-                                      handleOpenLocationPicker(scene.id)
-                                    }
-                                    disabled={generatingSceneId === scene.id}
-                                    className="flex-shrink-0 text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 font-medium transition disabled:opacity-50"
-                                    title="Choose from location library"
-                                  >
-                                    📍 Select
-                                  </button>
-                                  <button
-                                    onClick={() =>
-                                      handleOpenLocationTypeModal(scene.id)
-                                    }
-                                    disabled={generatingSceneId === scene.id}
-                                    className="flex-shrink-0 text-xs bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 font-medium transition disabled:opacity-50"
-                                    title="Generate a brand new location with AI"
-                                  >
-                                    {generatingSceneId === scene.id
-                                      ? "✨..."
-                                      : "✨ Generate"}
-                                  </button>
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <a
-                                  href="/admin/locations"
-                                  target="_blank"
-                                  className="text-xs text-blue-600 hover:text-blue-800 underline dark:text-blue-300 dark:hover:text-blue-200"
-                                >
-                                  Manage Locations
-                                </a>
-                              </div>
-                            </div>
-                          );
-                        })()}
-
-                        {/* Action Selection */}
-                        {(() => {
-                          const actionId = actionMapping[scene.id];
-                          const selectedAction = availableActions.find(
-                            (a) => a.id === actionId,
-                          );
-
-                          return selectedAction ? (
-                            <div className="mb-3 p-3 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg dark:from-blue-950/30 dark:to-indigo-950/30 dark:border-blue-900">
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <span className="text-lg">🎭</span>
-                                    <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-200">
-                                      {selectedAction.name}
-                                    </h4>
-                                  </div>
-                                  <p className="text-xs text-blue-700 mb-2 dark:text-blue-200">
-                                    {selectedAction.description}
-                                  </p>
-                                  {selectedAction.pose_variations && (
-                                    <div className="space-y-1">
-                                      <div className="text-xs font-medium text-blue-800 dark:text-blue-200">
-                                        Pose Options:
-                                      </div>
-                                      <div className="flex flex-wrap gap-1">
-                                        {selectedAction.pose_variations
-                                          .slice(0, 2)
-                                          .map((pose, idx) => (
-                                            <span
-                                              key={idx}
-                                              className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full dark:bg-blue-900/40 dark:text-blue-200"
-                                            >
-                                              {pose.length > 40
-                                                ? pose.substring(0, 40) + "..."
-                                                : pose}
-                                            </span>
-                                          ))}
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                  <button
-                                    onClick={() =>
-                                      handleOpenActionPicker(scene.id)
-                                    }
-                                    disabled={generatingSceneId === scene.id}
-                                    className="flex-shrink-0 text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 font-medium transition disabled:opacity-50"
-                                    title="Choose different action from library"
-                                  >
-                                    🎭 Select
-                                  </button>
-                                  <button
-                                    onClick={() =>
-                                      handleOpenActionGenerateModal(scene.id)
-                                    }
-                                    disabled={generatingSceneId === scene.id}
-                                    className="flex-shrink-0 text-xs bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 font-medium transition disabled:opacity-50"
-                                    title="Generate a brand new action with AI"
-                                  >
-                                    {generatingSceneId === scene.id
-                                      ? "✨..."
-                                      : "✨ Generate"}
-                                  </button>
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <a
-                                  href="/admin/actions"
-                                  target="_blank"
-                                  className="text-xs text-blue-600 hover:text-blue-800 underline dark:text-blue-300 dark:hover:text-blue-200"
-                                >
-                                  Manage Actions
-                                </a>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg dark:bg-yellow-950/30 dark:border-yellow-900">
-                              <div className="flex items-center justify-between gap-3 mb-2">
-                                <div className="flex items-center gap-2 text-sm text-yellow-800 dark:text-yellow-200">
-                                  <span>⚠️</span>
-                                  <span>No action/pose assigned</span>
-                                </div>
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={() =>
-                                      handleOpenActionPicker(scene.id)
-                                    }
-                                    disabled={generatingSceneId === scene.id}
-                                    className="flex-shrink-0 text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 font-medium transition disabled:opacity-50"
-                                    title="Choose action from library"
-                                  >
-                                    🎭 Select
-                                  </button>
-                                  <button
-                                    onClick={() =>
-                                      handleOpenActionGenerateModal(scene.id)
-                                    }
-                                    disabled={generatingSceneId === scene.id}
-                                    className="flex-shrink-0 text-xs bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 font-medium transition disabled:opacity-50"
-                                    title="Generate a brand new action with AI"
-                                  >
-                                    {generatingSceneId === scene.id
-                                      ? "✨..."
-                                      : "✨ Generate"}
-                                  </button>
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <a
-                                  href="/admin/actions"
-                                  target="_blank"
-                                  className="text-xs text-blue-600 hover:text-blue-800 underline dark:text-blue-300 dark:hover:text-blue-200"
-                                >
-                                  Manage Actions
-                                </a>
-                              </div>
-                            </div>
-                          );
-                        })()}
-
-                        <div className="space-y-3">
-                          {/* Voiceover Text - Read Only */}
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-200">
-                              Voiceover Segment:
-                            </label>
-                            <p className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 dark:bg-gray-950 dark:border-gray-800 dark:text-gray-200">
-                              {scene.voiceover}
-                            </p>
-                          </div>
-
-                          {/* Reference Image Selector */}
-                          {selectedCharacter?.image_urls &&
-                            selectedCharacter.image_urls.length > 0 && (
-                              <div className="mb-4 p-3 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg dark:from-blue-950/30 dark:to-indigo-950/30 dark:border-blue-900">
-                                <div className="flex items-center justify-between mb-2">
-                                  <div className="flex items-center gap-3">
-                                    <label className="block text-sm font-medium text-blue-900 dark:text-blue-200">
-                                      📸 Character Reference for This Scene:
-                                    </label>
-                                    <a
-                                      href={`/admin/characters?id=${selectedCharacter.character_id}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-xs text-blue-600 hover:text-blue-800 underline font-medium dark:text-blue-300 dark:hover:text-blue-200"
-                                    >
-                                      Manage Character
-                                    </a>
-                                  </div>
-                                  <button
-                                    onClick={() =>
-                                      handleOpenCharacterReferenceModal(
-                                        scene.id,
-                                      )
-                                    }
-                                    className="text-xs bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 font-medium transition"
-                                  >
-                                    📚 Browse All
-                                  </button>
-                                </div>
-                                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
-                                  {selectedCharacter.image_urls.map(
-                                    (imageUrl, idx) => (
-                                      <button
-                                        key={`ref-${scene.id}-${idx}`}
-                                        onClick={() => {
-                                          setSelectedReferenceImages(
-                                            (prev) => ({
-                                              ...prev,
-                                              [scene.id]: imageUrl,
-                                            }),
-                                          );
-                                        }}
-                                        className={`relative aspect-[9/16] rounded-lg overflow-hidden border-3 transition-all ${
-                                          (selectedReferenceImages[scene.id] ||
-                                            selectedCharacter.image_urls[0]) ===
-                                          imageUrl
-                                            ? "border-blue-500 ring-2 ring-blue-300 shadow-lg"
-                                            : "border-gray-300 hover:border-blue-400 opacity-60 hover:opacity-100 dark:border-gray-700"
-                                        }`}
-                                        title={`Reference ${idx + 1}`}
-                                      >
-                                        <img
-                                          src={imageUrl}
-                                          alt={`Reference ${idx + 1}`}
-                                          className="w-full h-full object-cover"
-                                        />
-                                        {(selectedReferenceImages[scene.id] ||
-                                          selectedCharacter.image_urls[0]) ===
-                                          imageUrl && (
-                                          <div className="absolute top-1 right-1 bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
-                                            ✓
-                                          </div>
-                                        )}
-                                      </button>
-                                    ),
-                                  )}
-                                </div>
-                                <p className="text-xs text-blue-700 mt-2 dark:text-blue-200">
-                                  Select which reference image to use for this
-                                  scene. Click "Browse All" to see references
-                                  from all projects.
-                                </p>
-                              </div>
-                            )}
-
-                          {/* Image Prompt */}
-                          <div>
-                            <div className="flex items-center justify-between mb-1">
-                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-                                Image Prompt:
-                              </label>
-                              <button
-                                onClick={() =>
-                                  handleRegenerateImagePrompt(scene.id)
-                                }
-                                disabled={
-                                  loading ||
-                                  regeneratingPromptSceneId === scene.id
-                                }
-                                className="text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded-lg hover:bg-purple-200 disabled:opacity-50 disabled:cursor-not-allowed transition font-medium"
-                                title="Regenerate this image prompt with AI"
-                              >
-                                {regeneratingPromptSceneId === scene.id
-                                  ? "🔄 Regenerating..."
-                                  : "🔄 Regenerate Prompt"}
-                              </button>
-                            </div>
-
-                            {/* Loading Progress Bar */}
-                            {regeneratingPromptSceneId === scene.id && (
-                              <div className="mb-2">
-                                <div className="w-full bg-purple-200 rounded-full h-2 overflow-hidden">
-                                  <div
-                                    className="h-full bg-gradient-to-r from-purple-600 to-pink-600 rounded-full animate-pulse"
-                                    style={{ width: "100%" }}
-                                  ></div>
-                                </div>
-                                <p className="text-xs text-purple-700 text-center mt-1 font-medium">
-                                  ✨ Generating cozy, dreamy image prompt with
-                                  AI...
-                                </p>
-                              </div>
-                            )}
-
-                            <textarea
-                              value={scene.image_prompt}
-                              onChange={(e) =>
-                                handleImagePromptChange(
-                                  scene.id,
-                                  e.target.value,
-                                )
-                              }
-                              rows={8}
-                              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y text-sm bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100 dark:border-gray-700"
-                              placeholder="Describe the scene environment, lighting, and character pose..."
-                            />
-                          </div>
-
-                          {/* Generate Image Button */}
-                          <div className="mt-4">
-                            <button
-                              onClick={() =>
-                                handleGenerateSingleImage(scene.id)
-                              }
-                              disabled={loading}
-                              className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                            >
-                              {scene.image_urls && scene.image_urls.length > 0
-                                ? `Generate Another (${scene.image_urls.length} generated)`
-                                : generatingSceneId === scene.id
-                                  ? "Generating..."
-                                  : "Generate Image"}
-                            </button>
-
-                            {/* Loading Progress Bar */}
-                            {generatingSceneId === scene.id && (
-                              <div className="mt-2">
-                                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden dark:bg-gray-800">
-                                  <div
-                                    className="h-full bg-blue-600 rounded-full animate-pulse"
-                                    style={{ width: "100%" }}
-                                  ></div>
-                                </div>
-                                <p className="text-xs text-gray-500 text-center mt-1 dark:text-gray-400">
-                                  Generating image with character reference...
-                                </p>
-                              </div>
+                            {isChild && (
+                              <span className="text-xs px-2 py-0.5 rounded-full border border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200">
+                                Linked → Scene {leaderId}
+                              </span>
                             )}
                           </div>
 
-                          {/* Generated Images Preview */}
-                          {scene.image_urls && scene.image_urls.length > 0 && (
-                            <div className="mt-4">
-                              <label className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-200">
-                                Generated Images ({scene.image_urls.length}) -
-                                Click to select for video:
-                              </label>
-                              <div className="grid grid-cols-4 gap-3">
-                                {scene.image_urls.map((url, idx) => {
-                                  const isSelected =
-                                    (selectedSceneImages[scene.id] ?? 0) ===
-                                    idx;
-                                  return (
-                                    <div
-                                      key={`scene-${scene.id}-img-${idx}`}
-                                      onClick={() =>
-                                        handleSelectSceneImage(scene.id, idx)
-                                      }
-                                      className={`relative aspect-[9/16] bg-gray-100 rounded-lg overflow-hidden cursor-pointer transition-all group dark:bg-gray-900 ${
-                                        isSelected
-                                          ? "border-4 border-blue-500 ring-4 ring-blue-200 shadow-lg"
-                                          : "border-2 border-gray-300 hover:border-blue-400 hover:shadow-md dark:border-gray-700"
-                                      }`}
-                                      title={
-                                        isSelected
-                                          ? "Selected for video"
-                                          : "Click to select for video"
-                                      }
-                                    >
-                                      <img
-                                        src={url}
-                                        alt={`Scene ${scene.id} - Version ${idx + 1}`}
-                                        className="w-full h-full object-cover"
-                                      />
-                                      {isSelected && (
-                                        <div className="absolute top-2 left-2 bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg flex items-center gap-1">
-                                          ✓ Selected
-                                        </div>
-                                      )}
-                                      <div className="absolute bottom-2 left-2 bg-black/70 text-white px-2 py-1 rounded text-xs dark:bg-black/60">
-                                        Version {idx + 1}
-                                      </div>
-                                      <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setExpandedImage({
-                                              sceneId: scene.id,
-                                              imageIndex: idx,
-                                              url,
-                                            });
-                                          }}
-                                          className="bg-gray-800 text-white px-2 py-1 rounded-lg text-xs font-medium hover:bg-gray-900"
-                                          title="View full size"
-                                        >
-                                          🔍 Expand
-                                        </button>
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleRemoveImage(scene.id, idx);
-                                          }}
-                                          disabled={loading}
-                                          className="bg-red-600 text-white px-2 py-1 rounded-lg text-xs font-medium hover:bg-red-700 disabled:opacity-50"
-                                          title="Remove this image"
-                                        >
-                                          Remove
-                                        </button>
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleRegenerateImage(
-                                              scene.id,
-                                              idx,
-                                            );
-                                          }}
-                                          disabled={
-                                            loading ||
-                                            generatingSceneId === scene.id
-                                          }
-                                          className="bg-blue-600 text-white px-2 py-1 rounded-lg text-xs font-medium hover:bg-blue-700 disabled:opacity-50"
-                                          title="Regenerate this specific image"
-                                        >
-                                          {generatingSceneId === scene.id
-                                            ? "Regenerating..."
-                                            : "Regenerate"}
-                                        </button>
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleDownloadImage(
-                                              url,
-                                              scene.id,
-                                              idx,
-                                            );
-                                          }}
-                                          className="bg-purple-600 text-white px-2 py-1 rounded-lg text-xs font-medium hover:bg-purple-700"
-                                          title="Download this image"
-                                        >
-                                          Download
-                                        </button>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
+                          {isChild && (
+                            <div className="mb-4 text-xs px-3 py-2 rounded-xl border bg-blue-50 text-blue-900 border-blue-200 dark:bg-blue-950/30 dark:text-blue-200 dark:border-blue-900">
+                              Scene {scene.id} is linked. Edit in Scene{" "}
+                              {leaderId}.
                             </div>
                           )}
-                        </div>
-                      </div>
 
-                      {/* Link connector between this scene and next */}
-                      {index < scriptData.scenes.length - 1 && (
-                        <div className="flex items-center justify-center gap-3 -my-2 px-2">
-                          <div className="flex-1 h-px bg-gray-200 dark:bg-gray-800" />
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleToggleSceneLink(
-                                scene.id,
-                                scriptData.scenes[index + 1].id,
-                              )
-                            }
-                            disabled={
-                              savingSceneGroups ||
-                              generatingSceneId === scene.id
-                            }
-                            className={
-                              "inline-flex items-center justify-center h-9 w-9 rounded-full border transition disabled:opacity-50 " +
-                              (areScenesLinked(
-                                sceneGroups,
-                                scene.id,
-                                scriptData.scenes[index + 1].id,
-                              )
-                                ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700"
-                                : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50 dark:bg-gray-950 dark:text-gray-200 dark:border-gray-800 dark:hover:bg-gray-900")
-                            }
-                            aria-label={
-                              areScenesLinked(
-                                sceneGroups,
-                                scene.id,
-                                scriptData.scenes[index + 1].id,
-                              )
-                                ? `Unlink Scene ${scene.id} and Scene ${scriptData.scenes[index + 1].id}`
-                                : `Link Scene ${scene.id} and Scene ${scriptData.scenes[index + 1].id}`
-                            }
-                            title={
-                              areScenesLinked(
-                                sceneGroups,
-                                scene.id,
-                                scriptData.scenes[index + 1].id,
-                              )
-                                ? `Unlink Scene ${scene.id} and Scene ${scriptData.scenes[index + 1].id}`
-                                : `Link Scene ${scene.id} and Scene ${scriptData.scenes[index + 1].id}`
-                            }
-                          >
-                            <svg
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="h-5 w-5"
-                            >
-                              <path d="M10 13a5 5 0 0 1 0-7l1.5-1.5a5 5 0 0 1 7 7L17 13" />
-                              <path d="M14 11a5 5 0 0 1 0 7L12.5 19.5a5 5 0 0 1-7-7L7 11" />
-                            </svg>
-                          </button>
-                          <div className="flex-1 h-px bg-gray-200 dark:bg-gray-800" />
+                          {/* Location Info */}
+                          {(() => {
+                            const locationId = locationMapping[scene.id];
+                            const location = selectedLocations.find(
+                              (loc) => loc.id === locationId,
+                            );
+
+                            return location ? (
+                              <div className="mb-4 p-4 border border-gray-200 rounded-2xl bg-gray-50 dark:bg-gray-900/40 dark:border-gray-800">
+                                <div className="flex items-start justify-between gap-3 mb-2">
+                                  <div className="flex items-start gap-2 flex-1 min-w-0">
+                                    <span className="text-xl">📍</span>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="font-semibold text-gray-900 text-sm mb-1 dark:text-gray-100">
+                                        {location.name}
+                                      </div>
+                                      <div className="text-xs text-gray-700 mb-2 leading-relaxed dark:text-gray-300">
+                                        {location.description}
+                                      </div>
+                                      <div className="flex flex-wrap gap-2 text-xs">
+                                        {location.category && (
+                                          <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full font-medium dark:bg-purple-900/40 dark:text-purple-200">
+                                            {location.category === "indoor"
+                                              ? "🏢 Indoor"
+                                              : "🌃 Outdoor"}
+                                          </span>
+                                        )}
+                                        <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-medium dark:bg-blue-900/40 dark:text-blue-200">
+                                          {location.type.replace(/_/g, " ")}
+                                        </span>
+                                        {location.visual_characteristics
+                                          .lighting &&
+                                          (Array.isArray(
+                                            location.visual_characteristics
+                                              .lighting,
+                                          )
+                                            ? location.visual_characteristics
+                                                .lighting
+                                            : location.visual_characteristics.lighting
+                                                .split(",")
+                                                .map((s) => s.trim())
+                                          ).map((light, idx) => (
+                                            <span
+                                              key={`light-${idx}`}
+                                              className="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full dark:bg-yellow-900/40 dark:text-yellow-200"
+                                            >
+                                              {light}
+                                            </span>
+                                          ))}
+                                        {location.visual_characteristics
+                                          .atmosphere &&
+                                          (Array.isArray(
+                                            location.visual_characteristics
+                                              .atmosphere,
+                                          )
+                                            ? location.visual_characteristics
+                                                .atmosphere
+                                            : location.visual_characteristics.atmosphere
+                                                .split(",")
+                                                .map((s) => s.trim())
+                                          ).map((atm, idx) => (
+                                            <span
+                                              key={`atm-${idx}`}
+                                              className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full dark:bg-indigo-900/40 dark:text-indigo-200"
+                                            >
+                                              {atm}
+                                            </span>
+                                          ))}
+                                        {location.visual_characteristics
+                                          .key_elements &&
+                                          location.visual_characteristics.key_elements.map(
+                                            (element, idx) => (
+                                              <span
+                                                key={`elem-${idx}`}
+                                                className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full dark:bg-green-900/40 dark:text-green-200"
+                                              >
+                                                {element}
+                                              </span>
+                                            ),
+                                          )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex flex-col gap-2">
+                                    <button
+                                      onClick={() =>
+                                        handleOpenLocationPicker(scene.id)
+                                      }
+                                      disabled={generatingSceneId === scene.id}
+                                      className="flex-shrink-0 text-xs px-3 py-1.5 rounded-xl border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 font-medium transition disabled:opacity-50 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-gray-900"
+                                      title="Choose different location from library"
+                                    >
+                                      Select
+                                    </button>
+                                    <button
+                                      onClick={() =>
+                                        handleOpenLocationTypeModal(scene.id)
+                                      }
+                                      disabled={generatingSceneId === scene.id}
+                                      className="flex-shrink-0 text-xs bg-blue-600 text-white px-3 py-1.5 rounded-xl hover:bg-blue-700 font-medium transition disabled:opacity-50"
+                                      title="Generate a brand new location with AI"
+                                    >
+                                      {generatingSceneId === scene.id
+                                        ? "✨..."
+                                        : "✨ Generate"}
+                                    </button>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <a
+                                    href="/admin/locations"
+                                    target="_blank"
+                                    className="text-xs text-blue-600 hover:text-blue-800 underline dark:text-blue-300 dark:hover:text-blue-200"
+                                  >
+                                    Manage Locations
+                                  </a>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="mb-4 p-4 border border-dashed border-yellow-300 rounded-2xl bg-yellow-50 dark:bg-yellow-950/30 dark:border-yellow-900">
+                                <div className="flex items-center justify-between gap-3 mb-2">
+                                  <div className="flex items-center gap-2 text-sm text-yellow-800 dark:text-yellow-200">
+                                    <span>⚠️</span>
+                                    <span>No location assigned</span>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() =>
+                                        handleOpenLocationPicker(scene.id)
+                                      }
+                                      disabled={generatingSceneId === scene.id}
+                                      className="flex-shrink-0 text-xs px-3 py-1.5 rounded-xl border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 font-medium transition disabled:opacity-50 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-gray-900"
+                                      title="Choose from location library"
+                                    >
+                                      Select
+                                    </button>
+                                    <button
+                                      onClick={() =>
+                                        handleOpenLocationTypeModal(scene.id)
+                                      }
+                                      disabled={generatingSceneId === scene.id}
+                                      className="flex-shrink-0 text-xs bg-blue-600 text-white px-3 py-1.5 rounded-xl hover:bg-blue-700 font-medium transition disabled:opacity-50"
+                                      title="Generate a brand new location with AI"
+                                    >
+                                      {generatingSceneId === scene.id
+                                        ? "✨..."
+                                        : "✨ Generate"}
+                                    </button>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <a
+                                    href="/admin/locations"
+                                    target="_blank"
+                                    className="text-xs text-blue-600 hover:text-blue-800 underline dark:text-blue-300 dark:hover:text-blue-200"
+                                  >
+                                    Manage Locations
+                                  </a>
+                                </div>
+                              </div>
+                            );
+                          })()}
+
+                          {/* Action Selection */}
+                          {(() => {
+                            const actionId = actionMapping[scene.id];
+                            const selectedAction = availableActions.find(
+                              (a) => a.id === actionId,
+                            );
+
+                            return selectedAction ? (
+                              <div className="mb-4 p-4 border border-gray-200 rounded-2xl bg-gray-50 dark:bg-gray-900/40 dark:border-gray-800">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <span className="text-lg">🎭</span>
+                                      <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                        {selectedAction.name}
+                                      </h4>
+                                    </div>
+                                    <p className="text-xs text-gray-700 mb-2 dark:text-gray-300">
+                                      {selectedAction.description}
+                                    </p>
+                                    {selectedAction.pose_variations && (
+                                      <div className="space-y-1">
+                                        <div className="text-xs font-medium text-gray-800 dark:text-gray-200">
+                                          Pose Options:
+                                        </div>
+                                        <div className="flex flex-wrap gap-1">
+                                          {selectedAction.pose_variations
+                                            .slice(0, 2)
+                                            .map((pose, idx) => (
+                                              <span
+                                                key={idx}
+                                                className="text-xs px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full dark:bg-blue-900/40 dark:text-blue-200"
+                                              >
+                                                {pose.length > 40
+                                                  ? pose.substring(0, 40) +
+                                                    "..."
+                                                  : pose}
+                                              </span>
+                                            ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex flex-col gap-2">
+                                    <button
+                                      onClick={() =>
+                                        handleOpenActionPicker(scene.id)
+                                      }
+                                      disabled={generatingSceneId === scene.id}
+                                      className="flex-shrink-0 text-xs px-3 py-1.5 rounded-xl border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 font-medium transition disabled:opacity-50 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-gray-900"
+                                      title="Choose different action from library"
+                                    >
+                                      Select
+                                    </button>
+                                    <button
+                                      onClick={() =>
+                                        handleOpenActionGenerateModal(scene.id)
+                                      }
+                                      disabled={generatingSceneId === scene.id}
+                                      className="flex-shrink-0 text-xs bg-blue-600 text-white px-3 py-1.5 rounded-xl hover:bg-blue-700 font-medium transition disabled:opacity-50"
+                                      title="Generate a brand new action with AI"
+                                    >
+                                      {generatingSceneId === scene.id
+                                        ? "✨..."
+                                        : "✨ Generate"}
+                                    </button>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <a
+                                    href="/admin/actions"
+                                    target="_blank"
+                                    className="text-xs text-blue-600 hover:text-blue-800 underline dark:text-blue-300 dark:hover:text-blue-200"
+                                  >
+                                    Manage Actions
+                                  </a>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="mb-4 p-4 border border-dashed border-yellow-300 rounded-2xl bg-yellow-50 dark:bg-yellow-950/30 dark:border-yellow-900">
+                                <div className="flex items-center justify-between gap-3 mb-2">
+                                  <div className="flex items-center gap-2 text-sm text-yellow-800 dark:text-yellow-200">
+                                    <span>⚠️</span>
+                                    <span>No action/pose assigned</span>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() =>
+                                        handleOpenActionPicker(scene.id)
+                                      }
+                                      disabled={generatingSceneId === scene.id}
+                                      className="flex-shrink-0 text-xs px-3 py-1.5 rounded-xl border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 font-medium transition disabled:opacity-50 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-gray-900"
+                                      title="Choose action from library"
+                                    >
+                                      Select
+                                    </button>
+                                    <button
+                                      onClick={() =>
+                                        handleOpenActionGenerateModal(scene.id)
+                                      }
+                                      disabled={generatingSceneId === scene.id}
+                                      className="flex-shrink-0 text-xs bg-blue-600 text-white px-3 py-1.5 rounded-xl hover:bg-blue-700 font-medium transition disabled:opacity-50"
+                                      title="Generate a brand new action with AI"
+                                    >
+                                      {generatingSceneId === scene.id
+                                        ? "✨..."
+                                        : "✨ Generate"}
+                                    </button>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <a
+                                    href="/admin/actions"
+                                    target="_blank"
+                                    className="text-xs text-blue-600 hover:text-blue-800 underline dark:text-blue-300 dark:hover:text-blue-200"
+                                  >
+                                    Manage Actions
+                                  </a>
+                                </div>
+                              </div>
+                            );
+                          })()}
+
+                          <div className="space-y-3">
+                            {/* Voiceover Text - Read Only */}
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-200">
+                                Voiceover Segment:
+                              </label>
+                              <p className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 dark:bg-gray-950 dark:border-gray-800 dark:text-gray-200">
+                                {scene.voiceover}
+                              </p>
+                            </div>
+
+                            {/* Reference Image Selector */}
+                            {selectedCharacter?.image_urls &&
+                              selectedCharacter.image_urls.length > 0 && (
+                                <div className="mb-4 p-3 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg dark:from-blue-950/30 dark:to-indigo-950/30 dark:border-blue-900">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-3">
+                                      <label className="block text-sm font-medium text-blue-900 dark:text-blue-200">
+                                        📸 Character Reference for This Scene:
+                                      </label>
+                                      <a
+                                        href={`/admin/characters?id=${selectedCharacter.character_id}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-xs text-blue-600 hover:text-blue-800 underline font-medium dark:text-blue-300 dark:hover:text-blue-200"
+                                      >
+                                        Manage Character
+                                      </a>
+                                    </div>
+                                    <button
+                                      onClick={() =>
+                                        handleOpenCharacterReferenceModal(
+                                          scene.id,
+                                        )
+                                      }
+                                      className="text-xs bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 font-medium transition"
+                                    >
+                                      📚 Browse All
+                                    </button>
+                                  </div>
+                                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                                    {selectedCharacter.image_urls.map(
+                                      (imageUrl, idx) => (
+                                        <button
+                                          key={`ref-${scene.id}-${idx}`}
+                                          onClick={() => {
+                                            setSelectedReferenceImages(
+                                              (prev) => ({
+                                                ...prev,
+                                                [scene.id]: imageUrl,
+                                              }),
+                                            );
+                                          }}
+                                          className={`relative aspect-[9/16] rounded-lg overflow-hidden border-3 transition-all ${
+                                            (selectedReferenceImages[
+                                              scene.id
+                                            ] ||
+                                              selectedCharacter
+                                                .image_urls[0]) === imageUrl
+                                              ? "border-blue-500 ring-2 ring-blue-300 shadow-lg"
+                                              : "border-gray-300 hover:border-blue-400 opacity-60 hover:opacity-100 dark:border-gray-700"
+                                          }`}
+                                          title={`Reference ${idx + 1}`}
+                                        >
+                                          <img
+                                            src={imageUrl}
+                                            alt={`Reference ${idx + 1}`}
+                                            className="w-full h-full object-cover"
+                                          />
+                                          {(selectedReferenceImages[scene.id] ||
+                                            selectedCharacter.image_urls[0]) ===
+                                            imageUrl && (
+                                            <div className="absolute top-1 right-1 bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
+                                              ✓
+                                            </div>
+                                          )}
+                                        </button>
+                                      ),
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-blue-700 mt-2 dark:text-blue-200">
+                                    Select which reference image to use for this
+                                    scene. Click &quot;Browse All&quot; to see
+                                    references from all projects.
+                                  </p>
+                                </div>
+                              )}
+
+                            {/* Image Prompt */}
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                                  Image Prompt:
+                                </label>
+                                <button
+                                  onClick={() =>
+                                    handleRegenerateImagePrompt(scene.id)
+                                  }
+                                  disabled={
+                                    loading ||
+                                    regeneratingPromptSceneId === scene.id
+                                  }
+                                  className="text-xs inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition font-medium dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-gray-900"
+                                  title="Regenerate this image prompt with AI"
+                                >
+                                  {regeneratingPromptSceneId === scene.id
+                                    ? "🔄 Regenerating..."
+                                    : "🔄 Regenerate Prompt"}
+                                </button>
+                              </div>
+
+                              {/* Loading Progress Bar */}
+                              {regeneratingPromptSceneId === scene.id && (
+                                <div className="mb-2">
+                                  <div className="w-full bg-purple-200 rounded-full h-2 overflow-hidden">
+                                    <div
+                                      className="h-full bg-gradient-to-r from-purple-600 to-pink-600 rounded-full animate-pulse"
+                                      style={{ width: "100%" }}
+                                    ></div>
+                                  </div>
+                                  <p className="text-xs text-purple-700 text-center mt-1 font-medium">
+                                    ✨ Generating cozy, dreamy image prompt with
+                                    AI...
+                                  </p>
+                                </div>
+                              )}
+
+                              <textarea
+                                value={scene.image_prompt}
+                                onChange={(e) =>
+                                  handleImagePromptChange(
+                                    scene.id,
+                                    e.target.value,
+                                  )
+                                }
+                                rows={8}
+                                className="w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y text-sm bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100 dark:border-gray-700"
+                                placeholder="Describe the scene environment, lighting, and character pose..."
+                              />
+                            </div>
+
+                            {/* Generate Image Button */}
+                            <div className="mt-4">
+                              <button
+                                onClick={() =>
+                                  handleGenerateSingleImage(scene.id)
+                                }
+                                disabled={loading}
+                                className="w-full bg-blue-600 text-white py-2.5 px-4 rounded-xl font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                              >
+                                {scene.image_urls && scene.image_urls.length > 0
+                                  ? `Generate Another (${scene.image_urls.length} generated)`
+                                  : generatingSceneId === scene.id
+                                    ? "Generating..."
+                                    : "Generate Image"}
+                              </button>
+
+                              {/* Loading Progress Bar */}
+                              {generatingSceneId === scene.id && (
+                                <div className="mt-2">
+                                  <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden dark:bg-gray-800">
+                                    <div
+                                      className="h-full bg-blue-600 rounded-full animate-pulse"
+                                      style={{ width: "100%" }}
+                                    ></div>
+                                  </div>
+                                  <p className="text-xs text-gray-500 text-center mt-1 dark:text-gray-400">
+                                    Generating image with character reference...
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Generated Images Preview */}
+                            {scene.image_urls &&
+                              scene.image_urls.length > 0 && (
+                                <div className="mt-4">
+                                  <label className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-200">
+                                    Generated Images ({scene.image_urls.length})
+                                    - Click to select for video:
+                                  </label>
+                                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                                    {scene.image_urls.map((url, idx) => {
+                                      const isSelected =
+                                        (selectedSceneImages[scene.id] ?? 0) ===
+                                        idx;
+                                      return (
+                                        <div
+                                          key={`scene-${scene.id}-img-${idx}`}
+                                          onClick={() =>
+                                            handleSelectSceneImage(
+                                              scene.id,
+                                              idx,
+                                            )
+                                          }
+                                          className={`relative aspect-[9/16] bg-gray-100 rounded-lg overflow-hidden cursor-pointer transition-all group dark:bg-gray-900 ${
+                                            isSelected
+                                              ? "border-2 border-blue-500 ring-2 ring-blue-200 shadow-lg"
+                                              : "border border-gray-200 hover:border-blue-300 hover:shadow-md dark:border-gray-800"
+                                          }`}
+                                          title={
+                                            isSelected
+                                              ? "Selected for video"
+                                              : "Click to select for video"
+                                          }
+                                        >
+                                          <img
+                                            src={url}
+                                            alt={`Scene ${scene.id} - Version ${idx + 1}`}
+                                            className="w-full h-full object-cover"
+                                          />
+                                          {isSelected && (
+                                            <div className="absolute top-2 left-2 bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg flex items-center gap-1">
+                                              ✓ Selected
+                                            </div>
+                                          )}
+                                          <div className="absolute bottom-2 left-2 bg-black/70 text-white px-2 py-1 rounded text-xs dark:bg-black/60">
+                                            Version {idx + 1}
+                                          </div>
+                                          <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setExpandedImage({
+                                                  sceneId: scene.id,
+                                                  imageIndex: idx,
+                                                  url,
+                                                });
+                                              }}
+                                              className="bg-gray-900 text-white px-2 py-1 rounded-lg text-xs font-medium hover:bg-black"
+                                              title="View full size"
+                                            >
+                                              🔍 Expand
+                                            </button>
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleRemoveImage(
+                                                  scene.id,
+                                                  idx,
+                                                );
+                                              }}
+                                              disabled={loading}
+                                              className="bg-red-600 text-white px-2 py-1 rounded-lg text-xs font-medium hover:bg-red-700 disabled:opacity-50"
+                                              title="Remove this image"
+                                            >
+                                              Remove
+                                            </button>
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleRegenerateImage(
+                                                  scene.id,
+                                                  idx,
+                                                );
+                                              }}
+                                              disabled={
+                                                loading ||
+                                                generatingSceneId === scene.id
+                                              }
+                                              className="bg-blue-600 text-white px-2 py-1 rounded-lg text-xs font-medium hover:bg-blue-700 disabled:opacity-50"
+                                              title="Regenerate this specific image"
+                                            >
+                                              {generatingSceneId === scene.id
+                                                ? "Regenerating..."
+                                                : "Regenerate"}
+                                            </button>
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDownloadImage(
+                                                  url,
+                                                  scene.id,
+                                                  idx,
+                                                );
+                                              }}
+                                              className="bg-purple-600 text-white px-2 py-1 rounded-lg text-xs font-medium hover:bg-purple-700"
+                                              title="Download this image"
+                                            >
+                                              Download
+                                            </button>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+                          </div>
                         </div>
-                      )}
-                    </Fragment>
-                  ))}
+
+                        {/* Link connector between this scene and next */}
+                        {index < scriptData.scenes.length - 1 && (
+                          <div className="flex items-center justify-center -my-2">
+                            {(() => {
+                              const nextId = scriptData.scenes[index + 1].id;
+                              const isSavingThisLink =
+                                savingSceneLinkKey ===
+                                `${sceneKey(scene.id)}-${sceneKey(nextId)}`;
+                              const isLinked = areScenesLinked(
+                                sceneGroups,
+                                scene.id,
+                                nextId,
+                              );
+
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleToggleSceneLink(scene.id, nextId)
+                                  }
+                                  disabled={
+                                    isSavingThisLink ||
+                                    generatingSceneId === scene.id
+                                  }
+                                  className={
+                                    "inline-flex items-center justify-center h-9 w-9 rounded-full border transition disabled:opacity-50 " +
+                                    (isLinked
+                                      ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700"
+                                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50 dark:bg-gray-950 dark:text-gray-200 dark:border-gray-800 dark:hover:bg-gray-900")
+                                  }
+                                  aria-busy={isSavingThisLink}
+                                  aria-label={
+                                    isSavingThisLink
+                                      ? "Saving scene link"
+                                      : isLinked
+                                        ? `Unlink Scene ${scene.id} and Scene ${nextId}`
+                                        : `Link Scene ${scene.id} and Scene ${nextId}`
+                                  }
+                                  title={
+                                    isSavingThisLink
+                                      ? "Saving…"
+                                      : isLinked
+                                        ? `Unlink Scene ${scene.id} and Scene ${nextId}`
+                                        : `Link Scene ${scene.id} and Scene ${nextId}`
+                                  }
+                                >
+                                  {isSavingThisLink ? (
+                                    <span className="inline-flex items-center justify-center">
+                                      <span
+                                        className={
+                                          "h-5 w-5 rounded-full border-2 border-t-transparent animate-spin " +
+                                          (isLinked
+                                            ? "border-white/80"
+                                            : "border-gray-400 dark:border-gray-500")
+                                        }
+                                      />
+                                    </span>
+                                  ) : (
+                                    <svg
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      className="h-5 w-5"
+                                    >
+                                      <path d="M10 13a5 5 0 0 1 0-7l1.5-1.5a5 5 0 0 1 7 7L17 13" />
+                                      <path d="M14 11a5 5 0 0 1 0 7L12.5 19.5a5 5 0 0 1-7-7L7 11" />
+                                    </svg>
+                                  )}
+                                </button>
+                              );
+                            })()}
+                          </div>
+                        )}
+                      </Fragment>
+                    );
+                  })}
                 </div>
 
                 <div className="flex gap-4">
                   <button
                     onClick={() => setStep(2)}
-                    className="flex-1 bg-gray-200 text-gray-700 py-2 sm:py-3 rounded-lg font-medium hover:bg-gray-300"
+                    className="flex-1 bg-gray-100 text-gray-800 py-2.5 sm:py-3 rounded-xl font-medium hover:bg-gray-200 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
                   >
                     ← Back
                   </button>
                   <button
-                    onClick={handleGenerateImages}
-                    disabled={loading}
-                    className="flex-1 bg-blue-600 text-white py-2 sm:py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
+                    onClick={handleContinueToVideos}
+                    disabled={
+                      loading || continuingToVideos || !canContinueToVideos
+                    }
+                    className="flex-1 bg-blue-600 text-white py-2.5 sm:py-3 rounded-xl font-medium hover:bg-blue-700 disabled:opacity-50"
+                    title={
+                      canContinueToVideos
+                        ? "Continue to video generation"
+                        : "Select an image for each scene (linked scenes share the leader's selection)"
+                    }
                   >
-                    {loading
+                    {loading || continuingToVideos
                       ? "Generating Scene Images..."
-                      : "Generate Scene Images →"}
+                      : "Continue videos →"}
                   </button>
                 </div>
               </div>
@@ -4745,13 +6440,23 @@ export default function VideoGeneratorPage() {
       )}
 
       {/* Step 4: Review Videos */}
-      {step === 4 && videos.length > 0 && (
+      {step === 4 && (
         <div className="admin-card p-8">
           <div className="mb-6">
-            <h2 className="text-2xl font-bold mb-3">Step 4: Review Videos</h2>
+            <h2 className="text-2xl font-bold mb-3">Step 4: Generate Videos</h2>
             <div className="flex flex-wrap gap-2">
               <div className="bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap">
                 🎬 {videos.length} videos
+              </div>
+              <div className="bg-purple-50 border border-purple-200 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
+                <span className="text-purple-700">⚡ I2V Unit:</span>
+                <span className="font-semibold text-purple-900">
+                  {loadingFalVideoPricing
+                    ? "Loading..."
+                    : falVideoUnitCost !== null
+                      ? `$${falVideoUnitCost.toFixed(3)}/${falVideoPricingUnit || "unit"}`
+                      : "Unavailable"}
+                </span>
               </div>
               {projectCosts?.step4?.fal_videos > 0 && (
                 <div className="bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
@@ -4772,25 +6477,508 @@ export default function VideoGeneratorPage() {
             </div>
           </div>
 
-          {/* Videos Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            {videos.map((vid) => {
-              const scene = scriptData.scenes.find(
-                (s) => s.id === vid.scene_id,
+          <div className="text-sm text-gray-700 mb-6 dark:text-gray-300">
+            Generate a short video per scene using your selected image and a
+            motion prompt.
+          </div>
+
+          {/* Scene Cards */}
+          <div className="flex flex-col gap-6 mb-8">
+            {(scriptData?.scenes || []).map((scene) => {
+              const selectedImageUrl = getSelectedImageUrlForScene(scene);
+              const selectedVideoUrl = getSelectedVideoUrlForScene(scene);
+              const allVideoUrls = getAllVideoUrlsForScene(
+                scene,
+                selectedVideoUrl,
               );
+              const canGenerate = Boolean(selectedImageUrl) && !loading;
+              const durationSeconds = getSceneDurationSeconds(scene);
+              const estimatedSceneCost =
+                getEstimatedI2VCostForScene(durationSeconds);
+
+              const cameraMovementId = cameraMovementMapping[scene.id];
+              const selectedCameraMovement = cameraMovementId
+                ? availableCameraMovements.find(
+                    (m) => m.id === cameraMovementId,
+                  )
+                : null;
+
+              const characterMotionId = characterMotionMapping[scene.id];
+              const selectedCharacterMotion = characterMotionId
+                ? availableCharacterMotions.find(
+                    (m) => m.id === characterMotionId,
+                  )
+                : null;
+
               return (
-                <div key={vid.scene_id} className="border rounded-lg p-4">
-                  <div className="mb-2">
-                    <span className="font-medium">Scene {vid.scene_id}</span>
+                <div
+                  key={scene.id}
+                  className="border border-gray-200 rounded-xl p-5 bg-white dark:bg-gray-950 dark:border-gray-800"
+                >
+                  <div className="flex items-start justify-between gap-3 mb-4">
+                    <div>
+                      <div className="font-semibold text-gray-900 dark:text-gray-100">
+                        Scene {scene.id}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        Model: Image-to-video (configured)
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <label className="text-xs text-gray-600 dark:text-gray-300 flex items-center gap-2">
+                        Duration
+                        <select
+                          value={durationSeconds}
+                          onChange={(e) =>
+                            handleVideoDurationChange(scene.id, e.target.value)
+                          }
+                          className="text-xs px-2 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-800 dark:bg-gray-950 dark:text-gray-200 dark:border-gray-800"
+                          title="Video duration (1–15 seconds). If pricing is per-second, this affects cost."
+                        >
+                          {Array.from({ length: 15 }, (_, i) => i + 1).map(
+                            (n) => (
+                              <option key={n} value={n}>
+                                {n}s
+                              </option>
+                            ),
+                          )}
+                        </select>
+                      </label>
+
+                      <div
+                        className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap"
+                        title={
+                          falVideoUnitCost == null
+                            ? "Pricing unavailable"
+                            : isPerSecondUnit(falVideoPricingUnit)
+                              ? "Estimated cost = unit price × duration"
+                              : "Estimated cost = unit price"
+                        }
+                      >
+                        Est:{" "}
+                        {estimatedSceneCost == null
+                          ? "—"
+                          : `$${estimatedSceneCost.toFixed(3)}`}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleGenerateVideoForScene(scene.id)}
+                        disabled={
+                          !canGenerate || generatingVideoSceneId === scene.id
+                        }
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={
+                          selectedImageUrl
+                            ? "Generate video for this scene"
+                            : "Select an image first"
+                        }
+                      >
+                        {generatingVideoSceneId === scene.id
+                          ? "Generating..."
+                          : selectedVideoUrl
+                            ? "Regenerate Video"
+                            : "Generate Video"}
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="aspect-[9/16] bg-gray-100 rounded-lg mb-3 overflow-hidden">
-                    <video controls className="w-full h-full object-cover">
-                      <source src={vid.video_url} type="video/mp4" />
-                    </video>
+                  {generatingVideoSceneId === scene.id && (
+                    <div className="mb-4" aria-live="polite">
+                      <div className="w-full bg-blue-100 dark:bg-blue-950/30 rounded-full h-2 overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-blue-600 via-violet-600 to-pink-600 rounded-full animate-pulse"
+                          style={{ width: "100%" }}
+                        ></div>
+                      </div>
+                      <div className="mt-2 text-xs text-blue-700 dark:text-blue-200">
+                        Generating video… this can take a bit.
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="min-w-0">
+                      <div className="flex items-center justify-between gap-3 mb-2">
+                        <div className="text-xs font-medium text-gray-700 dark:text-gray-200">
+                          Image → Video
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setExpandedI2VSceneId(scene.id)}
+                            className="text-xs text-gray-700 hover:text-gray-900 dark:text-gray-200 dark:hover:text-white"
+                            title="Expand preview"
+                          >
+                            Expand
+                          </button>
+                          {selectedVideoUrl && (
+                            <a
+                              href={selectedVideoUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-xs text-blue-700 hover:text-blue-900 dark:text-blue-300 dark:hover:text-blue-200"
+                              title="Open selected video in a new tab"
+                            >
+                              Open
+                            </a>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Large preview on desktop (same row) */}
+                      <div className="hidden lg:grid grid-cols-[minmax(0,1fr)_56px_minmax(0,1fr)] items-stretch gap-6">
+                        <div className="mx-auto h-[60vh] max-h-[760px] min-h-[520px] aspect-[9/16] rounded-3xl overflow-hidden border border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-900">
+                          {selectedImageUrl ? (
+                            <img
+                              src={selectedImageUrl}
+                              alt={`Scene ${scene.id} selected image`}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-sm text-gray-500 dark:text-gray-400">
+                              No image
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-center text-gray-400 dark:text-gray-500 select-none text-3xl">
+                          →
+                        </div>
+
+                        <div className="mx-auto h-[60vh] max-h-[760px] min-h-[520px] aspect-[9/16] rounded-3xl overflow-hidden border border-gray-200 dark:border-gray-800 bg-black">
+                          {selectedVideoUrl ? (
+                            <video
+                              key={selectedVideoUrl}
+                              controls
+                              className="w-full h-full object-cover"
+                              preload="metadata"
+                              playsInline
+                            >
+                              <source src={selectedVideoUrl} type="video/mp4" />
+                            </video>
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-sm text-gray-300">
+                              No video
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Compact preview for smaller screens */}
+                      <div className="lg:hidden flex items-start gap-4">
+                        <div className="flex-shrink-0 w-44 h-64 sm:w-48 sm:h-72 md:w-52 md:h-80 rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-900">
+                          {selectedImageUrl ? (
+                            <img
+                              src={selectedImageUrl}
+                              alt={`Scene ${scene.id} selected image`}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-xs text-gray-500 dark:text-gray-400">
+                              No image
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="pt-[7.25rem] sm:pt-[8.25rem] md:pt-[9.25rem] text-gray-400 dark:text-gray-500 select-none text-lg">
+                          →
+                        </div>
+
+                        <div className="flex-shrink-0 w-44 h-64 sm:w-48 sm:h-72 md:w-52 md:h-80 rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-800 bg-black">
+                          {selectedVideoUrl ? (
+                            <video
+                              key={selectedVideoUrl}
+                              controls
+                              className="w-full h-full object-cover"
+                              preload="metadata"
+                              playsInline
+                            >
+                              <source src={selectedVideoUrl} type="video/mp4" />
+                            </video>
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-xs text-gray-300">
+                              No video
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {expandedI2VSceneId === scene.id && (
+                        <div
+                          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+                          role="dialog"
+                          aria-modal="true"
+                          onMouseDown={(e) => {
+                            if (e.target === e.currentTarget) {
+                              setExpandedI2VSceneId(null);
+                            }
+                          }}
+                        >
+                          <div className="w-full max-w-7xl bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-2xl overflow-hidden">
+                            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
+                              <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                Image → Video (Scene {scene.id})
+                              </div>
+                              <div className="flex items-center gap-3">
+                                {selectedVideoUrl && (
+                                  <a
+                                    href={selectedVideoUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-xs text-blue-700 hover:text-blue-900 dark:text-blue-300 dark:hover:text-blue-200"
+                                    title="Open selected video in a new tab"
+                                  >
+                                    Open
+                                  </a>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedI2VSceneId(null)}
+                                  className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 dark:bg-gray-950 dark:text-gray-200 dark:border-gray-800 dark:hover:bg-gray-900"
+                                >
+                                  Close
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="p-4">
+                              <div className="flex flex-col xl:flex-row items-center xl:items-stretch justify-center gap-5">
+                                <div className="h-[38vh] xl:h-[78vh] max-h-[820px] aspect-[9/16] rounded-3xl overflow-hidden border border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-900">
+                                  {selectedImageUrl ? (
+                                    <img
+                                      src={selectedImageUrl}
+                                      alt={`Scene ${scene.id} selected image`}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-sm text-gray-500 dark:text-gray-400">
+                                      No image
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="hidden xl:flex items-center justify-center text-gray-400 dark:text-gray-500 select-none text-4xl">
+                                  →
+                                </div>
+                                <div className="xl:hidden text-gray-400 dark:text-gray-500 select-none text-2xl">
+                                  ↓
+                                </div>
+
+                                <div className="h-[38vh] xl:h-[78vh] max-h-[820px] aspect-[9/16] rounded-3xl overflow-hidden border border-gray-200 dark:border-gray-800 bg-black">
+                                  {selectedVideoUrl ? (
+                                    <video
+                                      key={selectedVideoUrl}
+                                      controls
+                                      className="w-full h-full object-cover"
+                                      preload="metadata"
+                                      playsInline
+                                    >
+                                      <source
+                                        src={selectedVideoUrl}
+                                        type="video/mp4"
+                                      />
+                                    </video>
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-sm text-gray-300">
+                                      No video
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {allVideoUrls.length > 1 && (
+                        <div className="mt-3">
+                          <div className="text-xs text-gray-600 dark:text-gray-300 font-medium mb-1">
+                            Versions ({allVideoUrls.length}) — click to select
+                          </div>
+                          <div className="flex gap-2 overflow-x-auto">
+                            {allVideoUrls.map((videoUrl, idx) => {
+                              const isSelected = videoUrl === selectedVideoUrl;
+                              return (
+                                <button
+                                  key={videoUrl}
+                                  type="button"
+                                  onClick={() =>
+                                    handleSelectVideoForScene(
+                                      scene.id,
+                                      videoUrl,
+                                    )
+                                  }
+                                  className={
+                                    "flex-shrink-0 w-32 h-44 md:w-36 md:h-52 xl:w-40 xl:h-56 rounded-2xl overflow-hidden border bg-black " +
+                                    (isSelected
+                                      ? "border-blue-500 ring-2 ring-blue-500/40"
+                                      : "border-gray-300 dark:border-gray-800")
+                                  }
+                                  title={
+                                    isSelected
+                                      ? `Selected (v${idx + 1})`
+                                      : `Select v${idx + 1}`
+                                  }
+                                >
+                                  <video
+                                    className="w-full h-full object-cover"
+                                    preload="metadata"
+                                    playsInline
+                                    muted
+                                  >
+                                    <source src={videoUrl} type="video/mp4" />
+                                  </video>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="mb-3">
+                        <div className="text-xs font-medium text-gray-700 mb-2 dark:text-gray-200">
+                          Motion libraries
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="space-y-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleOpenCameraMovementPicker(scene.id)
+                              }
+                              className="w-full text-xs px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 dark:bg-gray-950 dark:text-gray-200 dark:border-gray-800 dark:hover:bg-gray-900 text-center"
+                              title="Select a camera movement for this scene"
+                            >
+                              <span className="block truncate">
+                                📷 Camera:{" "}
+                                {selectedCameraMovement?.name || "Default"}
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleOpenCameraMovementGenerateModal(scene.id)
+                              }
+                              disabled={generatingSceneId === scene.id}
+                              className="w-full text-xs px-3 py-1.5 rounded-lg border border-violet-200 bg-violet-50 text-violet-800 hover:bg-violet-100 disabled:opacity-50 dark:bg-violet-950/30 dark:text-violet-200 dark:border-violet-900/50 dark:hover:bg-violet-950/40 text-center"
+                              title="Generate a new camera movement with AI"
+                            >
+                              {generatingSceneId === scene.id
+                                ? "✨..."
+                                : "✨ Generate camera"}
+                            </button>
+                          </div>
+
+                          <div className="space-y-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleOpenCharacterMotionPicker(scene.id)
+                              }
+                              className="w-full text-xs px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 dark:bg-gray-950 dark:text-gray-200 dark:border-gray-800 dark:hover:bg-gray-900 text-center"
+                              title="Select a character motion for this scene"
+                            >
+                              <span className="block truncate">
+                                🧍 Motion:{" "}
+                                {selectedCharacterMotion?.name || "Default"}
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleOpenCharacterMotionGenerateModal(scene.id)
+                              }
+                              disabled={generatingSceneId === scene.id}
+                              className="w-full text-xs px-3 py-1.5 rounded-lg border border-violet-200 bg-violet-50 text-violet-800 hover:bg-violet-100 disabled:opacity-50 dark:bg-violet-950/30 dark:text-violet-200 dark:border-violet-900/50 dark:hover:bg-violet-950/40 text-center"
+                              title="Generate a new character motion with AI"
+                            >
+                              {generatingSceneId === scene.id
+                                ? "✨..."
+                                : "✨ Generate motion"}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
-                  <p className="text-sm text-gray-600">{scene.voiceover}</p>
+                  {/* Prompts (moved below preview/controls to avoid overlap) */}
+                  <div className="mt-4 grid grid-cols-1 xl:grid-cols-2 gap-4">
+                    <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-950/40 shadow-sm">
+                      <div className="flex items-center justify-between gap-3 px-3 py-2 border-b border-gray-200/70 dark:border-gray-800/70">
+                        <div className="text-xs font-semibold text-gray-800 dark:text-gray-100">
+                          🖼️ Image prompt
+                        </div>
+                        <div className="text-[11px] text-gray-500 dark:text-gray-400">
+                          Reference
+                        </div>
+                      </div>
+                      <div className="px-3 py-3">
+                        <div className="text-xs font-mono leading-relaxed text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words max-h-40 overflow-auto rounded-xl bg-gray-50/80 dark:bg-gray-900/40 border border-gray-200/80 dark:border-gray-800/80 p-3">
+                          {scene.image_prompt || "No image prompt yet."}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-950/40 shadow-sm">
+                      <div className="flex items-center justify-between gap-3 px-3 py-2 border-b border-gray-200/70 dark:border-gray-800/70">
+                        <div className="text-xs font-semibold text-gray-800 dark:text-gray-100">
+                          🎬 Video prompt
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleGenerateVideoPromptForScene(scene.id)
+                            }
+                            disabled={generatingVideoPromptSceneId === scene.id}
+                            className="text-xs px-3 py-1.5 rounded-xl border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 disabled:opacity-50 dark:bg-gray-950 dark:text-gray-200 dark:border-gray-800 dark:hover:bg-gray-900"
+                          >
+                            {generatingVideoPromptSceneId === scene.id
+                              ? "Generating..."
+                              : "Generate"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleMotionPromptChange(scene.id, "")
+                            }
+                            disabled={
+                              generatingVideoPromptSceneId === scene.id ||
+                              !(scene.motion_prompt || "").trim()
+                            }
+                            className="text-xs px-3 py-1.5 rounded-xl border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 disabled:opacity-50 dark:bg-gray-950 dark:text-gray-200 dark:border-gray-800 dark:hover:bg-gray-900"
+                            title="Clear this scene's video prompt"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="px-3 py-3">
+                        <textarea
+                          value={scene.motion_prompt || ""}
+                          onChange={(e) =>
+                            handleMotionPromptChange(scene.id, e.target.value)
+                          }
+                          rows={6}
+                          placeholder="Describe motion/camera movement, e.g. slow push-in, subtle wind, gentle movement..."
+                          className="w-full px-3 py-2.5 border rounded-xl text-sm font-mono leading-relaxed bg-gray-50/80 text-gray-900 border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y dark:bg-gray-900/40 dark:text-gray-100 dark:border-gray-800"
+                        />
+                        <div className="mt-2 text-[11px] text-gray-500 dark:text-gray-400">
+                          Tip: keep it short and motion-focused.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 text-xs text-gray-600 dark:text-gray-400">
+                    Voiceover: {scene.voiceover}
+                  </div>
                 </div>
               );
             })}
@@ -4805,8 +6993,14 @@ export default function VideoGeneratorPage() {
             </button>
             <button
               onClick={handleAssembleVideo}
-              disabled={loading}
+              disabled={
+                loading ||
+                !(scriptData?.scenes || []).every((s) =>
+                  videos.some((v) => v.scene_id === s.id),
+                )
+              }
               className="flex-1 bg-blue-600 text-white py-2 sm:py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
+              title="Generate videos for all scenes to enable assembly"
             >
               {loading ? "Assembling Video..." : "Assemble Final Video →"}
             </button>
@@ -4933,29 +7127,47 @@ export default function VideoGeneratorPage() {
 
       {/* Location Picker Modal */}
       {showLocationPicker && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold text-gray-900">
-                  📍 Select Location for Scene {locationPickerSceneId}
-                </h3>
-                <button
-                  onClick={() => setShowLocationPicker(false)}
-                  className="text-gray-400 hover:text-gray-600 text-2xl"
-                >
-                  ×
-                </button>
-              </div>
-              <p className="text-sm text-gray-600 mt-2">
-                Choose a location from the library
-              </p>
-
-              {/* Filters */}
-              <div className="mt-4 space-y-3">
-                {/* Category Filter */}
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-950 rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-800">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-800">
+              <div className="flex items-center justify-between gap-4">
                 <div>
-                  <div className="text-xs font-medium text-gray-700 mb-1">
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                    📍 Select Location for Scene {locationPickerSceneId}
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
+                    Choose a location from your library
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <a
+                    href="/admin/locations"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs px-3 py-2 rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 dark:bg-gray-950 dark:text-gray-200 dark:border-gray-800 dark:hover:bg-gray-900"
+                    title="Manage location library"
+                  >
+                    Manage
+                  </a>
+                  <button
+                    onClick={() => setShowLocationPicker(false)}
+                    className="text-gray-400 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-200 text-2xl"
+                    aria-label="Close"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div
+              className="p-6 overflow-y-auto"
+              style={{ maxHeight: "calc(90vh - 180px)" }}
+            >
+              <div className="space-y-4 mb-4">
+                <div>
+                  <div className="text-xs font-medium text-gray-700 mb-1 dark:text-gray-200">
                     Indoor/Outdoor:
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -4966,7 +7178,11 @@ export default function VideoGeneratorPage() {
                           category: null,
                         }))
                       }
-                      className={`px-3 py-1 text-xs rounded-full ${!locationFilters.category ? "bg-gray-800 text-white" : "bg-gray-200 text-gray-700 hover:bg-gray-300"}`}
+                      className={`px-3 py-1 text-xs rounded-full border transition ${
+                        !locationFilters.category
+                          ? "bg-gray-900 text-white border-gray-900 dark:bg-gray-100 dark:text-gray-900 dark:border-gray-100"
+                          : "bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200 dark:bg-gray-900 dark:text-gray-200 dark:border-gray-800 dark:hover:bg-gray-800"
+                      }`}
                     >
                       All
                     </button>
@@ -4977,7 +7193,11 @@ export default function VideoGeneratorPage() {
                           category: "indoor",
                         }))
                       }
-                      className={`px-3 py-1 text-xs rounded-full ${locationFilters.category === "indoor" ? "bg-purple-600 text-white" : "bg-purple-100 text-purple-700 hover:bg-purple-200"}`}
+                      className={`px-3 py-1 text-xs rounded-full border transition ${
+                        locationFilters.category === "indoor"
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 dark:bg-blue-950/20 dark:text-blue-200 dark:border-blue-900/50 dark:hover:bg-blue-950/30"
+                      }`}
                     >
                       🏢 Indoor
                     </button>
@@ -4988,7 +7208,11 @@ export default function VideoGeneratorPage() {
                           category: "outdoor",
                         }))
                       }
-                      className={`px-3 py-1 text-xs rounded-full ${locationFilters.category === "outdoor" ? "bg-purple-600 text-white" : "bg-purple-100 text-purple-700 hover:bg-purple-200"}`}
+                      className={`px-3 py-1 text-xs rounded-full border transition ${
+                        locationFilters.category === "outdoor"
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 dark:bg-blue-950/20 dark:text-blue-200 dark:border-blue-900/50 dark:hover:bg-blue-950/30"
+                      }`}
                     >
                       🌃 Outdoor
                     </button>
@@ -5005,7 +7229,7 @@ export default function VideoGeneratorPage() {
                             key_elements: [],
                           })
                         }
-                        className="px-3 py-1 text-xs text-red-600 hover:text-red-800"
+                        className="px-3 py-1 text-xs text-red-600 hover:text-red-800 dark:text-red-300 dark:hover:text-red-200"
                       >
                         Clear All
                       </button>
@@ -5013,15 +7237,14 @@ export default function VideoGeneratorPage() {
                   </div>
                 </div>
 
-                {/* Filter Buttons */}
                 <div>
-                  <div className="text-xs font-medium text-gray-700 mb-1">
+                  <div className="text-xs font-medium text-gray-700 mb-1 dark:text-gray-200">
                     Filters:
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <button
                       onClick={() => setShowFilterModal("lighting")}
-                      className="px-3 py-1.5 text-xs rounded-lg bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border border-yellow-300 font-medium"
+                      className="px-3 py-1.5 text-xs rounded-xl bg-gray-50 text-gray-800 hover:bg-gray-100 border border-gray-200 font-medium transition dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800 dark:border-gray-800"
                     >
                       💡 Lighting{" "}
                       {locationFilters.lighting.length > 0 &&
@@ -5029,7 +7252,7 @@ export default function VideoGeneratorPage() {
                     </button>
                     <button
                       onClick={() => setShowFilterModal("atmosphere")}
-                      className="px-3 py-1.5 text-xs rounded-lg bg-indigo-100 text-indigo-700 hover:bg-indigo-200 border border-indigo-300 font-medium"
+                      className="px-3 py-1.5 text-xs rounded-xl bg-gray-50 text-gray-800 hover:bg-gray-100 border border-gray-200 font-medium transition dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800 dark:border-gray-800"
                     >
                       Atmosphere{" "}
                       {locationFilters.atmosphere.length > 0 &&
@@ -5037,7 +7260,7 @@ export default function VideoGeneratorPage() {
                     </button>
                     <button
                       onClick={() => setShowFilterModal("key_elements")}
-                      className="px-3 py-1.5 text-xs rounded-lg bg-green-100 text-green-700 hover:bg-green-200 border border-green-300 font-medium"
+                      className="px-3 py-1.5 text-xs rounded-xl bg-gray-50 text-gray-800 hover:bg-gray-100 border border-gray-200 font-medium transition dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800 dark:border-gray-800"
                     >
                       Key Elements{" "}
                       {locationFilters.key_elements.length > 0 &&
@@ -5046,23 +7269,16 @@ export default function VideoGeneratorPage() {
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div
-              className="p-6 overflow-y-auto"
-              style={{ maxHeight: "calc(90vh - 180px)" }}
-            >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 {availableLocations
                   .filter((location) => {
-                    // Filter by category
                     if (
                       locationFilters.category &&
                       location.category !== locationFilters.category
                     ) {
                       return false;
                     }
-                    // Filter by lighting
                     if (locationFilters.lighting.length > 0) {
                       const locationLighting = Array.isArray(
                         location.visual_characteristics?.lighting,
@@ -5077,7 +7293,6 @@ export default function VideoGeneratorPage() {
                         return false;
                       }
                     }
-                    // Filter by atmosphere
                     if (locationFilters.atmosphere.length > 0) {
                       const locationAtmosphere = Array.isArray(
                         location.visual_characteristics?.atmosphere,
@@ -5092,7 +7307,6 @@ export default function VideoGeneratorPage() {
                         return false;
                       }
                     }
-                    // Filter by key elements
                     if (locationFilters.key_elements.length > 0) {
                       const locationElements =
                         location.visual_characteristics?.key_elements || [];
@@ -5115,232 +7329,87 @@ export default function VideoGeneratorPage() {
                         key={location.id}
                         onClick={() => handleSelectLocationFromPicker(location)}
                         disabled={isCurrentLocation}
-                        className={`text-left p-4 rounded-lg border-2 transition ${
-                          isCurrentLocation
-                            ? "border-green-500 bg-green-50 cursor-not-allowed"
-                            : "border-gray-200 hover:border-blue-400 hover:bg-blue-50"
-                        }`}
+                        className={
+                          "text-left p-4 rounded-xl border-2 transition " +
+                          (isCurrentLocation
+                            ? "border-blue-500 bg-blue-50 cursor-not-allowed dark:bg-blue-950/20"
+                            : "border-gray-200 hover:border-blue-400 hover:bg-blue-50 dark:border-gray-800 dark:hover:bg-blue-950/20")
+                        }
                       >
-                        <div className="flex items-start gap-2 mb-2">
+                        <div className="flex items-start gap-2">
                           <span className="text-xl">📍</span>
                           <div className="flex-1">
-                            <div className="font-semibold text-gray-900 text-sm mb-1">
+                            <div className="font-semibold text-gray-900 dark:text-gray-100 text-base">
                               {location.name}
                               {isCurrentLocation && (
-                                <span className="ml-2 text-xs text-green-600 font-normal">
+                                <span className="ml-2 text-xs text-green-600 dark:text-green-300 font-normal">
                                   (Current)
                                 </span>
                               )}
                             </div>
-                          </div>
-                        </div>
-                        <div className="relative group mb-2">
-                          <p className="text-xs text-gray-700 line-clamp-2 leading-relaxed cursor-help">
-                            {location.description}
-                          </p>
-                          {/* Tooltip on hover */}
-                          <div className="invisible group-hover:visible absolute left-0 top-full mt-1 w-full bg-gray-900 text-white text-xs p-3 rounded-lg shadow-lg z-50 leading-relaxed">
-                            {location.description}
-                          </div>
-                        </div>
+                            <p className="text-sm text-gray-700 dark:text-gray-200 mt-1">
+                              {location.description}
+                            </p>
 
-                        {/* Sample Images */}
-                        {location.sample_images &&
-                          location.sample_images.length > 0 && (
-                            <div className="mb-2 flex gap-1 overflow-x-auto">
-                              {location.sample_images
-                                .slice(0, 3)
-                                .map((imageUrl, idx) => (
-                                  <div
-                                    key={idx}
-                                    className="relative flex-shrink-0 w-16 h-24 rounded overflow-hidden border border-gray-300 group"
-                                  >
-                                    <img
-                                      src={imageUrl}
-                                      alt={`Sample ${idx + 1}`}
-                                      className="w-full h-full object-cover"
-                                    />
-                                    <button
-                                      onClick={async (e) => {
-                                        e.stopPropagation();
-                                        console.log(
-                                          "=== REMOVE SAMPLE IMAGE ===",
-                                        );
-                                        console.log(
-                                          "Location ID:",
-                                          location.id,
-                                        );
-                                        console.log(
-                                          "Image URL to remove:",
-                                          imageUrl,
-                                        );
-                                        console.log(
-                                          "Current sample_images:",
-                                          location.sample_images,
-                                        );
-
-                                        const updatedImages =
-                                          location.sample_images.filter(
-                                            (url) => url !== imageUrl,
-                                          );
-                                        console.log(
-                                          "Updated sample_images:",
-                                          updatedImages,
-                                        );
-
-                                        try {
-                                          const response = await fetch(
-                                            `/api/locations/${location.id}`,
-                                            {
-                                              method: "PATCH",
-                                              headers: {
-                                                "Content-Type":
-                                                  "application/json",
-                                              },
-                                              body: JSON.stringify({
-                                                sample_images: updatedImages,
-                                              }),
-                                            },
-                                          );
-
-                                          console.log(
-                                            "Response status:",
-                                            response.status,
-                                          );
-                                          console.log(
-                                            "Response ok:",
-                                            response.ok,
-                                          );
-
-                                          const result = await response.json();
-                                          console.log("Response data:", result);
-
-                                          if (response.ok) {
-                                            // Update local state
-                                            setAvailableLocations((prev) =>
-                                              prev.map((loc) =>
-                                                loc.id === location.id
-                                                  ? {
-                                                      ...loc,
-                                                      sample_images:
-                                                        updatedImages,
-                                                    }
-                                                  : loc,
-                                              ),
-                                            );
-                                            console.log(
-                                              "Local state updated successfully",
-                                            );
-                                            await alert(
-                                              "Sample image removed",
-                                              "success",
-                                            );
-                                          } else {
-                                            console.error(
-                                              "Failed to remove image:",
-                                              result,
-                                            );
-                                            await alert(
-                                              "Failed to remove image: " +
-                                                (result.error ||
-                                                  "Unknown error"),
-                                              "error",
-                                            );
-                                          }
-                                        } catch (error) {
-                                          console.error(
-                                            "Error removing image:",
-                                            error,
-                                          );
-                                          await alert(
-                                            "Error removing image: " +
-                                              error.message,
-                                            "error",
-                                          );
-                                        }
-                                        console.log(
-                                          "=========================",
-                                        );
-                                      }}
-                                      className="absolute top-0 right-0 bg-red-500 text-white text-xs px-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
-                                      title="Remove this sample image"
-                                    >
-                                      ×
-                                    </button>
-                                  </div>
-                                ))}
-                              {location.sample_images.length > 3 && (
-                                <div className="flex-shrink-0 w-16 h-24 rounded bg-gray-100 border border-gray-300 flex items-center justify-center">
-                                  <span className="text-xs text-gray-600 font-medium">
-                                    +{location.sample_images.length - 3}
-                                  </span>
+                            {location.sample_images &&
+                              location.sample_images.length > 0 && (
+                                <div className="mt-3 flex gap-2 overflow-x-auto">
+                                  {location.sample_images
+                                    .slice(0, 3)
+                                    .map((imageUrl, idx) => (
+                                      <div
+                                        key={idx}
+                                        className="relative flex-shrink-0 w-16 h-24 rounded-lg overflow-hidden border border-gray-300 dark:border-gray-800"
+                                      >
+                                        <img
+                                          src={imageUrl}
+                                          alt={`Sample ${idx + 1}`}
+                                          className="w-full h-full object-cover"
+                                        />
+                                      </div>
+                                    ))}
+                                  {location.sample_images.length > 3 && (
+                                    <div className="flex-shrink-0 w-16 h-24 rounded-lg bg-gray-100 border border-gray-300 flex items-center justify-center dark:bg-gray-900 dark:border-gray-800">
+                                      <span className="text-xs text-gray-600 dark:text-gray-300 font-medium">
+                                        +{location.sample_images.length - 3}
+                                      </span>
+                                    </div>
+                                  )}
                                 </div>
                               )}
-                            </div>
-                          )}
 
-                        <div className="flex flex-wrap gap-2">
-                          {location.category && (
-                            <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full font-medium">
-                              {location.category === "indoor"
-                                ? "🏢 Indoor"
-                                : "🌃 Outdoor"}
-                            </span>
-                          )}
-                          <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">
-                            {location.type.replace(/_/g, " ")}
-                          </span>
-                          {location.visual_characteristics?.lighting &&
-                            (Array.isArray(
-                              location.visual_characteristics.lighting,
-                            )
-                              ? location.visual_characteristics.lighting
-                              : location.visual_characteristics.lighting
-                                  .split(",")
-                                  .map((s) => s.trim())
-                            ).map((light, idx) => (
-                              <span
-                                key={`light-${idx}`}
-                                className="px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs rounded-full"
-                              >
-                                {light}
-                              </span>
-                            ))}
-                          {location.visual_characteristics?.atmosphere &&
-                            (Array.isArray(
-                              location.visual_characteristics.atmosphere,
-                            )
-                              ? location.visual_characteristics.atmosphere
-                              : location.visual_characteristics.atmosphere
-                                  .split(",")
-                                  .map((s) => s.trim())
-                            ).map((atm, idx) => (
-                              <span
-                                key={`atm-${idx}`}
-                                className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded-full"
-                              >
-                                {atm}
-                              </span>
-                            ))}
-                          {location.visual_characteristics?.key_elements &&
-                            location.visual_characteristics.key_elements.map(
-                              (element, idx) => (
-                                <span
-                                  key={`elem-${idx}`}
-                                  className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full"
-                                >
-                                  {element}
+                            <div className="flex flex-wrap gap-1 mt-3">
+                              {location.category && (
+                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full dark:bg-blue-950/20 dark:text-blue-200">
+                                  {location.category === "indoor"
+                                    ? "🏢 Indoor"
+                                    : "🌃 Outdoor"}
                                 </span>
-                              ),
-                            )}
+                              )}
+                              {location.type && (
+                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full dark:bg-blue-950/20 dark:text-blue-200">
+                                  {location.type.replace(/_/g, " ")}
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </button>
                     );
                   })}
+
+                {availableLocations.length === 0 && (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    <p className="mb-2">No locations available yet.</p>
+                    <p className="text-sm">
+                      Locations will be seeded/generated in your library.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="p-6 border-t border-gray-200 bg-gray-50">
+            <div className="p-6 border-t border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-950/40">
               <button
                 onClick={() => setShowLocationPicker(false)}
                 className="w-full bg-gray-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-gray-700"
@@ -5354,23 +7423,38 @@ export default function VideoGeneratorPage() {
 
       {/* Action Picker Modal */}
       {showActionPicker && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold text-gray-900">
-                  🎭 Select Action/Pose for Scene {actionPickerSceneId}
-                </h3>
-                <button
-                  onClick={() => setShowActionPicker(false)}
-                  className="text-gray-400 hover:text-gray-600 text-2xl"
-                >
-                  ×
-                </button>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-950 rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-800">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-800">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                    🎭 Select Action/Pose for Scene {actionPickerSceneId}
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
+                    Choose an action or pose from the library
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <a
+                    href="/admin/actions"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs px-3 py-2 rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 dark:bg-gray-950 dark:text-gray-200 dark:border-gray-800 dark:hover:bg-gray-900"
+                    title="Manage action library"
+                  >
+                    Manage
+                  </a>
+                  <button
+                    onClick={() => setShowActionPicker(false)}
+                    className="text-gray-400 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-200 text-2xl"
+                    aria-label="Close"
+                  >
+                    ×
+                  </button>
+                </div>
               </div>
-              <p className="text-sm text-gray-600 mt-2">
-                Choose an action or pose from the library
-              </p>
             </div>
 
             <div
@@ -5387,24 +7471,25 @@ export default function VideoGeneratorPage() {
                       key={action.id}
                       onClick={() => handleSelectActionFromPicker(action)}
                       disabled={isCurrentAction}
-                      className={`text-left p-4 rounded-lg border-2 transition ${
-                        isCurrentAction
-                          ? "border-blue-500 bg-blue-50 cursor-not-allowed"
-                          : "border-gray-200 hover:border-blue-400 hover:bg-blue-50"
-                      }`}
+                      className={
+                        "text-left p-4 rounded-xl border-2 transition " +
+                        (isCurrentAction
+                          ? "border-blue-500 bg-blue-50 cursor-not-allowed dark:bg-blue-950/20"
+                          : "border-gray-200 hover:border-blue-400 hover:bg-blue-50 dark:border-gray-800 dark:hover:bg-blue-950/20")
+                      }
                     >
                       <div className="flex items-start gap-2 mb-2">
                         <span className="text-2xl">🎭</span>
                         <div className="flex-1">
-                          <div className="font-semibold text-gray-900 text-base mb-1">
+                          <div className="font-semibold text-gray-900 dark:text-gray-100 text-base mb-1">
                             {action.name}
                             {isCurrentAction && (
-                              <span className="ml-2 text-xs text-green-600 font-normal">
+                              <span className="ml-2 text-xs text-green-600 dark:text-green-300 font-normal">
                                 (Current)
                               </span>
                             )}
                           </div>
-                          <p className="text-sm text-gray-700 mb-3">
+                          <p className="text-sm text-gray-700 dark:text-gray-200 mb-3">
                             {action.description}
                           </p>
                         </div>
@@ -5414,14 +7499,14 @@ export default function VideoGeneratorPage() {
                       {action.pose_variations &&
                         action.pose_variations.length > 0 && (
                           <div className="mb-3">
-                            <div className="text-xs font-medium text-gray-700 mb-2">
+                            <div className="text-xs font-medium text-gray-700 dark:text-gray-200 mb-2">
                               Pose Variations:
                             </div>
                             <div className="space-y-1">
                               {action.pose_variations.map((pose, idx) => (
                                 <div
                                   key={idx}
-                                  className="text-xs text-gray-600 pl-4 border-l-2 border-blue-200"
+                                  className="text-xs text-gray-600 dark:text-gray-300 pl-4 border-l-2 border-blue-200 dark:border-blue-900/60"
                                 >
                                   • {pose}
                                 </div>
@@ -5433,10 +7518,10 @@ export default function VideoGeneratorPage() {
                       {/* Expression */}
                       {action.expression && (
                         <div className="mb-2">
-                          <span className="text-xs font-medium text-gray-700">
+                          <span className="text-xs font-medium text-gray-700 dark:text-gray-200">
                             Expression:{" "}
                           </span>
-                          <span className="text-xs text-gray-600">
+                          <span className="text-xs text-gray-600 dark:text-gray-300">
                             {action.expression}
                           </span>
                         </div>
@@ -5448,7 +7533,7 @@ export default function VideoGeneratorPage() {
                           {action.tags.map((tag, idx) => (
                             <span
                               key={idx}
-                              className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full"
+                              className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full dark:bg-blue-950/20 dark:text-blue-200"
                             >
                               {tag}
                             </span>
@@ -5460,7 +7545,7 @@ export default function VideoGeneratorPage() {
                 })}
 
                 {availableActions.length === 0 && (
-                  <div className="text-center py-8 text-gray-500">
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                     <p className="mb-2">No actions available yet.</p>
                     <p className="text-sm">
                       Actions will be seeded automatically when you select one.
@@ -5470,13 +7555,281 @@ export default function VideoGeneratorPage() {
               </div>
             </div>
 
-            <div className="p-6 border-t border-gray-200 bg-gray-50">
+            <div className="p-6 border-t border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-950/40">
               <button
                 onClick={() => setShowActionPicker(false)}
                 className="w-full bg-gray-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-gray-700"
               >
                 Cancel
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Camera Movement Picker Modal */}
+      {showCameraMovementPicker && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-950 rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-800">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-800">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                    📷 Select Camera Movement for Scene{" "}
+                    {cameraMovementPickerSceneId}
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
+                    Pick a camera movement to guide motion prompt generation.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <a
+                    href="/admin/camera-movements"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs px-3 py-2 rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 dark:bg-gray-950 dark:text-gray-200 dark:border-gray-800 dark:hover:bg-gray-900"
+                    title="Manage camera movement library"
+                  >
+                    Manage
+                  </a>
+                  <button
+                    onClick={() => setShowCameraMovementPicker(false)}
+                    className="text-gray-400 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-200 text-2xl"
+                    aria-label="Close"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div
+              className="p-6 overflow-y-auto"
+              style={{ maxHeight: "calc(90vh - 180px)" }}
+            >
+              <div className="grid grid-cols-1 gap-4">
+                {availableCameraMovements.map((movement) => {
+                  const isCurrent =
+                    cameraMovementMapping[cameraMovementPickerSceneId] ===
+                    movement.id;
+
+                  return (
+                    <button
+                      key={movement.id}
+                      onClick={() =>
+                        handleSelectCameraMovementFromPicker(movement)
+                      }
+                      disabled={isCurrent}
+                      className={
+                        "text-left p-4 rounded-xl border-2 transition " +
+                        (isCurrent
+                          ? "border-blue-500 bg-blue-50 cursor-not-allowed dark:bg-blue-950/20"
+                          : "border-gray-200 hover:border-blue-400 hover:bg-blue-50 dark:border-gray-800 dark:hover:bg-blue-950/20")
+                      }
+                    >
+                      <div className="flex items-start gap-2">
+                        <span className="text-xl">📷</span>
+                        <div className="flex-1">
+                          <div className="font-semibold text-gray-900 dark:text-gray-100 text-base">
+                            {movement.name}
+                            {isCurrent && (
+                              <span className="ml-2 text-xs text-green-600 dark:text-green-300 font-normal">
+                                (Current)
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-700 dark:text-gray-200 mt-1">
+                            {movement.description}
+                          </p>
+                          {movement.tags && movement.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-3">
+                              {movement.tags.map((tag, idx) => (
+                                <span
+                                  key={idx}
+                                  className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full dark:bg-blue-950/20 dark:text-blue-200"
+                                >
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+
+                {availableCameraMovements.length === 0 && (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    <p className="mb-2">No camera movements available yet.</p>
+                    <p className="text-sm">
+                      Camera movements will be seeded automatically.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-950/40">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {cameraMovementPickerSceneId &&
+                  cameraMovementMapping[cameraMovementPickerSceneId] && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await handleClearCameraMovementForScene(
+                          cameraMovementPickerSceneId,
+                        );
+                        setShowCameraMovementPicker(false);
+                      }}
+                      className="w-full bg-red-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-red-700"
+                      title="Clear camera movement selection"
+                    >
+                      ✕ Clear selection
+                    </button>
+                  )}
+                <button
+                  onClick={() => setShowCameraMovementPicker(false)}
+                  className="w-full bg-gray-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-gray-700"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Character Motion Picker Modal */}
+      {showCharacterMotionPicker && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-950 rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-800">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-800">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                    🧍 Select Character Motion for Scene{" "}
+                    {characterMotionPickerSceneId}
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
+                    Pick a character motion to guide motion prompt generation.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <a
+                    href="/admin/character-motions"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs px-3 py-2 rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 dark:bg-gray-950 dark:text-gray-200 dark:border-gray-800 dark:hover:bg-gray-900"
+                    title="Manage character motion library"
+                  >
+                    Manage
+                  </a>
+                  <button
+                    onClick={() => setShowCharacterMotionPicker(false)}
+                    className="text-gray-400 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-200 text-2xl"
+                    aria-label="Close"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div
+              className="p-6 overflow-y-auto"
+              style={{ maxHeight: "calc(90vh - 180px)" }}
+            >
+              <div className="grid grid-cols-1 gap-4">
+                {availableCharacterMotions.map((motion) => {
+                  const isCurrent =
+                    characterMotionMapping[characterMotionPickerSceneId] ===
+                    motion.id;
+
+                  return (
+                    <button
+                      key={motion.id}
+                      onClick={() =>
+                        handleSelectCharacterMotionFromPicker(motion)
+                      }
+                      disabled={isCurrent}
+                      className={
+                        "text-left p-4 rounded-xl border-2 transition " +
+                        (isCurrent
+                          ? "border-blue-500 bg-blue-50 cursor-not-allowed dark:bg-blue-950/20"
+                          : "border-gray-200 hover:border-blue-400 hover:bg-blue-50 dark:border-gray-800 dark:hover:bg-blue-950/20")
+                      }
+                    >
+                      <div className="flex items-start gap-2">
+                        <span className="text-xl">🧍</span>
+                        <div className="flex-1">
+                          <div className="font-semibold text-gray-900 dark:text-gray-100 text-base">
+                            {motion.name}
+                            {isCurrent && (
+                              <span className="ml-2 text-xs text-green-600 dark:text-green-300 font-normal">
+                                (Current)
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-700 dark:text-gray-200 mt-1">
+                            {motion.description}
+                          </p>
+                          {motion.tags && motion.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-3">
+                              {motion.tags.map((tag, idx) => (
+                                <span
+                                  key={idx}
+                                  className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full dark:bg-blue-950/20 dark:text-blue-200"
+                                >
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+
+                {availableCharacterMotions.length === 0 && (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    <p className="mb-2">No character motions available yet.</p>
+                    <p className="text-sm">
+                      Character motions will be seeded automatically.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-950/40">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {characterMotionPickerSceneId &&
+                  characterMotionMapping[characterMotionPickerSceneId] && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await handleClearCharacterMotionForScene(
+                          characterMotionPickerSceneId,
+                        );
+                        setShowCharacterMotionPicker(false);
+                      }}
+                      className="w-full bg-red-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-red-700"
+                      title="Clear character motion selection"
+                    >
+                      ✕ Clear selection
+                    </button>
+                  )}
+                <button
+                  onClick={() => setShowCharacterMotionPicker(false)}
+                  className="w-full bg-gray-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-gray-700"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -5634,6 +7987,209 @@ export default function VideoGeneratorPage() {
                 className="w-full mt-4 bg-gray-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-gray-700"
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Camera Movement Generation Modal */}
+      {showCameraMovementGenerateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                Generate Camera Movement with AI
+              </h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Enter keywords describing the camera motion style.
+              </p>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Keywords *
+                </label>
+                <input
+                  type="text"
+                  value={cameraMovementGenerationKeywords}
+                  onChange={(e) =>
+                    setCameraMovementGenerationKeywords(e.target.value)
+                  }
+                  placeholder="e.g., slow push-in, handheld, gentle drift, lock-off"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Comma-separated keywords work best
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  onClick={() =>
+                    handleGenerateNewCameraMovement(
+                      cameraMovementGenerateSceneId,
+                      cameraMovementGenerationKeywords,
+                    )
+                  }
+                  disabled={!cameraMovementGenerationKeywords.trim()}
+                  className="w-full p-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  ✨ Generate Camera Movement
+                </button>
+                <p className="text-xs text-gray-500 text-center">
+                  Cost: ~$0.01-0.03 per movement
+                </p>
+              </div>
+
+              <button
+                onClick={() => {
+                  setShowCameraMovementGenerateModal(false);
+                  setCameraMovementGenerationKeywords("");
+                }}
+                className="w-full mt-4 bg-gray-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Character Motion Generation Modal */}
+      {showCharacterMotionGenerateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                Generate Character Motion with AI
+              </h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Enter keywords describing the character’s subtle movement.
+              </p>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Keywords *
+                </label>
+                <input
+                  type="text"
+                  value={characterMotionGenerationKeywords}
+                  onChange={(e) =>
+                    setCharacterMotionGenerationKeywords(e.target.value)
+                  }
+                  placeholder="e.g., slow head turn, breathing, shifting weight, slight glance"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Comma-separated keywords work best
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  onClick={() =>
+                    handleGenerateNewCharacterMotion(
+                      characterMotionGenerateSceneId,
+                      characterMotionGenerationKeywords,
+                    )
+                  }
+                  disabled={!characterMotionGenerationKeywords.trim()}
+                  className="w-full p-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  ✨ Generate Character Motion
+                </button>
+                <p className="text-xs text-gray-500 text-center">
+                  Cost: ~$0.01-0.03 per motion
+                </p>
+              </div>
+
+              <button
+                onClick={() => {
+                  setShowCharacterMotionGenerateModal(false);
+                  setCharacterMotionGenerationKeywords("");
+                }}
+                className="w-full mt-4 bg-gray-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Prompt Review Modal (Step 3 + Step 4) */}
+      {promptReviewModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[90] p-4 isolate transform-gpu">
+          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[85vh] overflow-hidden dark:bg-gray-950 dark:border dark:border-gray-800 transform-gpu">
+            <div className="p-6 border-b border-gray-200 flex items-start justify-between gap-4 dark:border-gray-800">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                  {promptReviewModal.title}
+                </h3>
+                <p className="text-sm text-gray-600 mt-1 dark:text-gray-300">
+                  Scene {promptReviewModal.sceneId} •{" "}
+                  {promptReviewModal.kind === "motion_prompt"
+                    ? "Step 4"
+                    : "Step 3"}
+                  {typeof promptReviewModal.cost === "number"
+                    ? ` • Cost: $${(promptReviewModal.cost || 0).toFixed(4)}`
+                    : ""}
+                </p>
+                <p className="text-xs text-gray-500 mt-1 dark:text-gray-400">
+                  Note: generation cost is incurred when you click Generate.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleDiscardPromptReview}
+                className="text-gray-400 hover:text-gray-600 text-2xl leading-none dark:hover:text-gray-200"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            <div
+              className="p-6 overflow-y-auto"
+              style={{ maxHeight: "calc(85vh - 170px)" }}
+            >
+              <details className="mb-4">
+                <summary className="cursor-pointer text-sm font-medium text-gray-800 dark:text-gray-200">
+                  Current prompt
+                </summary>
+                <div className="mt-2 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg p-3 whitespace-pre-wrap break-words dark:bg-gray-900 dark:text-gray-200 dark:border-gray-800">
+                  {(promptReviewModal.originalPrompt || "(empty)").trim() ||
+                    "(empty)"}
+                </div>
+              </details>
+
+              <label className="block text-sm font-medium text-gray-800 mb-2 dark:text-gray-200">
+                New prompt (edit before saving)
+              </label>
+              <textarea
+                value={promptReviewDraft}
+                onChange={(e) => setPromptReviewDraft(e.target.value)}
+                rows={12}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-900 resize-y focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-950 dark:text-gray-100 dark:border-gray-800"
+              />
+            </div>
+
+            <div className="p-6 border-t border-gray-200 bg-gray-50 flex gap-3 justify-end dark:border-gray-800 dark:bg-gray-950/40">
+              <button
+                type="button"
+                onClick={handleDiscardPromptReview}
+                disabled={applyingPromptReview}
+                className="bg-gray-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-gray-700 disabled:opacity-50 transition-colors"
+              >
+                Discard
+              </button>
+              <button
+                type="button"
+                onClick={handleAcceptPromptReview}
+                disabled={applyingPromptReview}
+                className="bg-blue-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                {applyingPromptReview ? "Saving..." : "Accept & Save"}
               </button>
             </div>
           </div>

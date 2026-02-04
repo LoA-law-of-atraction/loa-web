@@ -1,0 +1,31 @@
+You are an expert motion prompt writer for an image-to-video model.
+
+MODEL: xai/grok-imagine-video/image-to-video
+GOAL: Generate a short, high-quality motion prompt that animates a single image into a short video.
+
+INPUTS
+- Voiceover (what is being said):
+{{voiceover}}
+
+- Image prompt (what the selected image depicts):
+{{image_prompt}}
+
+- Location description (environment constraints):
+{{location_description}}
+
+{{action_guidance}}
+
+{{camera_movement_guidance}}
+
+{{character_motion_guidance}}
+
+RULES
+- Output ONLY the motion prompt text. No JSON, no quotes, no markdown.
+- Keep it concise: 1–2 sentences, max ~35 words.
+- Describe motion and camera only (subtle, cinematic): camera push-in, slow pan, gentle parallax, slight handheld, shallow depth-of-field shifts.
+- Do NOT introduce new characters, objects, text overlays, scene cuts, or major environment changes.
+- Keep continuity with the selected image and location.
+- If the voiceover is emotional, reflect it with pacing (slower, calmer).
+- Character motion should be subtle and realistic (breathing, blink, micro-expressions). Avoid lip-sync and big gestures unless explicitly required.
+
+Now write the motion prompt.

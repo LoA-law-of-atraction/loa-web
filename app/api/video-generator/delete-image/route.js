@@ -1,34 +1,48 @@
 import { NextResponse } from "next/server";
 import { getAdminStorage, getAdminDb } from "@/utils/firebaseAdmin";
 
+function extractStorageObjectPathFromUrl(url, bucketName) {
+  if (!url) return null;
+
+  // https://storage.googleapis.com/{bucket}/{path}
+  const gcsMatch = String(url).match(
+    new RegExp(`^https://storage\\.googleapis\\.com/${bucketName}/(.+)$`),
+  );
+  if (gcsMatch?.[1]) return decodeURIComponent(gcsMatch[1]);
+
+  // https://firebasestorage.googleapis.com/v0/b/{bucket}/o/{encodedPath}?...
+  const fbMatch = String(url).match(
+    new RegExp(
+      `^https://firebasestorage\\.googleapis\\.com/v0/b/${bucketName}/o/(.+?)(\\?|$)`,
+    ),
+  );
+  if (fbMatch?.[1]) return decodeURIComponent(fbMatch[1]);
+
+  return null;
+}
+
 export async function POST(request) {
   try {
-    const { image_url, project_id, character_id, scene_id } = await request.json();
+    const { image_url, project_id, character_id, scene_id } =
+      await request.json();
 
     if (!image_url) {
       return NextResponse.json(
         { error: "Missing image_url parameter" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const bucket = getAdminStorage().bucket();
 
-    // Extract file path from the public URL
-    // URL format: https://storage.googleapis.com/{bucket-name}/{file-path}
-    const bucketName = bucket.name;
-    const urlPattern = new RegExp(`https://storage\\.googleapis\\.com/${bucketName}/(.+)`);
-    const match = image_url.match(urlPattern);
-
-    if (!match) {
-      console.error("Invalid image URL format:", image_url);
+    const filePath = extractStorageObjectPathFromUrl(image_url, bucket.name);
+    if (!filePath) {
+      console.error("Unsupported image URL format:", image_url);
       return NextResponse.json(
-        { error: "Invalid image URL format" },
-        { status: 400 }
+        { error: "Unsupported image URL format" },
+        { status: 400 },
       );
     }
-
-    const filePath = decodeURIComponent(match[1]);
     console.log(`Deleting image from storage: ${filePath}`);
 
     const file = bucket.file(filePath);
@@ -47,14 +61,18 @@ export async function POST(request) {
       try {
         const db = getAdminDb();
         const characterRef = db.collection("characters").doc(character_id);
-        const characterProjectRef = characterRef.collection("projects").doc(project_id);
+        const characterProjectRef = characterRef
+          .collection("projects")
+          .doc(project_id);
 
         const characterProjectDoc = await characterProjectRef.get();
         if (characterProjectDoc.exists) {
           const existingImages = characterProjectDoc.data()?.images || [];
 
           // Remove image for this scene_id
-          const updatedImages = existingImages.filter(img => img.scene_id !== scene_id);
+          const updatedImages = existingImages.filter(
+            (img) => img.scene_id !== scene_id,
+          );
 
           await characterProjectRef.update({
             images: updatedImages,
@@ -62,7 +80,9 @@ export async function POST(request) {
             updated_at: new Date().toISOString(),
           });
 
-          console.log(`Removed image reference for scene ${scene_id} from character ${character_id} project ${project_id}`);
+          console.log(
+            `Removed image reference for scene ${scene_id} from character ${character_id} project ${project_id}`,
+          );
         }
       } catch (characterError) {
         console.error("Error updating character project:", characterError);
@@ -78,8 +98,27 @@ export async function POST(request) {
         const projectDoc = await projectRef.get();
 
         if (projectDoc.exists) {
-          const locationMapping = projectDoc.data()?.location_mapping || {};
-          const locationId = locationMapping[scene_id];
+          let locationId = null;
+
+          // Prefer per-scene selection
+          try {
+            const sceneDocSnap = await projectRef
+              .collection("scenes")
+              .doc(String(scene_id))
+              .get();
+            if (sceneDocSnap.exists) {
+              locationId = sceneDocSnap.data()?.location_id || null;
+            }
+          } catch {}
+
+          // Legacy fallback
+          if (!locationId) {
+            const locationMapping = projectDoc.data()?.location_mapping || {};
+            locationId =
+              locationMapping?.[scene_id] ??
+              locationMapping?.[String(scene_id)] ??
+              null;
+          }
 
           if (locationId) {
             const locationRef = db.collection("locations").doc(locationId);
@@ -89,7 +128,9 @@ export async function POST(request) {
               const existingSamples = locationDoc.data()?.sample_images || [];
 
               // Remove this image from the samples
-              const updatedSamples = existingSamples.filter(url => url !== image_url);
+              const updatedSamples = existingSamples.filter(
+                (url) => url !== image_url,
+              );
 
               await locationRef.update({
                 sample_images: updatedSamples,
@@ -114,7 +155,7 @@ export async function POST(request) {
     console.error("Delete image error:", error);
     return NextResponse.json(
       { error: "Failed to delete image", message: error.message },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

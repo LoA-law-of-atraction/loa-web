@@ -4,33 +4,51 @@ import { calculateShotstackCost } from "@/utils/costCalculator";
 
 export async function POST(request) {
   try {
-    const { project_id, session_id, videos, voiceover_url } = await request.json();
+    const { project_id, session_id, videos, voiceover_url, scene_durations } =
+      await request.json();
 
     if (!project_id || !session_id || !videos || !voiceover_url) {
       return NextResponse.json(
         { error: "Missing required fields" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     console.log("Assembling final video with Shotstack...");
 
+    const clampDurationSeconds = (value, fallback = 8) => {
+      const n = Number(value);
+      const numeric = Number.isFinite(n) ? n : fallback;
+      return Math.max(1, Math.min(15, Math.round(numeric)));
+    };
+
     // Build Shotstack payload
+    let currentStart = 0;
+    const sortedVideos = videos.sort((a, b) => a.scene_id - b.scene_id);
+
     const shotstackPayload = {
       timeline: {
         tracks: [
           {
             clips: videos
               .sort((a, b) => a.scene_id - b.scene_id)
-              .map((video, index) => ({
-                asset: {
-                  type: "video",
-                  src: video.video_url,
-                  volume: 0, // Mute video audio
-                },
-                start: index * 8,
-                length: 8,
-              })),
+              .map((video) => {
+                const durationSeconds = clampDurationSeconds(
+                  scene_durations?.[video.scene_id],
+                  8,
+                );
+                const clip = {
+                  asset: {
+                    type: "video",
+                    src: video.video_url,
+                    volume: 0, // Mute video audio
+                  },
+                  start: currentStart,
+                  length: durationSeconds,
+                };
+                currentStart += durationSeconds;
+                return clip;
+              }),
           },
           {
             clips: [
@@ -67,7 +85,7 @@ export async function POST(request) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(shotstackPayload),
-      }
+      },
     );
 
     if (!shotstackResponse.ok) {
@@ -78,8 +96,10 @@ export async function POST(request) {
     const shotstackResult = await shotstackResponse.json();
     const renderId = shotstackResult.response.id;
 
-    // Calculate Shotstack cost (videos are 8 seconds each)
-    const totalDuration = videos.length * 8;
+    // Calculate Shotstack cost based on actual clip duration
+    const totalDuration = sortedVideos.reduce((sum, video) => {
+      return sum + clampDurationSeconds(scene_durations?.[video.scene_id], 8);
+    }, 0);
     const shotstackCost = calculateShotstackCost(totalDuration);
 
     // Update Firestore
@@ -97,7 +117,8 @@ export async function POST(request) {
 
     // Calculate new costs
     const newShotstackCost = (existingCosts.shotstack || 0) + shotstackCost;
-    const newStep5ShotstackCost = (existingCosts.step5?.shotstack || 0) + shotstackCost;
+    const newStep5ShotstackCost =
+      (existingCosts.step5?.shotstack || 0) + shotstackCost;
     const newStep5Total = (existingCosts.step5?.total || 0) + shotstackCost;
     const newTotal = (existingCosts.total || 0) + shotstackCost;
 
@@ -132,7 +153,7 @@ export async function POST(request) {
     console.error("Assemble video error:", error);
     return NextResponse.json(
       { error: "Failed to assemble video", message: error.message },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -150,7 +171,7 @@ async function pollShotstackStatus(projectId, sessionId, renderId) {
           headers: {
             "x-api-key": process.env.SHOTSTACK_API_KEY,
           },
-        }
+        },
       );
 
       if (!statusResponse.ok) {
@@ -225,7 +246,7 @@ export async function GET(request) {
     if (!session_id) {
       return NextResponse.json(
         { error: "Missing session_id" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -247,7 +268,7 @@ export async function GET(request) {
     console.error("Get status error:", error);
     return NextResponse.json(
       { error: "Failed to get status", message: error.message },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

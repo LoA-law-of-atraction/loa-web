@@ -394,6 +394,43 @@ export default function ManageActionsPage() {
                   {action.description}
                 </p>
 
+                {/* Sample Videos */}
+                {Array.isArray(action.sample_videos) &&
+                  action.sample_videos.length > 0 && (
+                    <div className="mb-3">
+                      <div className="text-xs text-gray-600 dark:text-gray-300 font-medium mb-1">
+                        Sample Videos ({action.sample_videos.length}):
+                      </div>
+                      <div className="flex gap-2 overflow-x-auto">
+                        {action.sample_videos
+                          .slice(0, 2)
+                          .map((videoUrl, idx) => (
+                            <div
+                              key={idx}
+                              className="flex-shrink-0 w-16 h-24 rounded overflow-hidden border border-gray-300 dark:border-gray-800 bg-black"
+                              title="Sample generated video"
+                            >
+                              <video
+                                className="w-full h-full object-cover"
+                                controls
+                                preload="metadata"
+                                playsInline
+                              >
+                                <source src={videoUrl} type="video/mp4" />
+                              </video>
+                            </div>
+                          ))}
+                        {action.sample_videos.length > 2 && (
+                          <div className="flex-shrink-0 w-16 h-24 rounded bg-gray-100 border border-gray-300 dark:bg-gray-900 dark:border-gray-800 flex items-center justify-center">
+                            <span className="text-xs text-gray-600 dark:text-gray-200 font-medium">
+                              +{action.sample_videos.length - 2}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                 {/* Pose Variations */}
                 {action.pose_variations &&
                   action.pose_variations.length > 0 && (

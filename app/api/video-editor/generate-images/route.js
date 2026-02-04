@@ -7,10 +7,15 @@ export async function POST(request) {
     const data = await request.json();
 
     // Validate required fields
-    if (!data.topic || !data.script || !data.scenes || !data.selected_character) {
+    if (
+      !data.topic ||
+      !data.script ||
+      !data.scenes ||
+      !data.selected_character
+    ) {
       return NextResponse.json(
         { error: "Missing required fields" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -37,7 +42,7 @@ export async function POST(request) {
             use_speaker_boost: true,
           },
         }),
-      }
+      },
     );
 
     if (!voiceoverResponse.ok) {
@@ -63,7 +68,7 @@ export async function POST(request) {
       const imageResponse = await fetch("https://fal.run/fal-ai/flux/schnell", {
         method: "POST",
         headers: {
-          "Authorization": `Key ${process.env.FAL_API_KEY}`,
+          Authorization: `Key ${process.env.FAL_API_KEY}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -75,7 +80,9 @@ export async function POST(request) {
       });
 
       if (!imageResponse.ok) {
-        throw new Error(`Fal AI image generation error for scene ${scene.id}: ${imageResponse.statusText}`);
+        throw new Error(
+          `Fal AI image generation error for scene ${scene.id}: ${imageResponse.statusText}`,
+        );
       }
 
       const imageResult = await imageResponse.json();
@@ -114,14 +121,13 @@ export async function POST(request) {
       voiceover_url: voiceoverUrl,
       status: "pending_approval",
       scenes: data.scenes.map((scene) => {
-        const generatedImage = generatedImages.find((img) => img.scene_id === scene.id);
+        const generatedImage = generatedImages.find(
+          (img) => img.scene_id === scene.id,
+        );
         return {
           id: scene.id,
           duration: scene.duration,
-          location: scene.location,
           voiceover: scene.voiceover,
-          camera: scene.camera,
-          mood: scene.mood,
           image_prompt: scene.image_prompt,
           motion_prompt: scene.motion_prompt,
           image_url: generatedImage?.image_url || null,
@@ -146,7 +152,7 @@ export async function POST(request) {
     console.error("Generate images error:", error);
     return NextResponse.json(
       { error: "Internal server error", message: error.message },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -188,7 +188,7 @@ h5 {
   }
 
   .admin-card {
-    @apply rounded-2xl border border-gray-200/70 bg-white/80 shadow-sm backdrop-blur dark:border-gray-800 dark:bg-gray-900/60;
+    @apply rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900;
   }
 
   .admin-card-solid {

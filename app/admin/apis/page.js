@@ -141,8 +141,8 @@ export default function APIsPage() {
         </h3>
         <ol className="space-y-2 text-sm text-gray-700 dark:text-gray-200">
           <li>
-            <span className="font-medium">1.</span> Click "Get API Key" to
-            obtain keys from each provider
+            <span className="font-medium">1.</span> Click &quot;Get API
+            Key&quot; to obtain keys from each provider
           </li>
           <li>
             <span className="font-medium">2.</span> Add the keys to your{" "}

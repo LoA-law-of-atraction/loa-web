@@ -3,14 +3,27 @@ import { getPrompt } from "@/utils/promptService";
 import { getAdminDb } from "@/utils/firebaseAdmin";
 import { calculateClaudeCost } from "@/utils/costCalculator";
 
+function clampDurationSeconds(value, fallback = 8) {
+  const n = Number(value);
+  const numeric = Number.isFinite(n) ? n : fallback;
+  return Math.max(1, Math.min(15, Math.round(numeric)));
+}
+
 export async function POST(request) {
   try {
-    const { project_id, topic, selected_character, categories = [], scene_count = 4, location_count = null } = await request.json();
+    const {
+      project_id,
+      topic,
+      selected_character,
+      categories = [],
+      scene_count = 4,
+      location_count = null,
+    } = await request.json();
 
     if (!project_id || !topic || !selected_character) {
       return NextResponse.json(
         { error: "Missing project_id, topic, or character" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -28,13 +41,29 @@ export async function POST(request) {
     const projectDoc = await projectRef.get();
 
     if (!projectDoc.exists) {
-      return NextResponse.json(
-        { error: "Project not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    const locationMapping = projectDoc.data()?.location_mapping || {};
+    // Prefer per-scene `location_id` (stored on projects/{id}/scenes/{sceneId})
+    // Fall back to legacy project.location_mapping if present.
+    let locationMapping = projectDoc.data()?.location_mapping || {};
+    if (Object.keys(locationMapping).length === 0) {
+      try {
+        const scenesSnap = await projectRef.collection("scenes").get();
+        if (!scenesSnap.empty) {
+          const next = {};
+          for (const doc of scenesSnap.docs) {
+            const data = doc.data() || {};
+            const sid = data?.id ?? doc.id;
+            const locId = data?.location_id;
+            if (sid != null && locId) next[String(sid)] = String(locId);
+          }
+          locationMapping = next;
+        }
+      } catch (error) {
+        console.error("Error loading scene locations for script:", error);
+      }
+    }
     let locationsContext = "";
 
     if (Object.keys(locationMapping).length > 0) {
@@ -45,7 +74,10 @@ export async function POST(request) {
       const locationsData = {};
 
       for (const locationId of locationIds) {
-        const locationDoc = await db.collection("locations").doc(locationId).get();
+        const locationDoc = await db
+          .collection("locations")
+          .doc(locationId)
+          .get();
         if (locationDoc.exists) {
           locationsData[locationId] = locationDoc.data();
         }
@@ -90,24 +122,27 @@ export async function POST(request) {
     });
 
     // Call Claude API
-    const claudeResponse = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": process.env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json",
+    const claudeResponse = await fetch(
+      "https://api.anthropic.com/v1/messages",
+      {
+        method: "POST",
+        headers: {
+          "x-api-key": process.env.ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: process.env.NEXT_PUBLIC_CLAUDE_MODEL,
+          max_tokens: 4096,
+          messages: [
+            {
+              role: "user",
+              content: prompt,
+            },
+          ],
+        }),
       },
-      body: JSON.stringify({
-        model: process.env.NEXT_PUBLIC_CLAUDE_MODEL,
-        max_tokens: 4096,
-        messages: [
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-      }),
-    });
+    );
 
     if (!claudeResponse.ok) {
       const errorText = await claudeResponse.text();
@@ -130,16 +165,31 @@ export async function POST(request) {
 
     const scriptData = JSON.parse(jsonMatch[0]);
 
+    // We intentionally persist only a minimal, stable scene shape on
+    // `projects/{id}/scenes`. Additional per-step fields are stored/added later.
+    if (Array.isArray(scriptData.scenes)) {
+      scriptData.scenes = scriptData.scenes.map((scene) => {
+        // Whitelist only the fields the video-generator flow expects from Step 2.
+        // Anything else returned by the model is discarded.
+        return {
+          id: scene?.id,
+          duration: clampDurationSeconds(scene?.duration, 8),
+          voiceover: scene?.voiceover,
+          image_prompt: scene?.image_prompt,
+        };
+      });
+    }
+
     // Validate script length
     const scriptLength = scriptData.script?.length || 0;
     if (scriptLength < minCharacters) {
       throw new Error(
-        `Script too short: ${scriptLength} characters (minimum ${minCharacters} required for ${scene_count} scenes). The voiceover must fill the full ${totalSeconds}-second video duration.`
+        `Script too short: ${scriptLength} characters (minimum ${minCharacters} required for ${scene_count} scenes). The voiceover must fill the full ${totalSeconds}-second video duration.`,
       );
     }
     if (scriptLength > maxCharacters) {
       console.warn(
-        `Script exceeds character limit: ${scriptLength} > ${maxCharacters} (${scene_count} scenes × 8s)`
+        `Script exceeds character limit: ${scriptLength} > ${maxCharacters} (${scene_count} scenes × 8s)`,
       );
     }
 
@@ -184,24 +234,31 @@ export async function POST(request) {
     });
 
     // Track project usage in character's projects subcollection
-    const characterRef = db.collection("characters").doc(selected_character.character_id);
-    const characterProjectRef = characterRef.collection("projects").doc(project_id);
+    const characterRef = db
+      .collection("characters")
+      .doc(selected_character.character_id);
+    const characterProjectRef = characterRef
+      .collection("projects")
+      .doc(project_id);
 
-    await characterProjectRef.set({
-      project_id,
-      project_name: projectDoc.data()?.project_name || "Untitled Project",
-      topic,
-      scene_count,
-      status: "script_generated",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }, { merge: true });
+    await characterProjectRef.set(
+      {
+        project_id,
+        project_name: projectDoc.data()?.project_name || "Untitled Project",
+        topic,
+        scene_count,
+        status: "script_generated",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      { merge: true },
+    );
 
     // Save scenes as subcollection
     const scenesCollection = projectRef.collection("scenes");
     const batch = db.batch();
 
-    scriptData.scenes.forEach((scene) => {
+    (scriptData.scenes || []).forEach((scene) => {
       const sceneRef = scenesCollection.doc(scene.id.toString());
       batch.set(sceneRef, scene);
     });
@@ -234,7 +291,7 @@ export async function POST(request) {
     console.error("Generate script error:", error);
     return NextResponse.json(
       { error: "Failed to generate script", message: error.message },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

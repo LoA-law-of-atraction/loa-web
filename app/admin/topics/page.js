@@ -431,7 +431,7 @@ export default function TopicsPage() {
                           onClick={() => handleAddCategory(categoryInput)}
                           className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm border-t text-blue-600"
                         >
-                          + Add "{categoryInput}" as new category
+                          + Add &quot;{categoryInput}&quot; as new category
                         </button>
                       )}
                   </div>

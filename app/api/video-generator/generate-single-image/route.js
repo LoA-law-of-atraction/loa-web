@@ -1,6 +1,19 @@
 import { NextResponse } from "next/server";
 import { getAdminStorage, getAdminDb } from "@/utils/firebaseAdmin";
 import { FAL_NEGATIVE_PROMPT } from "@/config/fal-settings";
+import { v4 as uuidv4 } from "uuid";
+
+function getImageToImageEndpointId() {
+  const endpointId = process.env.FAL_IMAGE_TO_IMAGE_MODEL;
+
+  if (!endpointId) {
+    throw new Error(
+      "Missing image-to-image model endpoint. Set FAL_IMAGE_TO_IMAGE_MODEL.",
+    );
+  }
+
+  return endpointId;
+}
 
 export async function POST(request) {
   try {
@@ -16,7 +29,13 @@ export async function POST(request) {
       action,
     } = await request.json();
 
-    if (!session_id || !scene_id || !image_prompt || !character_id || !project_id) {
+    if (
+      !session_id ||
+      !scene_id ||
+      !image_prompt ||
+      !character_id ||
+      !project_id
+    ) {
       return NextResponse.json(
         { error: "Missing required parameters" },
         { status: 400 },
@@ -30,16 +49,19 @@ export async function POST(request) {
     };
 
     // Call Grok Image Edit for character consistency
-    console.log("=== GROK IMAGE GENERATION REQUEST ===");
+    const endpointId = getImageToImageEndpointId();
+
+    console.log("=== IMAGE-TO-IMAGE GENERATION REQUEST ===");
     console.log("Scene ID:", scene_id);
     console.log("Character ID:", character_id);
     console.log("Character reference image URL:", character_image_url);
     console.log("Reference image URL (full):", character_image_url);
-    console.log("Grok settings:", JSON.stringify(settings, null, 2));
+    console.log("Model endpoint:", endpointId);
+    console.log("Settings:", JSON.stringify(settings, null, 2));
     console.log("Image prompt:", image_prompt);
     console.log("=====================================");
 
-    // Build request body for Grok Image Edit
+    // Build request body for image-to-image edit
     const requestBody = {
       prompt: image_prompt,
       image_url: character_image_url, // Character reference for editing
@@ -48,7 +70,7 @@ export async function POST(request) {
       sync_mode: true,
     };
 
-    const imageResponse = await fetch("https://fal.run/xai/grok-imagine-image/edit", {
+    const imageResponse = await fetch(`https://fal.run/${endpointId}`, {
       method: "POST",
       headers: {
         Authorization: `Key ${process.env.FAL_API_KEY}`,
@@ -59,12 +81,14 @@ export async function POST(request) {
 
     if (!imageResponse.ok) {
       const errorText = await imageResponse.text();
-      console.error("Grok API error response:", errorText);
-      throw new Error(`Grok API error (${imageResponse.status}): ${errorText}`);
+      console.error("Image-to-image API error response:", errorText);
+      throw new Error(
+        `Image-to-image API error (${imageResponse.status}): ${errorText}`,
+      );
     }
 
     const imageResult = await imageResponse.json();
-    console.log("=== GROK API RESPONSE ===");
+    console.log("=== IMAGE-TO-IMAGE API RESPONSE ===");
     console.log("Status:", imageResponse.status);
     console.log("Image URL:", imageResult.images?.[0]?.url);
     console.log("Revised prompt:", imageResult.revised_prompt);
@@ -82,44 +106,57 @@ export async function POST(request) {
     const imageFileName = `characters/${character_id}/projects/${project_id}/scene_${scene_id}_${Date.now()}.png`;
     const imageFile = bucket.file(imageFileName);
 
+    const downloadToken = uuidv4();
     await imageFile.save(Buffer.from(imageBuffer), {
-      metadata: { contentType: "image/png" },
-    });
-
-    await imageFile.makePublic();
-    const publicImageUrl = `https://storage.googleapis.com/${bucket.name}/${imageFileName}`;
-
-    // Track costs - Fetch from FAL Pricing API
-    const grokEndpoint = "xai/grok-imagine-image/edit";
-    const pricingResponse = await fetch(`https://api.fal.ai/v1/models/pricing?endpoint_id=${grokEndpoint}`, {
-      headers: {
-        Authorization: `Key ${process.env.FAL_API_KEY}`,
+      metadata: {
+        contentType: "image/png",
+        metadata: {
+          firebaseStorageDownloadTokens: downloadToken,
+          project_id,
+          character_id,
+          session_id,
+          scene_id: String(scene_id),
+        },
       },
     });
 
+    const encodedPath = encodeURIComponent(imageFileName);
+    const publicImageUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodedPath}?alt=media&token=${downloadToken}`;
+
+    // Track costs - Fetch from FAL Pricing API
+    const pricingResponse = await fetch(
+      `https://api.fal.ai/v1/models/pricing?endpoint_id=${endpointId}`,
+      {
+        headers: {
+          Authorization: `Key ${process.env.FAL_API_KEY}`,
+        },
+      },
+    );
+
     if (!pricingResponse.ok) {
       const errorText = await pricingResponse.text();
-      throw new Error(`FAL Pricing API failed (${pricingResponse.status}): ${errorText}`);
+      throw new Error(
+        `FAL Pricing API failed (${pricingResponse.status}): ${errorText}`,
+      );
     }
 
     const pricingData = await pricingResponse.json();
 
-    // Find Grok pricing
-    const grokPrice = pricingData.prices?.find(
-      (p) => p.endpoint_id === grokEndpoint
+    const modelPrice = pricingData.prices?.find(
+      (p) => p.endpoint_id === endpointId,
     );
 
-    if (!grokPrice) {
-      throw new Error("Grok pricing not found in FAL API response");
+    if (!modelPrice) {
+      throw new Error("Image-to-image pricing not found in FAL API response");
     }
 
-    const imageCost = grokPrice.unit_price;
+    const imageCost = modelPrice.unit_price;
 
     if (!imageCost || imageCost <= 0) {
       throw new Error(`Invalid Grok price: ${imageCost}`);
     }
 
-    console.log(`Grok Image Edit cost: $${imageCost} per image (from FAL API)`);
+    console.log(`Image-to-image cost: $${imageCost} per image (from FAL API)`);
 
     const db = getAdminDb();
 
@@ -181,27 +218,37 @@ export async function POST(request) {
     if (character_id && project_id) {
       try {
         const characterRef = db.collection("characters").doc(character_id);
-        const characterProjectRef = characterRef.collection("projects").doc(project_id);
+        const characterProjectRef = characterRef
+          .collection("projects")
+          .doc(project_id);
 
         // Get current character project data
         const characterProjectDoc = await characterProjectRef.get();
         const existingImages = characterProjectDoc.data()?.images || [];
 
         // Add new image for this scene
-        const updatedImages = [...existingImages, {
-          scene_id,
-          image_url: publicImageUrl,
-          storage_path: imageFileName,
-        }];
+        const updatedImages = [
+          ...existingImages,
+          {
+            scene_id,
+            image_url: publicImageUrl,
+            storage_path: imageFileName,
+          },
+        ];
 
-        await characterProjectRef.set({
-          images: updatedImages,
-          image_count: updatedImages.length,
-          status: "image_generated",
-          updated_at: new Date().toISOString(),
-        }, { merge: true });
+        await characterProjectRef.set(
+          {
+            images: updatedImages,
+            image_count: updatedImages.length,
+            status: "image_generated",
+            updated_at: new Date().toISOString(),
+          },
+          { merge: true },
+        );
 
-        console.log(`Updated character ${character_id} project ${project_id} with new image`);
+        console.log(
+          `Updated character ${character_id} project ${project_id} with new image`,
+        );
       } catch (characterError) {
         console.error("Error updating character project:", characterError);
         // Don't fail the whole request if character tracking fails
@@ -215,8 +262,27 @@ export async function POST(request) {
         const projectDoc = await projectRef.get();
 
         if (projectDoc.exists) {
-          const locationMapping = projectDoc.data()?.location_mapping || {};
-          const locationId = locationMapping[scene_id];
+          let locationId = null;
+
+          // Prefer per-scene selection
+          try {
+            const sceneDocSnap = await projectRef
+              .collection("scenes")
+              .doc(String(scene_id))
+              .get();
+            if (sceneDocSnap.exists) {
+              locationId = sceneDocSnap.data()?.location_id || null;
+            }
+          } catch {}
+
+          // Legacy fallback
+          if (!locationId) {
+            const locationMapping = projectDoc.data()?.location_mapping || {};
+            locationId =
+              locationMapping?.[scene_id] ??
+              locationMapping?.[String(scene_id)] ??
+              null;
+          }
 
           if (locationId) {
             const locationRef = db.collection("locations").doc(locationId);
@@ -226,7 +292,10 @@ export async function POST(request) {
               const existingSamples = locationDoc.data()?.sample_images || [];
 
               // Add this image to samples (limit to 10 most recent)
-              const updatedSamples = [publicImageUrl, ...existingSamples].slice(0, 10);
+              const updatedSamples = [publicImageUrl, ...existingSamples].slice(
+                0,
+                10,
+              );
 
               await locationRef.update({
                 sample_images: updatedSamples,
@@ -253,26 +322,34 @@ export async function POST(request) {
           character_reference_url: character_image_url,
           character_id: character_id,
           grok_settings: settings,
-          location: location ? {
-            id: location.id,
-            name: location.name,
-            description: location.description,
-            type: location.type,
-            category: location.category,
-          } : null,
-          action: action ? {
-            id: action.id,
-            name: action.name,
-            description: action.description,
-            pose_variations: action.pose_variations,
-            expression: action.expression,
-          } : null,
+          location: location
+            ? {
+                id: location.id,
+                name: location.name,
+                description: location.description,
+                type: location.type,
+                category: location.category,
+              }
+            : null,
+          action: action
+            ? {
+                id: action.id,
+                name: action.name,
+                description: action.description,
+                pose_variations: action.pose_variations,
+                expression: action.expression,
+              }
+            : null,
           grok_response: {
             revised_prompt: imageResult.revised_prompt || null,
           },
         };
 
-        const sceneRef = db.collection("projects").doc(project_id).collection("scenes").doc(scene_id.toString());
+        const sceneRef = db
+          .collection("projects")
+          .doc(project_id)
+          .collection("scenes")
+          .doc(scene_id.toString());
         const sceneDoc = await sceneRef.get();
 
         if (sceneDoc.exists) {
