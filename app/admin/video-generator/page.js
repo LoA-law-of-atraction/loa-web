@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState, useRef, Fragment } from "react";
+import { Suspense, useEffect, useState, useRef, Fragment } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useToast } from "@/components/admin/Toast";
 import { Trash2, Info } from "lucide-react";
 import { MUSIC_MODELS, getMusicModelById } from "@/data/music-models";
 import TimelineEditor from "@/components/admin/TimelineEditor";
 
-export default function VideoGeneratorPage() {
+function VideoGeneratorContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { alert, confirm } = useToast();
@@ -12286,5 +12286,22 @@ export default function VideoGeneratorPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function VideoGeneratorPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 dark:border-gray-100 mx-auto mb-4"></div>
+            <p className="admin-muted">Loading video generator...</p>
+          </div>
+        </div>
+      }
+    >
+      <VideoGeneratorContent />
+    </Suspense>
   );
 }
