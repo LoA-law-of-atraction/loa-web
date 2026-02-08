@@ -1,6 +1,5 @@
 import {
   getPostBySlug,
-  getAllPublishedSlugs,
   getRelatedPosts,
 } from "@/utils/blogService";
 import {
@@ -14,24 +13,33 @@ import { BLOG_CONFIG, BLOG_CATEGORIES } from "@/lib/constants/blogConfig";
 import BlogPostContent from "@/components/blog/BlogPostContent";
 import RelatedPosts from "@/components/blog/RelatedPosts";
 import { notFound } from "next/navigation";
+import Link from "next/link";
 
-export async function generateStaticParams() {
-  const slugs = await getAllPublishedSlugs();
-  return slugs.map((item) => ({
-    slug: item.slug,
-  }));
-}
+// Make page dynamic to support new posts without rebuild
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }) {
-  const post = await getPostBySlug(params.slug);
+  const { slug } = await params;
+  const post = await getPostBySlug(slug);
   if (!post) return {};
   return generatePostMetadata(post, BLOG_CONFIG.SITE_URL);
 }
 
-export default async function BlogPostPage({ params }) {
-  const post = await getPostBySlug(params.slug);
+export default async function BlogPostPage({ params, searchParams }) {
+  const { slug } = await params;
+  const resolvedSearchParams = await searchParams;
+  const preview = resolvedSearchParams?.preview;
+  const post = await getPostBySlug(slug);
 
-  if (!post || post.status !== "published") {
+  // Allow preview mode for drafts with ?preview=true
+  const isPreview = preview === "true";
+
+  if (!post) {
+    notFound();
+  }
+
+  // Only show published posts, unless in preview mode
+  if (post.status !== "published" && !isPreview) {
     notFound();
   }
 
@@ -56,27 +64,47 @@ export default async function BlogPostPage({ params }) {
 
   return (
     <>
-      {/* Structured Data */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(blogPostingSchema) }}
-      />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
-      />
+      {/* Structured Data - only for published posts */}
+      {post.status === "published" && (
+        <>
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify(blogPostingSchema),
+            }}
+          />
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify(breadcrumbSchema),
+            }}
+          />
+        </>
+      )}
 
-      <article className="min-h-screen bg-white pt-32 pb-16">
+      {/* Draft Preview Banner */}
+      {post.status !== "published" && (
+        <div className="fixed top-0 left-0 right-0 bg-yellow-500 text-black text-center py-2 z-50 font-medium">
+          ⚠️ DRAFT PREVIEW - This post is not published yet
+        </div>
+      )}
+
+      <article
+        className={`min-h-screen bg-white pb-16 ${post.status !== "published" ? "pt-44" : "pt-32"}`}
+      >
         <div className="max-w-3xl mx-auto px-4 sm:px-6">
           {/* Breadcrumbs */}
           <nav className="text-sm text-gray-400 mb-8">
-            <a href="/" className="hover:text-gray-600 transition-colors">
+            <Link href="/" className="hover:text-gray-600 transition-colors">
               Home
-            </a>
+            </Link>
             <span className="mx-2">/</span>
-            <a href="/blog" className="hover:text-gray-600 transition-colors">
+            <Link
+              href="/blog"
+              className="hover:text-gray-600 transition-colors"
+            >
               Blog
-            </a>
+            </Link>
           </nav>
 
           {/* Category */}
@@ -107,15 +135,24 @@ export default async function BlogPostPage({ params }) {
             <span>{readingTime} min read</span>
           </div>
 
-          {/* Featured Image */}
-          {post.featuredImage?.url && (
+          {/* Featured Image - handle both string URL and object format */}
+          {(post.featuredImage?.url ||
+            typeof post.featuredImage === "string") && (
             <div className="mb-10 rounded-lg overflow-hidden">
               <img
-                src={post.featuredImage.url}
-                alt={post.featuredImage.alt || post.title}
+                src={
+                  typeof post.featuredImage === "string"
+                    ? post.featuredImage
+                    : post.featuredImage.url
+                }
+                alt={
+                  typeof post.featuredImage === "string"
+                    ? post.title
+                    : post.featuredImage.alt || post.title
+                }
                 className="w-full h-auto"
-                width={post.featuredImage.width || 1200}
-                height={post.featuredImage.height || 630}
+                width={post.featuredImage?.width || 1200}
+                height={post.featuredImage?.height || 630}
               />
             </div>
           )}
@@ -163,7 +200,7 @@ export default async function BlogPostPage({ params }) {
 
           {/* Back to Blog */}
           <div className="mt-12 pt-8 border-t border-gray-100">
-            <a
+            <Link
               href="/blog"
               className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 font-medium transition-colors"
             >
@@ -181,13 +218,10 @@ export default async function BlogPostPage({ params }) {
                 />
               </svg>
               All posts
-            </a>
+            </Link>
           </div>
         </div>
       </article>
     </>
   );
 }
-
-// Enable ISR (Incremental Static Regeneration)
-export const revalidate = 60; // Revalidate every 60 seconds
