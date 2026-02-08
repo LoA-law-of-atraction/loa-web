@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 
 function StatusBadge({ status }) {
@@ -43,7 +43,7 @@ function StatusBadge({ status }) {
   );
 }
 
-export default function VideoEditorPage() {
+function VideoEditorContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const sessionId = searchParams.get("session");
@@ -372,5 +372,22 @@ export default function VideoEditorPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function VideoEditorPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center py-16">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+            <p className="admin-muted">Loading video editor...</p>
+          </div>
+        </div>
+      }
+    >
+      <VideoEditorContent />
+    </Suspense>
   );
 }
