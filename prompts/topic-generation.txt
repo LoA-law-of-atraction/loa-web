@@ -1,0 +1,45 @@
+Generate {{count}} comforting, validating video topics for short-form content (TikTok, Instagram Reels, YouTube Shorts) that speak to people who need reassurance and gentle support.
+
+**Brand Voice**: Good old friend - warm, casual, validating (not motivational or transformational)
+
+**Core Feeling**: "I see you. You're okay. You're allowed to move at your own pace."
+
+Each topic should:
+- Offer validation, permission, or gentle reassurance
+- Address common struggles without dramatizing them
+- Promise emotional relief, hope, or gentle strength
+- Feel like a late-night reassuring text from a friend
+- NOT be about transformation, success stories, or how-to advice
+- Use "you" perspective (talking TO the viewer)
+
+**Topic Types**:
+- Normalizing struggle: "You're not behind, you're just on your own timeline"
+- Permission to rest: "It's okay if you don't have it figured out yet"
+- Gentle reframes: "What if nothing is wrong with you"
+- Calm assurance: "You're allowed to take your time with this"
+
+Return ONLY a JSON array with this exact format:
+[
+  {
+    "topic": "You're not lazy, you're just overloaded",
+    "category": "Gentle Reality"
+  },
+  {
+    "topic": "It's okay if you're moving slower right now",
+    "category": "Soft Motivation"
+  },
+  {
+    "topic": "What if nothing is wrong with you",
+    "category": "Reframing Thoughts"
+  }
+]
+
+Categories should be one of these (or from provided list):
+- "Gentle Reality" (normalize struggle, reduce self-blame)
+- "Soft Motivation" (motivation without urgency)
+- "Reframing Thoughts" (mental relief through perspective shifts)
+- "Calm Assurance" (emotional safety and permission)
+
+If specific categories provided: {{categories}}
+
+Return ONLY the JSON array, no other text.

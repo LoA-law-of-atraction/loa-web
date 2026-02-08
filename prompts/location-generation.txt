@@ -1,0 +1,71 @@
+Generate {count} unique "SOFT DYSTOPIA" location(s) for a Blade Runner 2049-style video project.
+
+AESTHETIC CONCEPT: "SOFT DYSTOPIA" / "HUMAN SCI-FI"
+🌌 DYSTOPIAN world: overwhelming megacity, rain-soaked, nighttime, industrial tech everywhere
+🫶 WARM soul: intimate human refuges, analog nostalgia, quiet hope within harsh world
+🕯️ EMOTIONAL CONTRAST: "Cold world, warm soul" - this is CRITICAL
+
+VISUAL LANGUAGE:
+- Future imagined from the past: analog tech, CRT glow, retro-future aesthetic
+- Film grain, VHS texture, slight bloom, atmospheric particles
+- NOT sterile modern sci-fi - 80s/90s vision of dystopian future
+- Dystopian scale but human intimacy
+
+COLOR PALETTE (80% cold / 20% warm):
+COLD BASE (80%): Deep navy, charcoal, oil-black, asphalt gray, rainy blues
+WARM ACCENTS (20%): Amber, soft orange, tungsten light, muted gold, dusty peach, occasional warm red
+❌ AVOID: Pure cyberpunk magenta/cyan overload
+
+LIGHTING REQUIREMENTS:
+- Diffused neon through rain/fog (never sharp)
+- Warm tungsten/amber light sources in intimate spaces
+- Cold blue/gray dominant, warm orange/amber accents
+- "The world is harsh, but you're safe here"
+
+DYSTOPIAN ELEMENTS (must include):
+- Towering megacity scale, overwhelming urban density
+- Heavy rain or wet surfaces with reflections
+- Nighttime/perpetual darkness
+- Industrial, oppressive architecture
+- Tech everywhere (CRT monitors, screens, cables, analog UI)
+
+WARM ELEMENTS (must balance):
+- Small intimate human spaces within vast city
+- Warm light sources: window glow, street lamps, interior lights
+- Analog/retro tech creating nostalgia (CRT vibes)
+- Sense of shelter, hope, softness despite harsh environment
+
+REQUIREMENTS:
+- Gritty, street-level urban environments (NOT clean spaces)
+- Each location must show BOTH dystopian scale AND warm intimacy
+- Rich sensory details: lighting, atmosphere, textures
+- Intimate, contemplative spaces for quiet human moments
+- Rain, fog, or atmospheric particles preferred
+
+{typeConstraint}
+
+LOCATION TYPES TO CHOOSE FROM:
+- dark_alley, rooftop, elevated_walkway, street_corner, backstreet
+- fire_escape, train_platform, bar_interior, balcony, pedestrian_crossing
+- maintenance_corridor, rooftop_garden, underpass, loading_dock, market_stall
+- neon_tunnel, industrial_bridge, subway_platform, parking_garage, abandoned_building
+
+Return ONLY a valid JSON array with this exact structure:
+[
+  {
+    "id": "unique_location_id_with_underscores",
+    "type": "location_type",
+    "name": "Location Name (2-4 words)",
+    "description": "Detailed description (2-3 sentences) with vivid sensory details about the environment, lighting, and atmosphere. Include specific visual elements like neon colors, rain, steam, materials.",
+    "visual_characteristics": {
+      "lighting": ["array of lighting descriptions"],
+      "atmosphere": ["array of atmospheric characteristics"],
+      "key_elements": ["array of key visual elements"]
+    },
+    "tags": ["array of tags"]
+  }
+]
+
+IMPORTANT: lighting and atmosphere must be arrays (not strings)
+
+CRITICAL: Return ONLY the JSON array, no explanation or markdown.

@@ -93,6 +93,7 @@ export async function POST(request) {
             "[Image Upload] Failed to store image:",
             imageError.message,
           );
+          console.error("[Image Upload] Full error:", imageError);
           featuredImageUrl = body.featuredImage;
         }
       } else {

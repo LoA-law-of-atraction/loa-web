@@ -11,8 +11,8 @@ export default function AdminPage() {
   }, [router]);
 
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center">
-      <p className="text-gray-500">Redirecting...</p>
+    <div className="admin-card-solid max-w-md mx-auto p-6 text-center">
+      <p className="admin-muted">Redirecting...</p>
     </div>
   );
 }

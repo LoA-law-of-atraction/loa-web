@@ -1,0 +1,152 @@
+CHARACTER CONSISTENCY (CRITICAL - MUST PRESERVE):
+- The character's CLOTHING, HAIR, and PHYSICAL APPEARANCE must remain EXACTLY as shown in reference
+- Character's DARK COAT must stay DARK (charcoal/dark gray) - NOT pink, NOT purple, NOT magenta
+- Rim lighting (pink/magenta/cyan) appears ONLY as edge highlights/outlines - NOT as clothing color
+- The coat's BASE COLOR stays dark; rim light is just a glow on the edges
+- Location lighting affects BACKGROUND only, NOT the character's clothing colors
+- The character is the ANCHOR - environment changes, character design does NOT
+
+VISUAL LANGUAGE - "SOFT DYSTOPIA" / "HUMAN SCI-FI":
+🌌 DYSTOPIAN world: overwhelming megacity, rain-soaked, nighttime, industrial tech everywhere
+🫶 WARM soul: intimate human refuges, analog nostalgia, quiet hope within harsh world
+🕯️ EMOTIONAL CONTRAST: "Cold world, warm soul" - this is CRITICAL
+
+- A future imagined through the past - Blade Runner 2049 filtered through ANALOG MEMORIES
+- RETRO-FUTURE AESTHETIC: 80s/90s vision of dystopian future, NOT sterile modern sci-fi
+- ANALOG TECH: film grain, VHS texture, CRT glow, practical neon tubes, warm imperfection
+- Film grain, VHS noise, slight bloom, atmospheric particles
+- QUIET LONELINESS: contemplative solitude in overwhelming city (NOT dramatic action)
+- Dystopian scale but human intimacy - this balance is essential
+
+CORE FEELING - SOFT DYSTOPIA:
+- Dystopian world: towering megacity, rain, nighttime, industrial, oppressive
+- Warm human moments: small refuges, analog tech creating nostalgia, quiet hope
+- CONTEMPLATIVE and INTROSPECTIVE, not action-packed
+- INTIMATE REFUGE WITHIN HARSH WORLD - both must be present
+- The multiverse concept: seeing a better version of yourself in dystopian future
+
+COLOR PALETTE (80% COLD / 20% WARM) - CRITICAL:
+COLD BASE (80%): Deep navy, charcoal, oil-black, asphalt gray, rainy blues
+- Overwhelming environment, megacity scale, rain-soaked streets, industrial architecture
+WARM ACCENTS (20%): Amber, soft orange, tungsten light, muted gold, dusty peach, occasional warm red
+- Character's face ALWAYS lit by warm light, interior refuges, human shelter moments
+❌ AVOID: Pure cyberpunk magenta/cyan overload - keep palette grounded
+
+VISUAL STYLE - SOFT DYSTOPIA AESTHETIC:
+- **FLAT GRAPHIC ANIME STYLE** with SOFT DYSTOPIA mood
+- **Cel-shaded with defined edges** but ATMOSPHERIC and MOODY
+- Bold character outlines with strong linework
+- Blade Runner 2049 / sci-fi noir aesthetic - dystopian, moody, rain-soaked
+- Multiverse concept: character in alternate reality, speaking across dimensions
+- **Film grain / VHS texture** - heavy analog texture throughout
+- **Slight blur / bloom effect** around lights - nostalgic, not sharp
+- **Atmospheric particles**: fog, rain, dust creating depth
+- **Retro-future tech**: CRT monitors, analog UI, vintage displays, rotary phones
+- "Future imagined from the past" - 80s/90s vision of dystopian future
+- Dark backgrounds with diffused neon accents (NOT sharp, always through atmosphere)
+- **High contrast but ATMOSPHERIC** - deep blacks with glowing neon halos
+- Dystopian scale in background (towering megacity, rain-soaked streets)
+- Warm intimate lighting on character within cold harsh world
+
+COMPOSITION RULES (CRITICAL - KEEP IT CLEAN):
+- **NO holographic displays, floating interfaces, or tech panels** (too overused, not Blade Runner)
+- DO NOT show phone/laptop screens with visible content
+- DO NOT scatter multiple props (no "surrounded by coffee cups/books/items")
+- Minimal props: ONE key object maximum
+- Focus on CHARACTER and ENVIRONMENT (streets, rain, neon signs)
+- Clean, uncluttered compositions that feel natural and cinematic
+- Describe the FEELING and ATMOSPHERE, not literal tech elements
+- **Blade Runner = streets + neon + rain, NOT clean apartments + holograms**
+
+SOFT DYSTOPIA ENVIRONMENT REQUIREMENTS:
+MUST INCLUDE BOTH:
+1. DYSTOPIAN ELEMENTS:
+   - Towering megacity scale, overwhelming urban density
+   - Heavy rain or wet surfaces with reflections
+   - Nighttime/perpetual darkness atmosphere
+   - Industrial, oppressive architecture
+   - Tech everywhere (CRT monitors, screens, cables, analog UI)
+
+2. WARM INTIMATE ELEMENTS:
+   - Small human spaces within vast city (phone booth, bus stop shelter, diner booth)
+   - Warm light sources: tungsten lamps, interior lights, street lamps casting amber glow
+   - Analog/retro tech creating nostalgia (CRT vibes, rotary phones, vintage machines)
+   - Sense of shelter, hope, softness despite harsh environment
+   - Steam from vents, warm interior glow through windows
+
+ENVIRONMENT EXAMPLES:
+Streets: Rain-soaked dark alleys with DIFFUSED blue neon through fog + WARM amber streetlamp creating refuge, phone booth with warm interior light in cold rainy street, bus stop shelter lit by warm tungsten against cold megacity
+Rooftops/Elevated: Fire escape with warm hanging bulb overlooking COLD rain-soaked cityscape, rooftop under rain with warm shelter light, elevated walkway with character in pool of warm light
+Indoor Refuges: Retro diner booth with WARM amber lighting + COLD neon city through rain-streaked window, laundromat with vintage machines and CRT TV glow, small apartment with warm lamp + towering megacity visible outside
+
+AVOID: Clean modern spaces, holographic displays, sterile interfaces, bright lighting, sunny scenes
+FOCUS: Gritty dystopian street-level with small warm refuges, diffused neon through rain/fog, analog retro tech, film grain, atmospheric haze
+
+LIGHTING PHILOSOPHY - "Cold World, Warm Soul":
+- Warm tungsten/amber light on character's face (ALWAYS, even in cold environments)
+- Neon signs DIFFUSED through rain/fog (never sharp or harsh)
+- "The world is harsh, but you're safe here" - lighting conveys this
+- Background: Cold blue/gray/purple neon creating dystopian atmosphere
+- Foreground: Warm orange/amber/tungsten light creating refuge on character
+- Practical NEON TUBE lighting with atmospheric diffusion, CRT glow, analog imperfections
+- Rain-reflective surfaces, volumetric light rays, heavy atmospheric haze
+- Film grain texture, VHS noise, slight bloom effect
+- ANALOG WARMTH: imperfect glows, color bleed, nostalgic vintage feel (NOT digital perfection)
+
+ABSOLUTELY MANDATORY - END EVERY IMAGE PROMPT WITH THIS EXACT TEXT:
+"Blade Runner 2049 soft dystopia aesthetic - cold world, warm soul. Flat graphic anime style with DIFFUSED neon through rain/fog (never sharp), moody sci-fi atmosphere. DYSTOPIAN SCALE: towering megacity, rain-soaked streets, nighttime, industrial architecture, overwhelming urban density. WARM INTIMACY: character's face lit by warm tungsten/amber light (ALWAYS), small refuge within harsh world, quiet hope and nostalgia. 80% COLD palette (deep navy, charcoal, oil-black, asphalt gray, rainy blues) + 20% WARM accents (amber, soft orange, tungsten glow, muted gold on character). Film grain texture, VHS noise, slight bloom effect, atmospheric particles (fog, rain, dust). Retro-future aesthetic: future imagined from the past, 80s/90s vision of dystopian future, analog tech (CRT monitors, vintage displays, retro UI), NOT sterile modern sci-fi. Cel-shaded flat graphic anime style with bold character outlines. Strong neon rim lighting on character edges (pink, magenta, cyan) but DIFFUSED in environment through atmospheric haze. Moody color grading with deep blacks and glowing neon halos. CONTEMPLATIVE and INTROSPECTIVE mood - quiet lonely moments in overwhelming city, dystopian yet intimate, future that came back to reassure you. Vertical 9:16 format. No text."
+
+FORBIDDEN (WILL BE REJECTED):
+- Changing character's clothing color based on location lighting (CRITICAL: character appearance is fixed)
+- Letting location lighting change the character's coat/jacket/outfit colors
+- **Sharp, harsh neon lighting (MUST be diffused through rain/fog/atmosphere)**
+- **Character face without warm light (MUST have warm tungsten/amber on face ALWAYS)**
+- **Missing dystopian elements (MUST have megacity scale, rain, nighttime, industrial)**
+- **Missing warm refuge elements (MUST have warm light, shelter feeling, quiet hope)**
+- **Bright daytime scenes (MUST be night/perpetual darkness)**
+- **Clean modern environments (MUST be gritty dystopian street-level)**
+- **No atmospheric particles (MUST have fog, rain, dust, film grain, VHS texture)**
+- **Sterile modern sci-fi (MUST be retro-future: CRT, analog tech, 80s/90s vision)**
+- 3D render look or realistic CGI (must be flat 2D anime)
+- Soft painterly style (must be graphic anime with defined lines)
+- Pure cold palette with no warmth (must be 80% cold / 20% warm)
+- Pure warm palette with no dystopia (must have cold harsh world + warm soul)
+- Medieval, fantasy, or non-futuristic settings
+- Visible phone/laptop screens showing specific content
+- Multiple scattered props creating clutter
+- Missing bold rim lighting on character edges
+- Holographic displays or floating interfaces (use analog tech instead)
+
+GOOD VS BAD EXAMPLES - SOFT DYSTOPIA:
+
+❌ BAD: "sleek modern digital future with perfect clean lighting"
+✅ GOOD: "rain-soaked dystopian megacity with diffused neon through fog, character lit by warm tungsten lamp - retro-future with film grain and VHS texture"
+
+❌ BAD: "bright hopeful future with clean environment"
+✅ GOOD: "overwhelming dystopian cityscape at night with rain, but character in warm amber-lit refuge - cold world, warm soul"
+
+❌ BAD: "sharp bright neon signs in clear night"
+✅ GOOD: "neon signs diffused through heavy rain and fog, creating atmospheric glow - never sharp or harsh"
+
+❌ BAD: "uniformly cold blue cyberpunk with no warmth"
+✅ GOOD: "80% cold navy/charcoal environment + 20% warm amber/orange on character's face - essential contrast"
+
+❌ BAD: "character in sterile modern apartment with holographic displays"
+✅ GOOD: "character in small retro diner booth under warm tungsten light, towering rain-soaked megacity visible through window, CRT TV glowing nearby"
+
+❌ BAD: "character in purple jacket affected by location lighting"
+✅ GOOD: "The same character in their dark coat, face illuminated by warm amber lamp, cold blue neon diffused in rainy background"
+
+❌ BAD: "bright daytime city street with sunshine"
+✅ GOOD: "nighttime rain-soaked alley with diffused cyan neon overhead, warm orange streetlamp creating pool of light around character"
+
+❌ BAD: "dramatic action scene with movement"
+✅ GOOD: "quiet contemplative moment - character standing still in phone booth with warm interior light, cold rainy megacity beyond glass"
+
+❌ BAD: "clean modern tech everywhere"
+✅ GOOD: "retro analog tech - CRT monitors with green phosphor glow, vintage rotary phone, worn machines with character and soul"
+
+❌ BAD: "no atmosphere, clean and clear"
+✅ GOOD: "heavy atmospheric haze, film grain, rain particles, fog diffusing neon, VHS texture throughout - future imagined from the past"
+
+Keep it DYSTOPIAN yet INTIMATE - overwhelming harsh world with small warm human refuges. Focus on the "cold world, warm soul" emotional contrast.

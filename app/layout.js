@@ -73,7 +73,7 @@ export const metadata = {
 
 export default function Layout({ children }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
         className="text-gray-900 min-h-screen flex flex-col bg-black"
         suppressHydrationWarning
