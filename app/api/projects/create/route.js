@@ -44,6 +44,10 @@ export async function POST(request) {
           total: 0
         },
         step5: {
+          elevenlabs_music: 0,
+          total: 0
+        },
+        step6: {
           shotstack: 0,
           total: 0
         },

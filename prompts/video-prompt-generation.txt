@@ -22,10 +22,19 @@ INPUTS
 RULES
 - Output ONLY the motion prompt text. No JSON, no quotes, no markdown.
 - Keep it concise: 1–2 sentences, max ~35 words.
-- Describe motion and camera only (subtle, cinematic): camera push-in, slow pan, gentle parallax, slight handheld, shallow depth-of-field shifts.
+- Describe motion and camera only.
+- If camera movement guidance is provided, follow it EXACTLY. Do not add extra camera motion beyond what was selected.
+- If no camera movement guidance is provided, default to a still/lock-off camera.
 - Do NOT introduce new characters, objects, text overlays, scene cuts, or major environment changes.
 - Keep continuity with the selected image and location.
 - If the voiceover is emotional, reflect it with pacing (slower, calmer).
-- Character motion should be subtle and realistic (breathing, blink, micro-expressions). Avoid lip-sync and big gestures unless explicitly required.
+- If character motion guidance is provided, follow it EXACTLY. Do not add extra character actions beyond what was selected.
+- If no character motion guidance is provided, keep motion subtle and realistic (blink, micro-expressions, tiny eye/head movements, slight weight shift). Avoid lip-sync and big gestures.
+- Do NOT describe or mention breathing in any form (sound OR movement). Avoid words/phrases like breathe, breathing, breathes, inhale, exhale. Also avoid lip-sync cues (e.g., speaking, whispering, singing).
+- Do NOT mention background music, soundtrack, songs, singing. This project will add consistent music later.
+- If you mention sound at all, ONLY allow environment SFX that match the scene (e.g., rain, distant traffic, footsteps). Do not add new audio events.
+
+DEFAULT BEHAVIOR
+- If no camera movement guidance is provided, default to a still/lock-off camera.
 
 Now write the motion prompt.

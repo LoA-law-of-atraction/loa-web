@@ -64,6 +64,26 @@ export default function AdminLayout({ children }) {
       match: (p) => p.startsWith("/admin/actions"),
     },
     {
+      href: "/admin/camera-movements",
+      label: "Camera Movements",
+      match: (p) => p.startsWith("/admin/camera-movements"),
+    },
+    {
+      href: "/admin/character-motions",
+      label: "Character Motions",
+      match: (p) => p.startsWith("/admin/character-motions"),
+    },
+    {
+      href: "/admin/music-themes",
+      label: "Music Themes",
+      match: (p) => p.startsWith("/admin/music-themes"),
+    },
+    {
+      href: "/admin/instruments",
+      label: "Instruments",
+      match: (p) => p.startsWith("/admin/instruments"),
+    },
+    {
       href: "/admin/topics",
       label: "Topics",
       match: (p) => p.startsWith("/admin/topics"),
@@ -396,8 +416,16 @@ export default function AdminLayout({ children }) {
             </div>
           </header>
 
-          {/* Main Content */}
-          <main className="max-w-6xl mx-auto px-4 py-8">{children}</main>
+          {/* Main Content - full screen for video generator */}
+          <main
+            className={`mx-auto px-4 py-8 ${
+              pathname?.startsWith("/admin/video-generator")
+                ? "max-w-full min-h-[calc(100vh-4rem)]"
+                : "max-w-6xl"
+            }`}
+          >
+            {children}
+          </main>
         </div>
       </ToastProvider>
     </ThemeProvider>

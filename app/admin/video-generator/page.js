@@ -3,11 +3,20 @@
 import { useEffect, useState, useRef, Fragment } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useToast } from "@/components/admin/Toast";
+import { Trash2, Info } from "lucide-react";
+import { MUSIC_MODELS, getMusicModelById } from "@/data/music-models";
+import TimelineEditor from "@/components/admin/TimelineEditor";
 
 export default function VideoGeneratorPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { alert, confirm } = useToast();
+
+  const DEFAULT_VIDEO_NEGATIVE_PROMPT =
+    "lip-sync/speaking, breathing/chest rise-fall, background music/soundtrack/singing, text overlays, logos/watermarks, flicker/jitter, warping/morphing, camera shake";
+
+  const DEFAULT_MUSIC_NEGATIVE_PROMPT =
+    "meditation, spa, relaxation, calming, soothing, therapeutic, ambient chill, lo-fi, wellness, sound healing, binaural, nature sounds, yoga, mindfulness, zen, peaceful, serene, tranquil, massage, healing music, spa music, new age, chillout, ASMR";
 
   // Initialize step from URL if available to prevent flash on refresh
   const initialStep = (() => {
@@ -47,12 +56,16 @@ export default function VideoGeneratorPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [generatedTopics, setGeneratedTopics] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [loadingProjects, setLoadingProjects] = useState(true);
+  const [projectsError, setProjectsError] = useState(null);
   const [loadingProject, setLoadingProject] = useState(false);
+  const [firebaseEnv, setFirebaseEnv] = useState(null);
   const [currentProjectId, setCurrentProjectId] = useState(null);
   const [currentProjectName, setCurrentProjectName] = useState("");
   const [editingProjectName, setEditingProjectName] = useState(false);
   const [openProjectMenuId, setOpenProjectMenuId] = useState(null);
   const [deletingProjectId, setDeletingProjectId] = useState(null);
+  const [deletingVideoVersionKey, setDeletingVideoVersionKey] = useState(null);
   const projectMenuRef = useRef(null);
   const [sceneCount, setSceneCount] = useState(4); // Default 4 scenes
   const [locationCount, setLocationCount] = useState(null); // null = all different, number = that many locations
@@ -122,6 +135,8 @@ export default function VideoGeneratorPage() {
     useState(false);
   const [characterMotionPickerSceneId, setCharacterMotionPickerSceneId] =
     useState(null);
+  const [videoPromptTemperatureByScene, setVideoPromptTemperatureByScene] =
+    useState({}); // { scene_id: 0.8 }
 
   // Step 2: Script Generation
   const [scriptData, setScriptData] = useState(null);
@@ -145,6 +160,10 @@ export default function VideoGeneratorPage() {
     useState(null);
   const [images, setImages] = useState([]); // [{ scene_id, image_url }]
   const [fluxProCost, setFluxProCost] = useState(null); // Dynamic cost from API (NO FALLBACK)
+  const [fluxProEndpointId, setFluxProEndpointId] = useState(null);
+  const [multipleAnglesUnitCost, setMultipleAnglesUnitCost] = useState(null);
+  const [multipleAnglesEndpointId, setMultipleAnglesEndpointId] =
+    useState(null);
   const [showFluxSettings, setShowFluxSettings] = useState(false);
   const [fluxSettings, setFluxSettings] = useState({
     output_format: "png",
@@ -152,10 +171,22 @@ export default function VideoGeneratorPage() {
   });
   const imagePromptSaveTimers = useRef({});
   const motionPromptSaveTimers = useRef({});
+  const videoNegativePromptSaveTimers = useRef({});
   const videoDurationSaveTimers = useRef({});
   const [selectedReferenceImages, setSelectedReferenceImages] = useState({}); // Track selected reference per scene: { sceneId: imageUrl }
   const [selectedSceneImages, setSelectedSceneImages] = useState({}); // Track selected generated image index per scene: { sceneId: imageIndex }
   const [expandedImage, setExpandedImage] = useState(null); // Track expanded full-size image { sceneId, imageIndex, url }
+  const [angleEditModal, setAngleEditModal] = useState(null); // { sceneId, imageIndex, url }
+  const [angleEditSettings, setAngleEditSettings] = useState({
+    horizontal_angle: 0,
+    vertical_angle: 0,
+    zoom: 5,
+    num_images: 1,
+  });
+  const [editingImageAngleKey, setEditingImageAngleKey] = useState(null);
+  const [imageDetailsModal, setImageDetailsModal] = useState(null);
+  const [loadingImageDetails, setLoadingImageDetails] = useState(false);
+  const [imageDetailsError, setImageDetailsError] = useState(null);
   const [showCharacterReferenceModal, setShowCharacterReferenceModal] =
     useState(false);
   const [characterReferenceModalSceneId, setCharacterReferenceModalSceneId] =
@@ -169,11 +200,57 @@ export default function VideoGeneratorPage() {
   const [generatingVideoSceneId, setGeneratingVideoSceneId] = useState(null);
   const [generatingVideoPromptSceneId, setGeneratingVideoPromptSceneId] =
     useState(null);
-  const [expandedI2VSceneId, setExpandedI2VSceneId] = useState(null);
+  const [videoDetailsModal, setVideoDetailsModal] = useState(null);
+  const [loadingVideoDetails, setLoadingVideoDetails] = useState(false);
+  const [videoDetailsError, setVideoDetailsError] = useState(null);
+  const [musicDetailsModal, setMusicDetailsModal] = useState(null); // music object for details modal
   const [voiceoverUrl, setVoiceoverUrl] = useState(null);
   const [falVideoUnitCost, setFalVideoUnitCost] = useState(null);
   const [falVideoPricingUnit, setFalVideoPricingUnit] = useState(null);
   const [loadingFalVideoPricing, setLoadingFalVideoPricing] = useState(false);
+
+  // Fill missing per-scene negative prompts with a sensible default (do not overwrite explicit empty strings)
+  useEffect(() => {
+    if (step !== 4) return;
+    if (!currentProjectId) return;
+    if (!scriptData?.scenes?.length) return;
+
+    const scenesNeedingDefault = scriptData.scenes.filter(
+      (s) =>
+        s &&
+        (s.video_negative_prompt === undefined ||
+          s.video_negative_prompt === null),
+    );
+    if (scenesNeedingDefault.length === 0) return;
+
+    const nextScenes = scriptData.scenes.map((s) => {
+      if (!s) return s;
+      if (
+        s.video_negative_prompt === undefined ||
+        s.video_negative_prompt === null
+      ) {
+        return { ...s, video_negative_prompt: DEFAULT_VIDEO_NEGATIVE_PROMPT };
+      }
+      return s;
+    });
+    setScriptData({ ...scriptData, scenes: nextScenes });
+
+    // Best-effort persist (non-blocking)
+    try {
+      const persistPromises = scenesNeedingDefault
+        .filter((s) => s?.id)
+        .map((s) =>
+          fetch(`/api/projects/${currentProjectId}/scenes/${s.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              video_negative_prompt: DEFAULT_VIDEO_NEGATIVE_PROMPT,
+            }),
+          }),
+        );
+      Promise.allSettled(persistPromises).catch(() => {});
+    } catch {}
+  }, [step, currentProjectId, scriptData?.scenes?.length]);
 
   const clampDurationSeconds = (value, fallback = 8) => {
     const n = Number(value);
@@ -217,6 +294,11 @@ export default function VideoGeneratorPage() {
     return out;
   };
 
+  const toSceneKey = (id) => {
+    if (id === null || id === undefined) return null;
+    return String(id);
+  };
+
   const getAllVideoUrlsForScene = (scene, fallbackSelectedVideoUrl) => {
     const urls = Array.isArray(scene?.video_urls) ? scene.video_urls : [];
     return uniqueStringsPreserveOrder([
@@ -227,10 +309,10 @@ export default function VideoGeneratorPage() {
   };
 
   const getSelectedVideoUrlForScene = (scene) => {
-    const sceneId = scene?.id;
+    const sceneId = toSceneKey(scene?.id);
     if (!sceneId) return null;
     const fromVideosState = videos.find(
-      (v) => v.scene_id === sceneId,
+      (v) => toSceneKey(v?.scene_id) === sceneId,
     )?.video_url;
 
     const allUrls = getAllVideoUrlsForScene(scene, fromVideosState);
@@ -257,18 +339,179 @@ export default function VideoGeneratorPage() {
         (Array.isArray(scene?.video_urls) && scene.video_urls.length > 0
           ? scene.video_urls[scene.video_urls.length - 1]
           : null);
-      if (scene?.id && url) out.push({ scene_id: scene.id, video_url: url });
+      const sid = toSceneKey(scene?.id);
+      if (sid && url) out.push({ scene_id: sid, video_url: url });
     }
     return out.sort((a, b) => Number(a.scene_id) - Number(b.scene_id));
+  };
+
+  const getLibraryItemNameById = (items, id) => {
+    if (!id) return null;
+    const normalized = String(id);
+    const found = (items || []).find((it) => String(it?.id) === normalized);
+    return found?.name || null;
+  };
+
+  const stringifyJson = (value) => {
+    try {
+      return JSON.stringify(value ?? null, null, 2);
+    } catch {
+      return String(value);
+    }
+  };
+
+  const loadVideoDetailsForScene = async (sceneId, videoUrl) => {
+    const sid = toSceneKey(sceneId);
+    if (!sid || !videoUrl) return;
+    if (!currentProjectId) {
+      await alert("No active project selected", "error");
+      return;
+    }
+
+    setVideoDetailsError(null);
+    setLoadingVideoDetails(true);
+    try {
+      const response = await fetch(
+        `/api/projects/${currentProjectId}/scenes/${sid}`,
+        { cache: "no-store" },
+      );
+      const result = await response.json();
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || "Failed to load scene metadata");
+      }
+
+      const scene = result.scene || null;
+      const history = Array.isArray(scene?.video_generation_history)
+        ? scene.video_generation_history
+        : [];
+      const matched = history.find((h) => h?.video_url === videoUrl) || null;
+      const last = scene?.last_video_generation_metadata || null;
+      const metadata =
+        matched || (last?.video_url === videoUrl ? last : null) || null;
+
+      setVideoDetailsModal((prev) => {
+        if (!prev) return prev;
+        if (prev.sceneId !== sid || prev.videoUrl !== videoUrl) return prev;
+        return {
+          sceneId: sid,
+          videoUrl,
+          scene,
+          metadata,
+        };
+      });
+    } catch (error) {
+      console.error("Error loading video details:", error);
+      setVideoDetailsError(error.message || "Failed to load video details");
+    } finally {
+      setLoadingVideoDetails(false);
+    }
+  };
+
+  const handleOpenVideoDetailsModal = async (sceneId, videoUrl) => {
+    const sid = toSceneKey(sceneId);
+    if (!sid || !videoUrl) return;
+    setVideoDetailsModal({
+      sceneId: sid,
+      videoUrl,
+      scene: null,
+      metadata: null,
+    });
+    await loadVideoDetailsForScene(sid, videoUrl);
+  };
+
+  const handleCloseVideoDetailsModal = () => {
+    setVideoDetailsModal(null);
+    setVideoDetailsError(null);
+    setLoadingVideoDetails(false);
+  };
+
+  const loadImageDetailsForScene = async (
+    sceneId,
+    imageUrl,
+    { imageIndex = null, localPrompt = null } = {},
+  ) => {
+    const sid = toSceneKey(sceneId);
+    if (!sid || !imageUrl) return;
+    if (!currentProjectId) {
+      await alert("No active project selected", "error");
+      return;
+    }
+
+    setImageDetailsError(null);
+    setLoadingImageDetails(true);
+    try {
+      const response = await fetch(
+        `/api/projects/${currentProjectId}/scenes/${sid}`,
+        { cache: "no-store" },
+      );
+      const result = await response.json();
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || "Failed to load scene metadata");
+      }
+
+      const scene = result.scene || null;
+      const history = Array.isArray(scene?.generation_history)
+        ? scene.generation_history
+        : [];
+      const matched = history.find((h) => h?.image_url === imageUrl) || null;
+      const last = scene?.last_generation_metadata || null;
+      const metadata =
+        matched || (last?.image_url === imageUrl ? last : null) || null;
+
+      setImageDetailsModal((prev) => {
+        if (!prev) return prev;
+        if (prev.sceneId !== sid || prev.imageUrl !== imageUrl) return prev;
+        return {
+          sceneId: sid,
+          imageUrl,
+          imageIndex,
+          localPrompt,
+          scene,
+          metadata,
+        };
+      });
+    } catch (error) {
+      console.error("Error loading image details:", error);
+      setImageDetailsError(error.message || "Failed to load image details");
+    } finally {
+      setLoadingImageDetails(false);
+    }
+  };
+
+  const handleOpenImageDetailsModal = async (
+    sceneId,
+    imageUrl,
+    { imageIndex = null, localPrompt = null } = {},
+  ) => {
+    const sid = toSceneKey(sceneId);
+    if (!sid || !imageUrl) return;
+    setImageDetailsModal({
+      sceneId: sid,
+      imageUrl,
+      imageIndex,
+      localPrompt,
+      scene: null,
+      metadata: null,
+    });
+    await loadImageDetailsForScene(sid, imageUrl, { imageIndex, localPrompt });
+  };
+
+  const handleCloseImageDetailsModal = () => {
+    setImageDetailsModal(null);
+    setImageDetailsError(null);
+    setLoadingImageDetails(false);
   };
 
   const handleSelectVideoForScene = async (sceneId, videoUrl) => {
     if (!sceneId || !videoUrl) return;
 
+    const sid = toSceneKey(sceneId);
+    if (!sid) return;
+
     setScriptData((prev) => {
       if (!prev?.scenes) return prev;
       const nextScenes = prev.scenes.map((s) => {
-        if (s.id !== sceneId) return s;
+        if (toSceneKey(s.id) !== sid) return s;
         const existingUrls = Array.isArray(s.video_urls) ? s.video_urls : [];
         const nextUrls = uniqueStringsPreserveOrder([
           ...existingUrls,
@@ -285,7 +528,7 @@ export default function VideoGeneratorPage() {
 
     setVideos((prev) => {
       const byScene = new Map((prev || []).map((v) => [v.scene_id, v]));
-      byScene.set(sceneId, { scene_id: sceneId, video_url: videoUrl });
+      byScene.set(sid, { scene_id: sid, video_url: videoUrl });
       return Array.from(byScene.values()).sort(
         (a, b) => Number(a.scene_id) - Number(b.scene_id),
       );
@@ -293,7 +536,7 @@ export default function VideoGeneratorPage() {
 
     try {
       if (!currentProjectId) return;
-      await fetch(`/api/projects/${currentProjectId}/scenes/${sceneId}`, {
+      await fetch(`/api/projects/${currentProjectId}/scenes/${sid}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ selected_video_url: videoUrl }),
@@ -303,9 +546,145 @@ export default function VideoGeneratorPage() {
     }
   };
 
-  // Step 5: Final Video
+  const handleRemoveVideoVersion = async (sceneId, videoUrl) => {
+    if (!sceneId || !videoUrl) return;
+    if (!currentProjectId) {
+      await alert("No active project selected", "error");
+      return;
+    }
+
+    const sid = toSceneKey(sceneId);
+    if (!sid) return;
+
+    const confirmed = await confirm(
+      "Delete this video version? This will also remove it from Firebase Storage.",
+    );
+    if (!confirmed) return;
+
+    const deletingKey = `${sid}::${videoUrl}`;
+    setDeletingVideoVersionKey(deletingKey);
+
+    try {
+      await fetch("/api/video-generator/delete-video", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          video_url: videoUrl,
+          project_id: currentProjectId,
+          scene_id: sid,
+        }),
+      });
+
+      let nextSelectedUrl = null;
+      let nextVideoUrls = [];
+
+      setScriptData((prev) => {
+        if (!prev?.scenes) return prev;
+        const nextScenes = prev.scenes.map((s) => {
+          if (toSceneKey(s.id) !== sid) return s;
+
+          const existingUrls = Array.isArray(s.video_urls) ? s.video_urls : [];
+          nextVideoUrls = existingUrls.filter((u) => u !== videoUrl);
+          const currentSelected = getSelectedVideoUrlForScene(s);
+
+          nextSelectedUrl =
+            currentSelected === videoUrl
+              ? nextVideoUrls.length > 0
+                ? nextVideoUrls[nextVideoUrls.length - 1]
+                : null
+              : currentSelected;
+
+          return {
+            ...s,
+            video_urls: nextVideoUrls,
+            selected_video_url: nextSelectedUrl,
+          };
+        });
+        return { ...prev, scenes: nextScenes };
+      });
+
+      setVideos((prev) => {
+        const byScene = new Map((prev || []).map((v) => [v.scene_id, v]));
+        const current = byScene.get(sid);
+
+        if (current?.video_url === videoUrl) {
+          if (nextSelectedUrl) {
+            byScene.set(sid, {
+              scene_id: sid,
+              video_url: nextSelectedUrl,
+            });
+          } else {
+            byScene.delete(sid);
+          }
+        }
+
+        return Array.from(byScene.values()).sort(
+          (a, b) => Number(a.scene_id) - Number(b.scene_id),
+        );
+      });
+
+      await fetch(`/api/projects/${currentProjectId}/scenes/${sid}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          video_urls: nextVideoUrls,
+          selected_video_url: nextSelectedUrl,
+        }),
+      });
+
+      await alert("Video version deleted", "success");
+    } catch (error) {
+      console.error("Error deleting video version:", error);
+      await alert("Failed to delete video version", "error");
+    } finally {
+      setDeletingVideoVersionKey(null);
+    }
+  };
+
+  // Step 5: Background Music
+  const [backgroundMusicUrl, setBackgroundMusicUrl] = useState(null);
+  const [backgroundMusicPrompt, setBackgroundMusicPrompt] = useState("");
+  const [musicPrompt, setMusicPrompt] = useState("");
+  const [musicNegativePrompt, setMusicNegativePrompt] = useState(
+    DEFAULT_MUSIC_NEGATIVE_PROMPT,
+  );
+  const [generatingBackgroundMusic, setGeneratingBackgroundMusic] =
+    useState(false);
+  const [musicModelEndpoint, setMusicModelEndpoint] = useState(null);
+  const [musicUnitCost, setMusicUnitCost] = useState(null);
+  const [musicPricingUnit, setMusicPricingUnit] = useState(null);
+  const [loadingMusicPricing, setLoadingMusicPricing] = useState(false);
+  const [musicDefaultDescription, setMusicDefaultDescription] = useState("");
+  const [useCompositionPlan, setUseCompositionPlan] = useState(false);
+  const [musicCompositionPlan, setMusicCompositionPlan] = useState({
+    positive_global_styles: [],
+    negative_global_styles: [],
+    sections: [],
+  });
+  const [generatingMusicPlan, setGeneratingMusicPlan] = useState(false);
+  const [generatingMusicPrompt, setGeneratingMusicPrompt] = useState(false);
+  const [availableMusicThemes, setAvailableMusicThemes] = useState([]);
+  const [defaultMusicThemeId, setDefaultMusicThemeId] = useState(null);
+  const [selectedMusicThemeId, setSelectedMusicThemeId] = useState(null);
+  const [showMusicThemePicker, setShowMusicThemePicker] = useState(false);
+  const [availableMusicFromCollection, setAvailableMusicFromCollection] =
+    useState([]);
+  const [loadingMusicCollection, setLoadingMusicCollection] = useState(false);
+  const [showMusicCollectionPicker, setShowMusicCollectionPicker] =
+    useState(false);
+  const [availableInstruments, setAvailableInstruments] = useState([]);
+  const [selectedInstrumentIds, setSelectedInstrumentIds] = useState([]);
+  const [useInstrumentPalette, setUseInstrumentPalette] = useState(true);
+  const [selectedMusicModelId, setSelectedMusicModelId] = useState("stable-audio-25");
+  const [isPlayingWithVoiceover, setIsPlayingWithVoiceover] = useState(false);
+  const playWithVoiceoverRef = useRef({ voiceover: null, music: null });
+
+  // Step 6: Final Video
   const [finalVideoUrl, setFinalVideoUrl] = useState(null);
   const [sessionId, setSessionId] = useState(null);
+  const [isAssembling, setIsAssembling] = useState(false);
+  const timelineEditorRef = useRef(null);
+  const [timelineSettings, setTimelineSettings] = useState(null);
 
   // Scene linking/grouping (persisted on project doc as `scene_group`)
   const [sceneGroups, setSceneGroups] = useState([]);
@@ -613,8 +992,25 @@ export default function VideoGeneratorPage() {
     loadAvailableCameraMovements();
     loadAvailableCharacterMotions();
     loadFluxPricing();
+    loadMultipleAnglesPricing();
     loadFalVideoPricing();
+    loadMusicPricing("stable-audio-25");
+    loadAvailableMusicThemes();
   }, []);
+
+  useEffect(() => {
+    fetch("/api/debug/firebase-env")
+      .then((r) => r.json())
+      .then(setFirebaseEnv)
+      .catch(() => setFirebaseEnv({ error: "Failed to fetch" }));
+  }, []);
+
+  // Reload music pricing when model selection changes (Step 5)
+  useEffect(() => {
+    if (step === 5 && selectedMusicModelId) {
+      loadMusicPricing(selectedMusicModelId);
+    }
+  }, [step, selectedMusicModelId]);
 
   // Close Step 0 project menu on outside click / Escape
   useEffect(() => {
@@ -667,24 +1063,28 @@ export default function VideoGeneratorPage() {
   }, [currentProjectId, scriptData?.scenes?.length]);
 
   // Check for project_id in URL and load project automatically
+  const loadingProjectRef = useRef(false);
+  loadingProjectRef.current = loadingProject;
   useEffect(() => {
     const projectId = searchParams.get("project_id");
-    // Only load if we have a project_id in URL and it's not already loaded
-    if (projectId && currentProjectId !== projectId) {
-      // Wait for projects to load first
-      const checkAndLoadProject = setInterval(() => {
-        if (projects.length > 0) {
-          clearInterval(checkAndLoadProject);
-          const project = projects.find((p) => p.id === projectId);
-          if (project) {
-            handleSelectProject(project.id);
-          }
-        }
-      }, 100);
+    if (!projectId || currentProjectId === projectId) return;
+    if (loadingProjectRef.current) return; // avoid overlapping loads
 
-      // Cleanup after 5 seconds if projects don't load
-      setTimeout(() => clearInterval(checkAndLoadProject), 5000);
-    }
+    const checkAndLoadProject = setInterval(() => {
+      if (projects.length > 0) {
+        clearInterval(checkAndLoadProject);
+        const project = projects.find((p) => p.id === projectId);
+        if (project && !loadingProjectRef.current) {
+          handleSelectProject(project.id);
+        }
+      }
+    }, 100);
+    const timeoutId = setTimeout(() => clearInterval(checkAndLoadProject), 5000);
+
+    return () => {
+      clearInterval(checkAndLoadProject);
+      clearTimeout(timeoutId);
+    };
   }, [searchParams, projects, currentProjectId]);
 
   // Auto-save topic when it changes
@@ -748,6 +1148,47 @@ export default function VideoGeneratorPage() {
     }
   }, [scriptData?.script, currentProjectId, step]);
 
+  // Auto-save selected music theme when it changes (Step 5)
+  useEffect(() => {
+    if (currentProjectId && step === 5) {
+      fetch(`/api/projects/${currentProjectId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          selected_music_theme_id: selectedMusicThemeId ?? null,
+        }),
+      }).catch(() => {});
+    }
+  }, [currentProjectId, step, selectedMusicThemeId]);
+
+  // Auto-save music prompt when it changes (Step 5, debounced)
+  useEffect(() => {
+    if (currentProjectId && step === 5) {
+      const debounce = setTimeout(() => {
+        fetch(`/api/projects/${currentProjectId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ music_prompt: musicPrompt }),
+        }).catch(() => {});
+      }, 500);
+      return () => clearTimeout(debounce);
+    }
+  }, [musicPrompt, currentProjectId, step]);
+
+  // Auto-save music negative prompt when it changes (Step 5, debounced)
+  useEffect(() => {
+    if (currentProjectId && step === 5) {
+      const debounce = setTimeout(() => {
+        fetch(`/api/projects/${currentProjectId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ music_negative_prompt: musicNegativePrompt }),
+        }).catch(() => {});
+      }, 500);
+      return () => clearTimeout(debounce);
+    }
+  }, [musicNegativePrompt, currentProjectId, step]);
+
   // Load ElevenLabs info when on Step 2
   useEffect(() => {
     if (step === 2) {
@@ -785,6 +1226,52 @@ export default function VideoGeneratorPage() {
     }
   }, [step, maxStepReached]);
 
+  // Load music defaults when entering step 5
+  useEffect(() => {
+    if (step !== 5 || musicDefaultDescription) return;
+    fetch("/api/video-generator/music-defaults")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success && data.default_description) {
+          setMusicDefaultDescription(data.default_description);
+        }
+      })
+      .catch(() => {});
+  }, [step, musicDefaultDescription]);
+
+  // Load project-generated music, themes, and instruments when entering step 5
+  useEffect(() => {
+    if (step !== 5) return;
+    loadAvailableMusicThemes();
+    loadAvailableInstruments();
+    if (currentProjectId) loadAvailableMusicFromCollection();
+  }, [step, currentProjectId]);
+
+  // Poll for final video URL when on step 6/7 and user has started a render (isAssembling)
+  useEffect(() => {
+    if ((step !== 6 && step !== 7) || !sessionId) return;
+    const poll = async () => {
+      try {
+        const res = await fetch(
+          `/api/video-generator/assemble-video?session_id=${sessionId}`,
+        );
+        const data = await res.json();
+        if (data.success && data.final_video_url) {
+          setFinalVideoUrl(data.final_video_url);
+          setIsAssembling(false);
+        }
+        // Do NOT set isAssembling(true) from poll – only when user clicks Render.
+        // This ensures Step 6 always shows timeline editor first for editing.
+      } catch {
+        // ignore
+      }
+    };
+    poll();
+    if (finalVideoUrl) return;
+    const interval = setInterval(poll, 5000);
+    return () => clearInterval(interval);
+  }, [step, finalVideoUrl, sessionId]);
+
   // Update selectedCharacter with full data when characters load
   useEffect(() => {
     if (
@@ -815,11 +1302,15 @@ export default function VideoGeneratorPage() {
 
   const loadFluxPricing = async () => {
     try {
-      const response = await fetch("/api/video-generator/image2image-pricing");
+      const response = await fetch("/api/video-generator/image2image-pricing", {
+        cache: "no-store",
+      });
       const result = await response.json();
-      if (result.success && result.cost) {
-        setFluxProCost(result.cost);
-        console.log(`Loaded Grok pricing: $${result.cost}/image`);
+      const unitCost = Number(result.cost);
+      if (result.success && Number.isFinite(unitCost) && unitCost > 0) {
+        setFluxProCost(unitCost);
+        setFluxProEndpointId(result.endpoint_id || null);
+        console.log(`Loaded Grok pricing: $${unitCost}/image`);
       } else {
         throw new Error(result.error || "Failed to load FAL pricing");
       }
@@ -828,6 +1319,32 @@ export default function VideoGeneratorPage() {
       alert(
         `Failed to load FAL AI pricing: ${error.message}. Cannot proceed with image generation.`,
       );
+    }
+  };
+
+  const loadMultipleAnglesPricing = async () => {
+    try {
+      const response = await fetch(
+        "/api/video-generator/multiple-angles-pricing",
+        { cache: "no-store" },
+      );
+      const result = await response.json();
+      const unitCost = Number(result.cost);
+      if (result?.endpoint_id) {
+        setMultipleAnglesEndpointId(result.endpoint_id);
+      }
+
+      if (result.success && Number.isFinite(unitCost) && unitCost > 0) {
+        setMultipleAnglesUnitCost(unitCost);
+      } else {
+        setMultipleAnglesUnitCost(null);
+        if (result?.error) {
+          console.warn("Multiple-angles pricing unavailable:", result.error);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load multiple-angles pricing:", error);
+      setMultipleAnglesUnitCost(null);
     }
   };
 
@@ -851,6 +1368,34 @@ export default function VideoGeneratorPage() {
       setFalVideoPricingUnit(null);
     } finally {
       setLoadingFalVideoPricing(false);
+    }
+  };
+
+  const loadMusicPricing = async (modelId) => {
+    const id = modelId ?? selectedMusicModelId ?? "stable-audio-25";
+    setLoadingMusicPricing(true);
+    try {
+      const response = await fetch(
+        `/api/video-generator/music-pricing?model_id=${encodeURIComponent(id)}`,
+      );
+      const result = await response.json();
+      if (result.success && result.cost != null) {
+        setMusicUnitCost(result.cost);
+        setMusicPricingUnit(result.unit || "min");
+        setMusicModelEndpoint(result.endpoint_id || null);
+        console.log(
+          `Loaded music pricing: $${result.cost}/${result.unit || "min"}`,
+        );
+      } else {
+        throw new Error(result.error || "Failed to load music pricing");
+      }
+    } catch (error) {
+      console.error("Failed to load music pricing:", error);
+      setMusicUnitCost(null);
+      setMusicPricingUnit(null);
+      setMusicModelEndpoint(null);
+    } finally {
+      setLoadingMusicPricing(false);
     }
   };
 
@@ -968,6 +1513,7 @@ export default function VideoGeneratorPage() {
       if (currentProjectId === project.id) {
         setCurrentProjectId(null);
         setCurrentProjectName("");
+        setTimelineSettings(null);
         setScriptData(null);
         setTopic("");
         setTopicCategories([]);
@@ -1019,6 +1565,52 @@ export default function VideoGeneratorPage() {
       }
     } catch (error) {
       console.error("Failed to load character motions:", error);
+    }
+  };
+
+  const loadAvailableMusicThemes = async () => {
+    try {
+      const response = await fetch("/api/music-themes/list");
+      const result = await response.json();
+      if (result.success) {
+        if (result.music_themes) setAvailableMusicThemes(result.music_themes);
+        setDefaultMusicThemeId(result.default_theme_id || null);
+      }
+    } catch (error) {
+      console.error("Failed to load music themes:", error);
+    }
+  };
+
+  const loadAvailableInstruments = async () => {
+    try {
+      const response = await fetch("/api/instruments/list");
+      const result = await response.json();
+      if (result.success) {
+        if (result.instruments) setAvailableInstruments(result.instruments);
+      }
+    } catch (error) {
+      console.error("Failed to load instruments:", error);
+    }
+  };
+
+  const loadAvailableMusicFromCollection = async () => {
+    setLoadingMusicCollection(true);
+    try {
+      const url = currentProjectId
+        ? `/api/video-generator/music-list?project_id=${currentProjectId}&limit=50`
+        : "/api/video-generator/music-list?limit=50";
+      const response = await fetch(url);
+      const result = await response.json();
+      if (result.success && result.music) {
+        setAvailableMusicFromCollection(result.music);
+      } else {
+        setAvailableMusicFromCollection([]);
+      }
+    } catch (error) {
+      console.error("Failed to load music collection:", error);
+      setAvailableMusicFromCollection([]);
+    } finally {
+      setLoadingMusicCollection(false);
     }
   };
 
@@ -1100,7 +1692,12 @@ export default function VideoGeneratorPage() {
         color:
           "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200",
       },
-      5:
+      5: {
+        label: "Step 5: Music",
+        color:
+          "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-200",
+      },
+      6:
         status === "completed"
           ? {
               label: "✓ Completed",
@@ -1112,7 +1709,7 @@ export default function VideoGeneratorPage() {
                 label: "Rendering...",
                 color:
                   "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-200",
-              }
+            }
             : status === "failed"
               ? {
                   label: "Failed",
@@ -1120,10 +1717,15 @@ export default function VideoGeneratorPage() {
                     "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-200",
                 }
               : {
-                  label: "Step 5: Videos Ready",
+                  label: "Step 6: Assemble",
                   color:
                     "bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-200",
                 },
+      7: {
+        label: "Step 7: Post",
+        color:
+          "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-200",
+      },
     };
 
     return statusMap[step] || statusMap[0];
@@ -1165,7 +1767,9 @@ export default function VideoGeneratorPage() {
   const handleSelectProject = async (projectId) => {
     setLoadingProject(true);
     try {
-      const response = await fetch(`/api/projects/${projectId}`);
+      const response = await fetch(`/api/projects/${projectId}`, {
+        cache: "no-store",
+      });
       const result = await response.json();
 
       if (result.success) {
@@ -1176,7 +1780,28 @@ export default function VideoGeneratorPage() {
         setScriptData(result.scriptData);
 
         // Initialize selected videos from scene docs so Step 4 can resume.
-        setVideos(deriveSelectedVideosFromScenes(result.scriptData?.scenes));
+        // Fallback: hydrate from session videos (older data) if needed.
+        const fromScenes = deriveSelectedVideosFromScenes(
+          result.scriptData?.scenes,
+        );
+        const fromSession = (
+          Array.isArray(result.sessionVideos) ? result.sessionVideos : []
+        )
+          .map((v) => ({
+            scene_id: toSceneKey(v?.scene_id),
+            video_url: v?.video_url,
+          }))
+          .filter((v) => v.scene_id && v.video_url);
+
+        const merged = new Map();
+        for (const v of fromSession) merged.set(v.scene_id, v);
+        for (const v of fromScenes) merged.set(toSceneKey(v.scene_id), v);
+
+        setVideos(
+          Array.from(merged.values()).sort(
+            (a, b) => Number(a.scene_id) - Number(b.scene_id),
+          ),
+        );
 
         setTopic(result.project.topic || "");
         setTopicCategories(result.project.categories || []);
@@ -1225,6 +1850,22 @@ export default function VideoGeneratorPage() {
         );
         setVoiceoverUrl(result.project.voiceover_url || null);
         setSessionId(result.project.session_id || null);
+        setFinalVideoUrl(result.project.final_video_url || null);
+        setTimelineSettings(result.project.timeline_settings || null);
+        setBackgroundMusicUrl(result.project.background_music_url || null);
+        setBackgroundMusicPrompt(result.project.background_music_prompt || "");
+        setMusicPrompt(
+          result.project.music_prompt ??
+            result.project.background_music_prompt ??
+            "",
+        );
+        setMusicNegativePrompt(
+          result.project.music_negative_prompt?.trim() ||
+            DEFAULT_MUSIC_NEGATIVE_PROMPT,
+        );
+        setSelectedMusicThemeId(
+          result.project.selected_music_theme_id ?? null,
+        );
         console.log(
           "Loaded project costs on project select:",
           result.project.costs,
@@ -1654,6 +2295,45 @@ export default function VideoGeneratorPage() {
     }
   };
 
+  const handleClearLocationForScene = async (sceneId) => {
+    if (!currentProjectId || !sceneId) return;
+
+    try {
+      const updateResponse = await fetch(
+        `/api/projects/${currentProjectId}/scenes/${sceneId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ location_id: null }),
+        },
+      );
+
+      const updateResult = await updateResponse.json();
+      if (!updateResult.success) {
+        await alert("Failed to clear location", "error");
+        return;
+      }
+
+      setLocationMapping((prev) => {
+        const next = { ...(prev || {}) };
+        delete next[sceneId];
+        delete next[String(sceneId)];
+        return next;
+      });
+
+      if (scriptData?.scenes) {
+        setScriptData({
+          ...scriptData,
+          scenes: scriptData.scenes.map((s) =>
+            s.id === sceneId ? { ...s, location_id: null } : s,
+          ),
+        });
+      }
+    } catch (error) {
+      await alert("Error clearing location: " + error.message, "error");
+    }
+  };
+
   const handleOpenActionPicker = async (sceneId) => {
     try {
       if (availableActions.length === 0) {
@@ -1716,6 +2396,45 @@ export default function VideoGeneratorPage() {
       }
     } catch (error) {
       await alert("Error selecting action: " + error.message, "error");
+    }
+  };
+
+  const handleClearActionForScene = async (sceneId) => {
+    if (!currentProjectId || !sceneId) return;
+
+    try {
+      const updateResponse = await fetch(
+        `/api/projects/${currentProjectId}/scenes/${sceneId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action_id: null }),
+        },
+      );
+
+      const updateResult = await updateResponse.json();
+      if (!updateResult.success) {
+        await alert("Failed to clear action", "error");
+        return;
+      }
+
+      setActionMapping((prev) => {
+        const next = { ...(prev || {}) };
+        delete next[sceneId];
+        delete next[String(sceneId)];
+        return next;
+      });
+
+      if (scriptData?.scenes) {
+        setScriptData({
+          ...scriptData,
+          scenes: scriptData.scenes.map((s) =>
+            s.id === sceneId ? { ...s, action_id: null } : s,
+          ),
+        });
+      }
+    } catch (error) {
+      await alert("Error clearing action: " + error.message, "error");
     }
   };
 
@@ -2549,6 +3268,8 @@ export default function VideoGeneratorPage() {
       console.log(`[Generate Another] Scene ${sceneId} found`);
       console.log(`[Generate Another] Current prompt:`, scene.image_prompt);
 
+      const promptUsedForNewImage = scene.image_prompt || "";
+
       // Get character reference image (use selected reference for this scene, or default to first)
       const characterImageUrl =
         selectedReferenceImages[sceneId] ||
@@ -2585,26 +3306,33 @@ export default function VideoGeneratorPage() {
       const result = await response.json();
       if (result.success) {
         // Update the scene in scriptData locally
-        const updatedScenes = scriptData.scenes.map((scene) => {
-          if (scene.id === sceneId) {
-            const existingUrls = scene.image_urls || [];
+        const updatedScenes = scriptData.scenes.map((s) => {
+          if (s.id === sceneId) {
+            const existingUrls = Array.isArray(s.image_urls)
+              ? s.image_urls
+              : [];
+            const existingPrompts = Array.isArray(s.image_prompts)
+              ? s.image_prompts
+              : [];
             return {
-              ...scene,
+              ...s,
               image_urls: [...existingUrls, result.image_url],
+              image_prompts: [...existingPrompts, promptUsedForNewImage],
             };
           }
-          return scene;
+          return s;
         });
         const updatedScriptData = { ...scriptData, scenes: updatedScenes };
         setScriptData(updatedScriptData);
 
         // Save image_urls to scene document in subcollection
-        const scene = updatedScenes.find((s) => s.id === sceneId);
+        const updatedScene = updatedScenes.find((s) => s.id === sceneId);
         await fetch(`/api/projects/${currentProjectId}/scenes/${sceneId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            image_urls: scene.image_urls,
+            image_urls: updatedScene?.image_urls || [],
+            image_prompts: updatedScene?.image_prompts || [],
           }),
         });
 
@@ -2628,6 +3356,128 @@ export default function VideoGeneratorPage() {
     } finally {
       setLoading(false);
       setGeneratingSceneId(null);
+    }
+  };
+
+  const handleOpenAngleEditModal = (sceneId, imageIndex, url) => {
+    setAngleEditModal({ sceneId, imageIndex, url });
+    setAngleEditSettings({
+      horizontal_angle: 0,
+      vertical_angle: 0,
+      zoom: 5,
+      num_images: 1,
+    });
+  };
+
+  const handleGenerateAngleEdit = async () => {
+    if (!angleEditModal) return;
+    if (!currentProjectId) {
+      await alert("No project selected", "warning");
+      return;
+    }
+    if (!selectedCharacter?.id) {
+      await alert("No character selected", "warning");
+      return;
+    }
+
+    const { sceneId, url, imageIndex } = angleEditModal;
+    const key = `${sceneId}::${url}`;
+    setEditingImageAngleKey(key);
+    // Close modal immediately so the user can keep working.
+    setAngleEditModal(null);
+    setLoading(true);
+
+    try {
+      const response = await fetch("/api/video-generator/edit-image-angles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project_id: currentProjectId,
+          scene_id: sceneId,
+          character_id: selectedCharacter.id,
+          source_image_url: url,
+          ...angleEditSettings,
+          output_format: "png",
+        }),
+      });
+
+      const result = await response.json();
+      if (!result.success) {
+        const msg = result.message
+          ? `${result.error}: ${result.message}`
+          : result.error;
+        await alert(
+          "Failed to change angle: " + (msg || "Unknown error"),
+          "error",
+        );
+        return;
+      }
+
+      const newUrls = Array.isArray(result.image_urls) ? result.image_urls : [];
+      if (newUrls.length === 0) {
+        await alert("No images were returned", "error");
+        return;
+      }
+
+      // Append new variants to the scene's image_urls (preserve ordering)
+      const sourceScene = scriptData?.scenes?.find((s) => s.id === sceneId);
+      const prevLen = Array.isArray(sourceScene?.image_urls)
+        ? sourceScene.image_urls.length
+        : 0;
+      const sourcePrompts = Array.isArray(sourceScene?.image_prompts)
+        ? sourceScene.image_prompts
+        : [];
+      const promptUsedForSourceImage =
+        (Number.isFinite(Number(imageIndex))
+          ? sourcePrompts[Math.floor(Number(imageIndex))]
+          : null) ||
+        sourceScene?.image_prompt ||
+        "";
+
+      const updatedScenes = (scriptData?.scenes || []).map((s) => {
+        if (s.id !== sceneId) return s;
+        const existingUrls = Array.isArray(s.image_urls) ? s.image_urls : [];
+        const existingPrompts = Array.isArray(s.image_prompts)
+          ? s.image_prompts
+          : [];
+        return {
+          ...s,
+          image_urls: [...existingUrls, ...newUrls],
+          image_prompts: [
+            ...existingPrompts,
+            ...newUrls.map(() => promptUsedForSourceImage),
+          ],
+        };
+      });
+
+      const updatedScriptData = { ...scriptData, scenes: updatedScenes };
+      setScriptData(updatedScriptData);
+
+      // Persist image_urls to the scene document
+      const updatedScene = updatedScenes.find((s) => s.id === sceneId);
+      await fetch(`/api/projects/${currentProjectId}/scenes/${sceneId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image_urls: updatedScene?.image_urls || [],
+          image_prompts: updatedScene?.image_prompts || [],
+        }),
+      });
+
+      // Select the first newly created variant
+      await handleSelectSceneImage(sceneId, prevLen);
+
+      // Reload project costs
+      const projectResponse = await fetch(`/api/projects/${currentProjectId}`);
+      const projectResult = await projectResponse.json();
+      if (projectResult.success) {
+        setProjectCosts(projectResult.project.costs || null);
+      }
+    } catch (error) {
+      await alert("Error changing angle: " + error.message, "error");
+    } finally {
+      setLoading(false);
+      setEditingImageAngleKey(null);
     }
   };
 
@@ -2669,16 +3519,31 @@ export default function VideoGeneratorPage() {
 
       const result = await response.json();
       if (result.success) {
+        const promptUsedForRegeneratedImage = scene.image_prompt || "";
+
         // Replace the specific image by index, or the last one if no index provided
-        const updatedScenes = scriptData.scenes.map((scene) => {
-          if (scene.id === sceneId) {
-            const existingUrls = scene.image_urls || [];
+        const updatedScenes = scriptData.scenes.map((s) => {
+          if (s.id === sceneId) {
+            const existingUrls = Array.isArray(s.image_urls)
+              ? s.image_urls
+              : [];
             let updatedUrls;
+
+            const normalizedPrompts = Array.isArray(s.image_prompts)
+              ? s.image_prompts.slice(0, existingUrls.length)
+              : [];
+            while (normalizedPrompts.length < existingUrls.length) {
+              normalizedPrompts.push(s.image_prompt || "");
+            }
+            let updatedPrompts;
 
             if (imageIndex !== null && imageIndex < existingUrls.length) {
               // Replace the specific image at the given index
               updatedUrls = existingUrls.map((url, idx) =>
                 idx === imageIndex ? result.image_url : url,
+              );
+              updatedPrompts = normalizedPrompts.map((p, idx) =>
+                idx === imageIndex ? promptUsedForRegeneratedImage : p,
               );
               console.log(
                 `Replaced image at index ${imageIndex} for scene ${sceneId}`,
@@ -2689,12 +3554,23 @@ export default function VideoGeneratorPage() {
                 existingUrls.length > 0
                   ? [...existingUrls.slice(0, -1), result.image_url]
                   : [result.image_url];
+              updatedPrompts =
+                existingUrls.length > 0
+                  ? [
+                      ...normalizedPrompts.slice(0, -1),
+                      promptUsedForRegeneratedImage,
+                    ]
+                  : [promptUsedForRegeneratedImage];
               console.log(`Replaced last image for scene ${sceneId}`);
             }
 
-            return { ...scene, image_urls: updatedUrls };
+            return {
+              ...s,
+              image_urls: updatedUrls,
+              image_prompts: updatedPrompts,
+            };
           }
-          return scene;
+          return s;
         });
         const updatedScriptData = { ...scriptData, scenes: updatedScenes };
         setScriptData(updatedScriptData);
@@ -2706,6 +3582,7 @@ export default function VideoGeneratorPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             image_urls: scene.image_urls,
+            image_prompts: scene.image_prompts || [],
           }),
         });
 
@@ -2965,6 +3842,12 @@ export default function VideoGeneratorPage() {
       const updatedUrls = scene.image_urls.filter(
         (_, idx) => idx !== imageIndex,
       );
+      const existingPrompts = Array.isArray(scene.image_prompts)
+        ? scene.image_prompts
+        : [];
+      const updatedPrompts = existingPrompts.filter(
+        (_, idx) => idx !== imageIndex,
+      );
 
       // Delete image from Cloud Storage and update character project
       await fetch("/api/video-generator/delete-image", {
@@ -2981,7 +3864,11 @@ export default function VideoGeneratorPage() {
       // Update local state
       const updatedScenes = scriptData.scenes.map((s) => {
         if (s.id === sceneId) {
-          return { ...s, image_urls: updatedUrls };
+          return {
+            ...s,
+            image_urls: updatedUrls,
+            image_prompts: updatedPrompts,
+          };
         }
         return s;
       });
@@ -2993,6 +3880,7 @@ export default function VideoGeneratorPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           image_urls: updatedUrls,
+          image_prompts: updatedPrompts,
         }),
       });
     } catch (error) {
@@ -3036,6 +3924,52 @@ export default function VideoGeneratorPage() {
     return imageUrls[safeIndex] || null;
   };
 
+  const getSelectedImagePromptForScene = (scene) => {
+    const sceneId = normalizeSceneId(scene?.id);
+    if (!sceneId) return scene?.image_prompt || "";
+
+    const { leaderId } = getSceneGroupInfo(
+      sceneGroups,
+      sceneId,
+      sceneIdsInOrder,
+    );
+    const leaderKey = normalizeSceneId(leaderId);
+    const leaderScene =
+      scriptData?.scenes?.find((s) => normalizeSceneId(s.id) === leaderKey) ||
+      scene;
+
+    const imageUrls = leaderScene?.image_urls;
+    if (!Array.isArray(imageUrls) || imageUrls.length === 0) {
+      return leaderScene?.image_prompt || scene?.image_prompt || "";
+    }
+
+    const selectedIndex =
+      selectedSceneImages[leaderKey] ?? leaderScene?.selected_image_index;
+    if (selectedIndex === undefined || selectedIndex === null) {
+      return leaderScene?.image_prompt || scene?.image_prompt || "";
+    }
+
+    const numericIndex = Number(selectedIndex);
+    if (!Number.isFinite(numericIndex)) {
+      return leaderScene?.image_prompt || scene?.image_prompt || "";
+    }
+
+    const safeIndex = Math.max(
+      0,
+      Math.min(imageUrls.length - 1, Math.floor(numericIndex)),
+    );
+
+    const prompts = Array.isArray(leaderScene?.image_prompts)
+      ? leaderScene.image_prompts
+      : null;
+    return (
+      (prompts ? prompts[safeIndex] : null) ||
+      leaderScene?.image_prompt ||
+      scene?.image_prompt ||
+      ""
+    );
+  };
+
   const handleMotionPromptChange = async (sceneId, newMotionPrompt) => {
     if (!scriptData?.scenes) return;
 
@@ -3063,6 +3997,40 @@ export default function VideoGeneratorPage() {
         });
       } catch (error) {
         console.error("Error auto-saving motion prompt:", error);
+      }
+    }, 750);
+  };
+
+  const handleVideoNegativePromptChange = async (
+    sceneId,
+    newNegativePrompt,
+  ) => {
+    if (!scriptData?.scenes) return;
+
+    const updatedScenes = scriptData.scenes.map((scene) => {
+      if (scene.id === sceneId) {
+        return { ...scene, video_negative_prompt: newNegativePrompt };
+      }
+      return scene;
+    });
+    setScriptData({ ...scriptData, scenes: updatedScenes });
+
+    if (videoNegativePromptSaveTimers.current[sceneId]) {
+      clearTimeout(videoNegativePromptSaveTimers.current[sceneId]);
+    }
+
+    videoNegativePromptSaveTimers.current[sceneId] = setTimeout(async () => {
+      try {
+        if (!currentProjectId) return;
+        await fetch(`/api/projects/${currentProjectId}/scenes/${sceneId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            video_negative_prompt: newNegativePrompt,
+          }),
+        });
+      } catch (error) {
+        console.error("Error auto-saving video negative prompt:", error);
       }
     }, 750);
   };
@@ -3163,7 +4131,7 @@ export default function VideoGeneratorPage() {
       if (result.success) {
         const returnedVideos = result.videos || [];
         const newVideoForScene = returnedVideos.find(
-          (v) => v.scene_id === sceneId,
+          (v) => toSceneKey(v?.scene_id) === toSceneKey(sceneId),
         );
 
         // Fill missing selections from session (best-effort), then select the newly generated one.
@@ -3171,11 +4139,18 @@ export default function VideoGeneratorPage() {
           const byScene = new Map((prev || []).map((v) => [v.scene_id, v]));
           for (const v of returnedVideos) {
             if (!v?.scene_id || !v?.video_url) continue;
-            if (!byScene.has(v.scene_id)) byScene.set(v.scene_id, v);
+            const key = toSceneKey(v.scene_id);
+            if (!key) continue;
+            if (!byScene.has(key)) byScene.set(key, { ...v, scene_id: key });
           }
           if (newVideoForScene?.video_url) {
-            byScene.set(sceneId, {
-              scene_id: sceneId,
+            const key = toSceneKey(sceneId);
+            if (!key)
+              return Array.from(byScene.values()).sort(
+                (a, b) => Number(a.scene_id) - Number(b.scene_id),
+              );
+            byScene.set(key, {
+              scene_id: key,
               video_url: newVideoForScene.video_url,
             });
           }
@@ -3231,6 +4206,8 @@ export default function VideoGeneratorPage() {
       return;
     }
 
+    const selectedImagePrompt = getSelectedImagePromptForScene(scene);
+
     // Get selected action for this scene (optional)
     const actionId = actionMapping[sceneId];
     const selectedAction = actionId
@@ -3267,13 +4244,14 @@ export default function VideoGeneratorPage() {
           body: JSON.stringify({
             scene_id: sceneId,
             voiceover: scene.voiceover,
-            image_prompt: scene.image_prompt || "",
+            image_prompt: selectedImagePrompt || "",
             scene_index: sceneId - 1,
             total_scenes: scriptData.scenes.length,
             project_id: currentProjectId,
             action: selectedAction,
             camera_movement: selectedCameraMovement,
             character_motion: selectedCharacterMotion,
+            temperature: videoPromptTemperatureByScene[sceneId] ?? 0.8,
           }),
         },
       );
@@ -3345,7 +4323,11 @@ export default function VideoGeneratorPage() {
         const returnedVideos = result.videos || [];
 
         // Treat the newly generated set as the default selected set.
-        setVideos(returnedVideos);
+        setVideos(
+          returnedVideos
+            .map((v) => ({ ...v, scene_id: toSceneKey(v?.scene_id) }))
+            .filter((v) => v.scene_id && v.video_url),
+        );
 
         // Append versions locally and persist selected_video_url per scene.
         try {
@@ -3423,32 +4405,68 @@ export default function VideoGeneratorPage() {
     }
   };
 
-  // Step 4: Assemble Final Video
-  const handleAssembleVideo = async () => {
+  // Step 5: Play music with voiceover (preview mix)
+  const handlePlayWithVoiceover = () => {
+    if (isPlayingWithVoiceover) {
+      const { voiceover, music } = playWithVoiceoverRef.current;
+      if (voiceover) voiceover.pause();
+      if (music) music.pause();
+      playWithVoiceoverRef.current = { voiceover: null, music: null };
+      setIsPlayingWithVoiceover(false);
+      return;
+    }
+    if (!voiceoverUrl || !backgroundMusicUrl) return;
+
+    const voiceoverAudio = new Audio(voiceoverUrl);
+    const musicAudio = new Audio(backgroundMusicUrl);
+    musicAudio.volume = 0.25; // Match assembly mix
+
+    playWithVoiceoverRef.current = { voiceover: voiceoverAudio, music: musicAudio };
+
+    const cleanup = () => {
+      playWithVoiceoverRef.current = { voiceover: null, music: null };
+      setIsPlayingWithVoiceover(false);
+    };
+
+    voiceoverAudio.onended = () => {
+      musicAudio.pause();
+      cleanup();
+    };
+    voiceoverAudio.onerror = cleanup;
+    musicAudio.onerror = cleanup;
+
+    voiceoverAudio.play();
+    musicAudio.play();
+    setIsPlayingWithVoiceover(true);
+  };
+
+  // Step 6: Render from timeline editor (ShotStack Studio)
+  const handleRenderFromEditor = async () => {
+    const edit = timelineEditorRef.current?.getEdit?.();
+    if (!edit?.timeline || !edit?.output) {
+      await alert("Timeline editor not ready. Please wait for it to load.", "error");
+      return;
+    }
+    if (!currentProjectId || !sessionId) {
+      await alert("Missing project or session.", "error");
+      return;
+    }
     setLoading(true);
+    setIsAssembling(false);
     try {
-      const sceneDurations = Object.fromEntries(
-        (scriptData?.scenes || []).map((s) => [
-          s.id,
-          getSceneDurationSeconds(s),
-        ]),
-      );
       const response = await fetch("/api/video-generator/assemble-video", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           project_id: currentProjectId,
           session_id: sessionId,
-          videos,
-          voiceover_url: voiceoverUrl,
-          scene_durations: sceneDurations,
+          edit,
         }),
       });
 
       const result = await response.json();
       if (result.success) {
-        setFinalVideoUrl(result.video_url);
-        // Reload project costs
+        setIsAssembling(true);
         const projectResponse = await fetch(
           `/api/projects/${currentProjectId}`,
         );
@@ -3456,19 +4474,8 @@ export default function VideoGeneratorPage() {
         if (projectResult.success) {
           setProjectCosts(projectResult.project.costs || null);
         }
-        // Best-effort: persist step transition for resume.
-        try {
-          if (currentProjectId) {
-            await fetch(`/api/projects/${currentProjectId}`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ current_step: 5 }),
-            });
-          }
-        } catch {}
-        setStep(5);
       } else {
-        await alert("Failed to assemble video: " + result.error, "error");
+        await alert("Failed to render video: " + (result.error || result.message), "error");
       }
     } catch (error) {
       await alert("Error: " + error.message, "error");
@@ -3581,7 +4588,32 @@ export default function VideoGeneratorPage() {
   };
 
   return (
-    <div className="space-y-6 text-gray-900 dark:text-gray-100">
+    <div className="w-full min-h-[calc(100vh-8rem)] space-y-6 text-gray-900 dark:text-gray-100">
+      {/* Firebase Env (debug) – dev only */}
+      {process.env.NODE_ENV === "development" && (
+        <div className="rounded-lg border-2 border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-800 dark:bg-amber-950/40">
+          <div className="font-semibold text-amber-900 dark:text-amber-200 mb-2">
+            Firebase env (debug)
+          </div>
+          {!firebaseEnv ? (
+            <div className="text-amber-700 dark:text-amber-300">Loading…</div>
+          ) : firebaseEnv.error ? (
+            <div className="text-red-600 dark:text-red-400">{firebaseEnv.error}</div>
+          ) : (
+            <div className="grid gap-1 font-mono text-amber-800 dark:text-amber-300">
+              <div>Client project: <span className="font-bold">{firebaseEnv.client?.projectId ?? "—"}</span></div>
+              <div>Admin project: <span className="font-bold">{firebaseEnv.admin?.projectId ?? "—"}</span></div>
+              <div>Admin configured: {firebaseEnv.admin?.configured ? "✓" : "✗"}</div>
+              {firebaseEnv.match !== undefined && (
+                <div className={firebaseEnv.match ? "text-green-600 dark:text-green-400" : "text-amber-600 dark:text-amber-500"}>
+                  Match: {firebaseEnv.match ? "✓" : "✗ Mismatch"}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Header with Steps */}
       <div className="mb-8">
         <div className="flex items-start justify-between gap-4 mb-4">
@@ -3700,7 +4732,9 @@ export default function VideoGeneratorPage() {
               { num: 2, label: "Script & Voice" },
               { num: 3, label: "Scenes" },
               { num: 4, label: "Videos" },
-              { num: 5, label: "Post" },
+              { num: 5, label: "Music" },
+              { num: 6, label: "Assemble" },
+              { num: 7, label: "Post" },
             ].map((s, idx) => (
               <div key={s.num} className="flex items-center flex-1">
                 <div
@@ -3722,7 +4756,7 @@ export default function VideoGeneratorPage() {
                 <span className="ml-1 sm:ml-2 text-xs sm:text-sm font-medium hidden md:inline whitespace-nowrap">
                   {s.label}
                 </span>
-                {idx < 4 && (
+                {idx < 6 && (
                   <div
                     className={`flex-1 h-1 mx-1 sm:mx-4 ${
                       step > s.num
@@ -5551,105 +6585,135 @@ export default function VideoGeneratorPage() {
           ) : (
             <>
               <div className="mb-8">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
+                <div className="flex flex-col gap-2">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                       Step 3: Scene Images
                     </h2>
-                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
-                      Review prompts and generate/select one image per scene.
-                    </p>
-                    {topic && (
-                      <div className="mt-3">
-                        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                          Topic
-                        </span>
-                        <div className="mt-1 text-sm text-gray-900 dark:text-gray-100">
-                          {topic}
+
+                    <div className="flex flex-wrap gap-2">
+                      {topic && (
+                        <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200">
+                          <span className="text-base">🏷️</span>
+                          <span className="text-gray-600 dark:text-gray-300">
+                            Topic
+                          </span>
+                          <span className="font-semibold text-gray-900 dark:text-gray-100 break-all">
+                            {topic}
+                          </span>
                         </div>
+                      )}
+                      <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200">
+                        <span className="text-base">🎨</span>
+                        <span>{scriptData?.scenes?.length || 0} scenes</span>
                       </div>
-                    )}
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200">
-                      <span className="text-base">🎨</span>
-                      <span>{scriptData?.scenes?.length || 0} scenes</span>
-                    </div>
-                    <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200">
-                      <span className="text-base">🤖</span>
-                      <span className="text-gray-600 dark:text-gray-300">
-                        Model
-                      </span>
-                      <span className="font-semibold text-gray-900 dark:text-gray-100">
-                        Grok Image Edit
-                      </span>
-                    </div>
-                    <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800 shadow-sm dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-200">
-                      <span className="text-base">💰</span>
-                      <span className="text-emerald-700 dark:text-emerald-200">
-                        $
-                        {fluxProCost !== null
-                          ? fluxProCost.toFixed(3)
-                          : "0.000"}
-                        /image
-                      </span>
-                    </div>
-                    {projectCosts?.step3?.claude > 0 && (
-                      <div className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-800 shadow-sm dark:border-violet-900/50 dark:bg-violet-950/30 dark:text-violet-200">
+                      <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200">
                         <span className="text-base">🤖</span>
-                        <span>Claude</span>
-                        <span className="font-semibold">
-                          ${projectCosts.step3.claude.toFixed(4)}
+                        <span className="text-gray-600 dark:text-gray-300">
+                          Model
                         </span>
-                      </div>
-                    )}
-                    {projectCosts?.step3?.total > 0 && (
-                      <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-medium text-orange-900 shadow-sm dark:border-orange-900/50 dark:bg-orange-950/30 dark:text-orange-200">
-                        <span className="text-base">🧾</span>
-                        <span>Step 3</span>
-                        <span className="font-semibold">
-                          ${projectCosts.step3.total.toFixed(3)}
+                        <span className="font-semibold text-gray-900 dark:text-gray-100">
+                          Grok Image Edit
                         </span>
-                      </div>
-                    )}
-                    <a
-                      href="https://fal.ai/dashboard/billing"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-gray-900"
-                    >
-                      💳 FAL balance
-                      <span className="text-gray-400 dark:text-gray-500">
-                        →
-                      </span>
-                    </a>
-                    <button
-                      onClick={() => setShowFluxSettings(!showFluxSettings)}
-                      className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-800 shadow-sm hover:bg-indigo-100 transition dark:border-indigo-900/50 dark:bg-indigo-950/30 dark:text-indigo-200 dark:hover:bg-indigo-950/40"
-                    >
-                      ⚙️ {showFluxSettings ? "Hide" : "Show"} settings
-                    </button>
-                  </div>
-                </div>
 
-                {topic && <div className="hidden" />}
-                {voiceoverUrl && (
-                  <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-950">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-gray-100">
-                        <span className="text-lg">🎤</span>
-                        Voiceover
+                        {fluxProEndpointId && (
+                          <span
+                            title={fluxProEndpointId}
+                            className="ml-1 inline-block max-w-[280px] rounded-full bg-gray-100 px-2 py-0.5 font-mono text-[10px] text-gray-700 break-all dark:bg-gray-900 dark:text-gray-200"
+                          >
+                            {fluxProEndpointId}
+                          </span>
+                        )}
+
+                        <span className="ml-1 inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200">
+                          ${fluxProCost !== null ? fluxProCost.toFixed(3) : "—"}
+                          /image
+                        </span>
                       </div>
-                      <audio
-                        controls
-                        src={voiceoverUrl}
-                        className="w-full sm:w-auto sm:flex-1 h-9"
-                        style={{ maxWidth: "520px" }}
-                      />
+
+                      <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200">
+                        <span className="text-base">🧭</span>
+                        <span className="text-gray-600 dark:text-gray-300">
+                          Angle edit
+                        </span>
+                        <span className="font-semibold text-gray-900 dark:text-gray-100">
+                          Multiple angles
+                        </span>
+
+                        <span
+                          title={
+                            multipleAnglesEndpointId ||
+                            "fal-ai/flux-2-lora-gallery/multiple-angles"
+                          }
+                          className="ml-1 inline-block max-w-[280px] rounded-full bg-gray-100 px-2 py-0.5 font-mono text-[10px] text-gray-700 break-all dark:bg-gray-900 dark:text-gray-200"
+                        >
+                          {multipleAnglesEndpointId ||
+                            "fal-ai/flux-2-lora-gallery/multiple-angles"}
+                        </span>
+
+                        <span className="ml-1 inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200">
+                          $
+                          {multipleAnglesUnitCost !== null
+                            ? multipleAnglesUnitCost.toFixed(3)
+                            : "—"}
+                          /image
+                        </span>
+                      </div>
+                      {projectCosts?.step3?.claude > 0 && (
+                        <div className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-800 shadow-sm dark:border-violet-900/50 dark:bg-violet-950/30 dark:text-violet-200">
+                          <span className="text-base">🤖</span>
+                          <span>Claude</span>
+                          <span className="font-semibold">
+                            ${projectCosts.step3.claude.toFixed(4)}
+                          </span>
+                        </div>
+                      )}
+                      {projectCosts?.step3?.total > 0 && (
+                        <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-medium text-orange-900 shadow-sm dark:border-orange-900/50 dark:bg-orange-950/30 dark:text-orange-200">
+                          <span className="text-base">🧾</span>
+                          <span>Step 3</span>
+                          <span className="font-semibold">
+                            ${projectCosts.step3.total.toFixed(3)}
+                          </span>
+                        </div>
+                      )}
+                      <a
+                        href="https://fal.ai/dashboard/billing"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-gray-900"
+                      >
+                        💳 FAL balance
+                        <span className="text-gray-400 dark:text-gray-500">
+                          →
+                        </span>
+                      </a>
+                      <button
+                        onClick={() => setShowFluxSettings(!showFluxSettings)}
+                        className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-800 shadow-sm hover:bg-indigo-100 transition dark:border-indigo-900/50 dark:bg-indigo-950/30 dark:text-indigo-200 dark:hover:bg-indigo-950/40"
+                      >
+                        ⚙️ {showFluxSettings ? "Hide" : "Show"} settings
+                      </button>
                     </div>
                   </div>
-                )}
+
+                  {voiceoverUrl && (
+                    <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-950">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-gray-100">
+                          <span className="text-lg">🎤</span>
+                          Voiceover
+                        </div>
+                        <audio
+                          controls
+                          src={voiceoverUrl}
+                          className="w-full sm:w-auto sm:flex-1 h-9"
+                          style={{ maxWidth: "520px" }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Grok Image Edit Settings Panel */}
@@ -5846,6 +6910,17 @@ export default function VideoGeneratorPage() {
                                       Select
                                     </button>
                                     <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleClearLocationForScene(scene.id)
+                                      }
+                                      disabled={generatingSceneId === scene.id}
+                                      className="flex-shrink-0 text-xs px-3 py-1.5 rounded-xl border border-red-200 bg-white text-red-700 hover:bg-red-50 font-medium transition disabled:opacity-50 dark:border-red-900/60 dark:bg-gray-950 dark:text-red-300 dark:hover:bg-red-950/20"
+                                      title="Clear location for this scene"
+                                    >
+                                      Clear
+                                    </button>
+                                    <button
                                       onClick={() =>
                                         handleOpenLocationTypeModal(scene.id)
                                       }
@@ -5967,6 +7042,17 @@ export default function VideoGeneratorPage() {
                                       title="Choose different action from library"
                                     >
                                       Select
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleClearActionForScene(scene.id)
+                                      }
+                                      disabled={generatingSceneId === scene.id}
+                                      className="flex-shrink-0 text-xs px-3 py-1.5 rounded-xl border border-red-200 bg-white text-red-700 hover:bg-red-50 font-medium transition disabled:opacity-50 dark:border-red-900/60 dark:bg-gray-950 dark:text-red-300 dark:hover:bg-red-950/20"
+                                      title="Clear action/pose for this scene"
+                                    >
+                                      Clear
                                     </button>
                                     <button
                                       onClick={() =>
@@ -6208,6 +7294,28 @@ export default function VideoGeneratorPage() {
                                   </p>
                                 </div>
                               )}
+
+                              {/* Angle Edit Loading Bar */}
+                              {editingImageAngleKey &&
+                                String(editingImageAngleKey).startsWith(
+                                  `${scene.id}::`,
+                                ) && (
+                                  <div className="mt-3 bg-emerald-50 border border-emerald-200 rounded-xl p-3 dark:bg-emerald-950/20 dark:border-emerald-900/60">
+                                    <div className="flex items-center gap-3 mb-2">
+                                      <div className="animate-spin h-4 w-4 border-2 border-emerald-600 border-t-transparent rounded-full"></div>
+                                      <span className="text-sm font-medium text-emerald-900 dark:text-emerald-200">
+                                        Editing angle... generating new image
+                                        variants
+                                      </span>
+                                    </div>
+                                    <div className="w-full bg-emerald-200 rounded-full h-2 overflow-hidden dark:bg-emerald-900/40">
+                                      <div
+                                        className="h-full bg-emerald-600 rounded-full animate-pulse"
+                                        style={{ width: "100%" }}
+                                      ></div>
+                                    </div>
+                                  </div>
+                                )}
                             </div>
 
                             {/* Generated Images Preview */}
@@ -6260,6 +7368,29 @@ export default function VideoGeneratorPage() {
                                             <button
                                               onClick={(e) => {
                                                 e.stopPropagation();
+                                                const localPrompt =
+                                                  Array.isArray(
+                                                    scene?.image_prompts,
+                                                  ) && scene.image_prompts[idx]
+                                                    ? scene.image_prompts[idx]
+                                                    : null;
+                                                handleOpenImageDetailsModal(
+                                                  scene.id,
+                                                  url,
+                                                  {
+                                                    imageIndex: idx,
+                                                    localPrompt,
+                                                  },
+                                                );
+                                              }}
+                                              className="bg-black/80 text-white px-2 py-1 rounded-lg text-xs font-medium hover:bg-black"
+                                              title="Show generation details for this image"
+                                            >
+                                              Info
+                                            </button>
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation();
                                                 setExpandedImage({
                                                   sceneId: scene.id,
                                                   imageIndex: idx,
@@ -6270,6 +7401,28 @@ export default function VideoGeneratorPage() {
                                               title="View full size"
                                             >
                                               🔍 Expand
+                                            </button>
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleOpenAngleEditModal(
+                                                  scene.id,
+                                                  idx,
+                                                  url,
+                                                );
+                                              }}
+                                              disabled={
+                                                loading ||
+                                                editingImageAngleKey ===
+                                                  `${scene.id}::${url}`
+                                              }
+                                              className="bg-emerald-600 text-white px-2 py-1 rounded-lg text-xs font-medium hover:bg-emerald-700 disabled:opacity-50"
+                                              title="Change camera angle (multiple-angles)"
+                                            >
+                                              {editingImageAngleKey ===
+                                              `${scene.id}::${url}`
+                                                ? "Editing..."
+                                                : "Edit angle"}
                                             </button>
                                             <button
                                               onClick={(e) => {
@@ -6448,6 +7601,18 @@ export default function VideoGeneratorPage() {
               <div className="bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap">
                 🎬 {videos.length} videos
               </div>
+              <div className="bg-teal-50 border border-teal-200 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 whitespace-nowrap dark:bg-teal-950/30 dark:border-teal-900">
+                <span className="text-teal-700 dark:text-teal-200">⏱️ Total:</span>
+                <span className="font-semibold text-teal-900 dark:text-teal-100">
+                  {(() => {
+                    const t = (scriptData?.scenes || []).reduce(
+                      (sum, s) => sum + getSceneDurationSeconds(s),
+                      0,
+                    );
+                    return `${Math.floor(t / 60)}m ${Math.round(t % 60)}s`;
+                  })()}
+                </span>
+              </div>
               <div className="bg-purple-50 border border-purple-200 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
                 <span className="text-purple-700">⚡ I2V Unit:</span>
                 <span className="font-semibold text-purple-900">
@@ -6481,6 +7646,23 @@ export default function VideoGeneratorPage() {
             Generate a short video per scene using your selected image and a
             motion prompt.
           </div>
+
+          {voiceoverUrl && (
+            <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-950">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-gray-100">
+                  <span className="text-lg">🎤</span>
+                  Voiceover
+                </div>
+                <audio
+                  controls
+                  src={voiceoverUrl}
+                  className="w-full sm:w-auto sm:flex-1 h-9"
+                  style={{ maxWidth: "520px" }}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Scene Cards */}
           <div className="flex flex-col gap-6 mb-8">
@@ -6524,106 +7706,22 @@ export default function VideoGeneratorPage() {
                         Model: Image-to-video (configured)
                       </div>
                     </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="text-xs text-gray-600 dark:text-gray-300 flex items-center gap-2">
-                        Duration
-                        <select
-                          value={durationSeconds}
-                          onChange={(e) =>
-                            handleVideoDurationChange(scene.id, e.target.value)
-                          }
-                          className="text-xs px-2 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-800 dark:bg-gray-950 dark:text-gray-200 dark:border-gray-800"
-                          title="Video duration (1–15 seconds). If pricing is per-second, this affects cost."
-                        >
-                          {Array.from({ length: 15 }, (_, i) => i + 1).map(
-                            (n) => (
-                              <option key={n} value={n}>
-                                {n}s
-                              </option>
-                            ),
-                          )}
-                        </select>
-                      </label>
-
-                      <div
-                        className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap"
-                        title={
-                          falVideoUnitCost == null
-                            ? "Pricing unavailable"
-                            : isPerSecondUnit(falVideoPricingUnit)
-                              ? "Estimated cost = unit price × duration"
-                              : "Estimated cost = unit price"
-                        }
-                      >
-                        Est:{" "}
-                        {estimatedSceneCost == null
-                          ? "—"
-                          : `$${estimatedSceneCost.toFixed(3)}`}
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => handleGenerateVideoForScene(scene.id)}
-                        disabled={
-                          !canGenerate || generatingVideoSceneId === scene.id
-                        }
-                        className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                        title={
-                          selectedImageUrl
-                            ? "Generate video for this scene"
-                            : "Select an image first"
-                        }
-                      >
-                        {generatingVideoSceneId === scene.id
-                          ? "Generating..."
-                          : selectedVideoUrl
-                            ? "Regenerate Video"
-                            : "Generate Video"}
-                      </button>
-                    </div>
                   </div>
 
-                  {generatingVideoSceneId === scene.id && (
-                    <div className="mb-4" aria-live="polite">
-                      <div className="w-full bg-blue-100 dark:bg-blue-950/30 rounded-full h-2 overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-blue-600 via-violet-600 to-pink-600 rounded-full animate-pulse"
-                          style={{ width: "100%" }}
-                        ></div>
-                      </div>
-                      <div className="mt-2 text-xs text-blue-700 dark:text-blue-200">
-                        Generating video… this can take a bit.
-                      </div>
+                  <div className="mb-4">
+                    <div className="text-xs font-medium text-gray-700 mb-1 dark:text-gray-200">
+                      Voiceover Segment:
                     </div>
-                  )}
+                    <div className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 dark:bg-gray-950 dark:border-gray-800 dark:text-gray-200">
+                      {scene.voiceover}
+                    </div>
+                  </div>
 
                   <div className="grid grid-cols-1 gap-4">
                     <div className="min-w-0">
                       <div className="flex items-center justify-between gap-3 mb-2">
                         <div className="text-xs font-medium text-gray-700 dark:text-gray-200">
                           Image → Video
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <button
-                            type="button"
-                            onClick={() => setExpandedI2VSceneId(scene.id)}
-                            className="text-xs text-gray-700 hover:text-gray-900 dark:text-gray-200 dark:hover:text-white"
-                            title="Expand preview"
-                          >
-                            Expand
-                          </button>
-                          {selectedVideoUrl && (
-                            <a
-                              href={selectedVideoUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-xs text-blue-700 hover:text-blue-900 dark:text-blue-300 dark:hover:text-blue-200"
-                              title="Open selected video in a new tab"
-                            >
-                              Open
-                            </a>
-                          )}
                         </div>
                       </div>
 
@@ -6647,17 +7745,57 @@ export default function VideoGeneratorPage() {
                           →
                         </div>
 
-                        <div className="mx-auto h-[60vh] max-h-[760px] min-h-[520px] aspect-[9/16] rounded-3xl overflow-hidden border border-gray-200 dark:border-gray-800 bg-black">
+                        <div className="mx-auto h-[60vh] max-h-[760px] min-h-[520px] aspect-[9/16] rounded-3xl overflow-hidden border border-gray-200 dark:border-gray-800 bg-black relative group">
                           {selectedVideoUrl ? (
-                            <video
-                              key={selectedVideoUrl}
-                              controls
-                              className="w-full h-full object-cover"
-                              preload="metadata"
-                              playsInline
-                            >
-                              <source src={selectedVideoUrl} type="video/mp4" />
-                            </video>
+                            <>
+                              <video
+                                key={selectedVideoUrl}
+                                controls
+                                className="w-full h-full object-cover"
+                                preload="metadata"
+                                playsInline
+                              >
+                                <source
+                                  src={selectedVideoUrl}
+                                  type="video/mp4"
+                                />
+                              </video>
+
+                              <div className="absolute top-3 right-3 flex flex-col gap-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleOpenVideoDetailsModal(
+                                      scene.id,
+                                      selectedVideoUrl,
+                                    )
+                                  }
+                                  className="w-9 h-9 rounded-full bg-black/70 text-white text-sm font-semibold flex items-center justify-center shadow-sm hover:bg-black/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                                  title="Video generation info"
+                                  aria-label="Video generation info"
+                                >
+                                  i
+                                </button>
+                                <a
+                                  href={selectedVideoUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="w-9 h-9 rounded-full bg-black/70 text-white flex items-center justify-center shadow-sm hover:bg-black/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                                  title="Open selected video in a new tab"
+                                  aria-label="Open selected video in a new tab"
+                                >
+                                  <svg
+                                    viewBox="0 0 20 20"
+                                    fill="currentColor"
+                                    className="w-4 h-4"
+                                    aria-hidden="true"
+                                  >
+                                    <path d="M11 3a1 1 0 000 2h2.586L8.293 10.293a1 1 0 001.414 1.414L15 6.414V9a1 1 0 102 0V3h-6z" />
+                                    <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 100-2H5z" />
+                                  </svg>
+                                </a>
+                              </div>
+                            </>
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-sm text-gray-300">
                               No video
@@ -6686,17 +7824,57 @@ export default function VideoGeneratorPage() {
                           →
                         </div>
 
-                        <div className="flex-shrink-0 w-44 h-64 sm:w-48 sm:h-72 md:w-52 md:h-80 rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-800 bg-black">
+                        <div className="flex-shrink-0 w-44 h-64 sm:w-48 sm:h-72 md:w-52 md:h-80 rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-800 bg-black relative group">
                           {selectedVideoUrl ? (
-                            <video
-                              key={selectedVideoUrl}
-                              controls
-                              className="w-full h-full object-cover"
-                              preload="metadata"
-                              playsInline
-                            >
-                              <source src={selectedVideoUrl} type="video/mp4" />
-                            </video>
+                            <>
+                              <video
+                                key={selectedVideoUrl}
+                                controls
+                                className="w-full h-full object-cover"
+                                preload="metadata"
+                                playsInline
+                              >
+                                <source
+                                  src={selectedVideoUrl}
+                                  type="video/mp4"
+                                />
+                              </video>
+
+                              <div className="absolute top-2 right-2 flex flex-col gap-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleOpenVideoDetailsModal(
+                                      scene.id,
+                                      selectedVideoUrl,
+                                    )
+                                  }
+                                  className="w-8 h-8 rounded-full bg-black/70 text-white text-[13px] font-semibold flex items-center justify-center shadow-sm hover:bg-black/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                                  title="Video generation info"
+                                  aria-label="Video generation info"
+                                >
+                                  i
+                                </button>
+                                <a
+                                  href={selectedVideoUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="w-8 h-8 rounded-full bg-black/70 text-white flex items-center justify-center shadow-sm hover:bg-black/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                                  title="Open selected video in a new tab"
+                                  aria-label="Open selected video in a new tab"
+                                >
+                                  <svg
+                                    viewBox="0 0 20 20"
+                                    fill="currentColor"
+                                    className="w-4 h-4"
+                                    aria-hidden="true"
+                                  >
+                                    <path d="M11 3a1 1 0 000 2h2.586L8.293 10.293a1 1 0 001.414 1.414L15 6.414V9a1 1 0 102 0V3h-6z" />
+                                    <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 100-2H5z" />
+                                  </svg>
+                                </a>
+                              </div>
+                            </>
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-xs text-gray-300">
                               No video
@@ -6705,134 +7883,106 @@ export default function VideoGeneratorPage() {
                         </div>
                       </div>
 
-                      {expandedI2VSceneId === scene.id && (
-                        <div
-                          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
-                          role="dialog"
-                          aria-modal="true"
-                          onMouseDown={(e) => {
-                            if (e.target === e.currentTarget) {
-                              setExpandedI2VSceneId(null);
-                            }
-                          }}
-                        >
-                          <div className="w-full max-w-7xl bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-2xl overflow-hidden">
-                            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
-                              <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                                Image → Video (Scene {scene.id})
-                              </div>
-                              <div className="flex items-center gap-3">
-                                {selectedVideoUrl && (
-                                  <a
-                                    href={selectedVideoUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="text-xs text-blue-700 hover:text-blue-900 dark:text-blue-300 dark:hover:text-blue-200"
-                                    title="Open selected video in a new tab"
-                                  >
-                                    Open
-                                  </a>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => setExpandedI2VSceneId(null)}
-                                  className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 dark:bg-gray-950 dark:text-gray-200 dark:border-gray-800 dark:hover:bg-gray-900"
-                                >
-                                  Close
-                                </button>
-                              </div>
-                            </div>
-
-                            <div className="p-4">
-                              <div className="flex flex-col xl:flex-row items-center xl:items-stretch justify-center gap-5">
-                                <div className="h-[38vh] xl:h-[78vh] max-h-[820px] aspect-[9/16] rounded-3xl overflow-hidden border border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-900">
-                                  {selectedImageUrl ? (
-                                    <img
-                                      src={selectedImageUrl}
-                                      alt={`Scene ${scene.id} selected image`}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-sm text-gray-500 dark:text-gray-400">
-                                      No image
-                                    </div>
-                                  )}
-                                </div>
-
-                                <div className="hidden xl:flex items-center justify-center text-gray-400 dark:text-gray-500 select-none text-4xl">
-                                  →
-                                </div>
-                                <div className="xl:hidden text-gray-400 dark:text-gray-500 select-none text-2xl">
-                                  ↓
-                                </div>
-
-                                <div className="h-[38vh] xl:h-[78vh] max-h-[820px] aspect-[9/16] rounded-3xl overflow-hidden border border-gray-200 dark:border-gray-800 bg-black">
-                                  {selectedVideoUrl ? (
-                                    <video
-                                      key={selectedVideoUrl}
-                                      controls
-                                      className="w-full h-full object-cover"
-                                      preload="metadata"
-                                      playsInline
-                                    >
-                                      <source
-                                        src={selectedVideoUrl}
-                                        type="video/mp4"
-                                      />
-                                    </video>
-                                  ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-sm text-gray-300">
-                                      No video
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
                       {allVideoUrls.length > 1 && (
                         <div className="mt-3">
-                          <div className="text-xs text-gray-600 dark:text-gray-300 font-medium mb-1">
+                          <div className="text-[11px] text-gray-600 dark:text-gray-300 font-medium mb-1 text-center">
                             Versions ({allVideoUrls.length}) — click to select
                           </div>
-                          <div className="flex gap-2 overflow-x-auto">
-                            {allVideoUrls.map((videoUrl, idx) => {
-                              const isSelected = videoUrl === selectedVideoUrl;
-                              return (
-                                <button
-                                  key={videoUrl}
-                                  type="button"
-                                  onClick={() =>
-                                    handleSelectVideoForScene(
-                                      scene.id,
-                                      videoUrl,
-                                    )
-                                  }
-                                  className={
-                                    "flex-shrink-0 w-32 h-44 md:w-36 md:h-52 xl:w-40 xl:h-56 rounded-2xl overflow-hidden border bg-black " +
-                                    (isSelected
-                                      ? "border-blue-500 ring-2 ring-blue-500/40"
-                                      : "border-gray-300 dark:border-gray-800")
-                                  }
-                                  title={
-                                    isSelected
-                                      ? `Selected (v${idx + 1})`
-                                      : `Select v${idx + 1}`
-                                  }
-                                >
-                                  <video
-                                    className="w-full h-full object-cover"
-                                    preload="metadata"
-                                    playsInline
-                                    muted
+                          <div className="w-full overflow-x-auto pb-1">
+                            <div className="flex justify-center gap-1.5 min-w-max">
+                              {allVideoUrls.map((videoUrl, idx) => {
+                                const isSelected =
+                                  videoUrl === selectedVideoUrl;
+                                const isDeleting =
+                                  deletingVideoVersionKey ===
+                                  `${toSceneKey(scene.id)}::${videoUrl}`;
+                                return (
+                                  <div
+                                    key={videoUrl}
+                                    className={
+                                      "group relative flex-shrink-0 w-16 h-24 sm:w-20 sm:h-28 md:w-24 md:h-32 rounded-xl overflow-hidden border bg-black " +
+                                      (isSelected
+                                        ? "border-blue-500 ring-2 ring-blue-500/40"
+                                        : "border-gray-300 dark:border-gray-800")
+                                    }
+                                    title={
+                                      isSelected
+                                        ? `Selected (v${idx + 1})`
+                                        : `Select v${idx + 1}`
+                                    }
                                   >
-                                    <source src={videoUrl} type="video/mp4" />
-                                  </video>
-                                </button>
-                              );
-                            })}
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleSelectVideoForScene(
+                                          scene.id,
+                                          videoUrl,
+                                        )
+                                      }
+                                      className="w-full h-full"
+                                      disabled={isDeleting}
+                                    >
+                                      <video
+                                        className="w-full h-full object-cover"
+                                        preload="metadata"
+                                        playsInline
+                                        muted
+                                        onMouseEnter={(e) => {
+                                          const el = e.currentTarget;
+                                          try {
+                                            el.play?.().catch(() => {});
+                                          } catch {}
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          const el = e.currentTarget;
+                                          try {
+                                            el.pause?.();
+                                            el.currentTime = 0;
+                                          } catch {}
+                                        }}
+                                      >
+                                        <source
+                                          src={videoUrl}
+                                          type="video/mp4"
+                                        />
+                                      </video>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleOpenVideoDetailsModal(
+                                          scene.id,
+                                          videoUrl,
+                                        );
+                                      }}
+                                      disabled={isDeleting}
+                                      className="absolute top-1 left-1 w-7 h-7 rounded-full bg-black/70 text-white text-[12px] font-semibold flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus:opacity-100 transition-opacity hover:bg-black/80 disabled:opacity-50"
+                                      title="Video generation details"
+                                    >
+                                      i
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleRemoveVideoVersion(
+                                          scene.id,
+                                          videoUrl,
+                                        );
+                                      }}
+                                      disabled={isDeleting}
+                                      className="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-600 text-white text-xs font-semibold flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700 disabled:opacity-50"
+                                      title="Delete this video version"
+                                    >
+                                      {isDeleting ? "…" : "✕"}
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
                         </div>
                       )}
@@ -6855,7 +8005,8 @@ export default function VideoGeneratorPage() {
                             >
                               <span className="block truncate">
                                 📷 Camera:{" "}
-                                {selectedCameraMovement?.name || "Default"}
+                                {selectedCameraMovement?.name ||
+                                  "Still (lock-off)"}
                               </span>
                             </button>
                             <button
@@ -6918,7 +8069,7 @@ export default function VideoGeneratorPage() {
                         </div>
                       </div>
                       <div className="px-3 py-3">
-                        <div className="text-xs font-mono leading-relaxed text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words max-h-40 overflow-auto rounded-xl bg-gray-50/80 dark:bg-gray-900/40 border border-gray-200/80 dark:border-gray-800/80 p-3">
+                        <div className="text-xs font-mono leading-relaxed text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words min-h-72 max-h-72 overflow-auto rounded-xl bg-gray-50/80 dark:bg-gray-900/40 border border-gray-200/80 dark:border-gray-800/80 p-3">
                           {scene.image_prompt || "No image prompt yet."}
                         </div>
                       </div>
@@ -6929,7 +8080,36 @@ export default function VideoGeneratorPage() {
                         <div className="text-xs font-semibold text-gray-800 dark:text-gray-100">
                           🎬 Video prompt
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <div className="flex items-center gap-1.5">
+                            <label
+                              htmlFor={`video-prompt-temp-${scene.id}`}
+                              className="text-[11px] text-gray-500 dark:text-gray-400"
+                            >
+                              Temp
+                            </label>
+                            <input
+                              id={`video-prompt-temp-${scene.id}`}
+                              type="range"
+                              min="0"
+                              max="1"
+                              step="0.1"
+                              value={
+                                videoPromptTemperatureByScene[scene.id] ?? 0.8
+                              }
+                              onChange={(e) =>
+                                setVideoPromptTemperatureByScene((prev) => ({
+                                  ...prev,
+                                  [scene.id]: parseFloat(e.target.value),
+                                }))
+                              }
+                              className="h-1.5 w-16 rounded-lg appearance-none bg-gray-200 dark:bg-gray-700 accent-blue-600"
+                            />
+                            <span className="text-[11px] text-gray-600 dark:text-gray-400 tabular-nums w-6">
+                              {(videoPromptTemperatureByScene[scene.id] ?? 0.8)
+                                .toFixed(1)}
+                            </span>
+                          </div>
                           <button
                             type="button"
                             onClick={() =>
@@ -6966,19 +8146,140 @@ export default function VideoGeneratorPage() {
                             handleMotionPromptChange(scene.id, e.target.value)
                           }
                           rows={6}
-                          placeholder="Describe motion/camera movement, e.g. slow push-in, subtle wind, gentle movement..."
+                          placeholder="Describe motion/camera movement, e.g. still/lock-off, gentle drift, slow pan..."
                           className="w-full px-3 py-2.5 border rounded-xl text-sm font-mono leading-relaxed bg-gray-50/80 text-gray-900 border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y dark:bg-gray-900/40 dark:text-gray-100 dark:border-gray-800"
                         />
-                        <div className="mt-2 text-[11px] text-gray-500 dark:text-gray-400">
-                          Tip: keep it short and motion-focused.
+
+                        <div className="mt-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="text-[11px] font-semibold text-gray-700 dark:text-gray-200">
+                              Negative prompt (avoid)
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleVideoNegativePromptChange(
+                                    scene.id,
+                                    DEFAULT_VIDEO_NEGATIVE_PROMPT,
+                                  )
+                                }
+                                disabled={
+                                  generatingVideoPromptSceneId === scene.id
+                                }
+                                className="text-[11px] px-2.5 py-1 rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 disabled:opacity-50 dark:bg-gray-950 dark:text-gray-200 dark:border-gray-800 dark:hover:bg-gray-900"
+                                title="Reset to default"
+                              >
+                                Default
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleVideoNegativePromptChange(scene.id, "")
+                                }
+                                disabled={
+                                  generatingVideoPromptSceneId === scene.id ||
+                                  !(scene.video_negative_prompt || "").trim()
+                                }
+                                className="text-[11px] px-2.5 py-1 rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 disabled:opacity-50 dark:bg-gray-950 dark:text-gray-200 dark:border-gray-800 dark:hover:bg-gray-900"
+                                title="Clear negative prompt"
+                              >
+                                Clear
+                              </button>
+                            </div>
+                          </div>
+
+                          <textarea
+                            value={
+                              scene.video_negative_prompt ??
+                              DEFAULT_VIDEO_NEGATIVE_PROMPT
+                            }
+                            onChange={(e) =>
+                              handleVideoNegativePromptChange(
+                                scene.id,
+                                e.target.value,
+                              )
+                            }
+                            rows={3}
+                            placeholder="e.g. speaking/lip-sync, background music/soundtrack, text overlays, warping, camera shake"
+                            className="mt-2 w-full px-3 py-2 border rounded-xl text-sm font-mono leading-relaxed bg-gray-50/80 text-gray-900 border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y dark:bg-gray-900/40 dark:text-gray-100 dark:border-gray-800"
+                          />
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="mt-4 text-xs text-gray-600 dark:text-gray-400">
-                    Voiceover: {scene.voiceover}
+                  <div className="mt-4 flex flex-wrap items-center justify-end gap-3">
+                    <label className="text-xs text-gray-600 dark:text-gray-300 flex items-center gap-2">
+                      Duration
+                      <select
+                        value={durationSeconds}
+                        onChange={(e) =>
+                          handleVideoDurationChange(scene.id, e.target.value)
+                        }
+                        className="text-xs px-2 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-800 dark:bg-gray-950 dark:text-gray-200 dark:border-gray-800"
+                        title="Video duration (1–15 seconds). If pricing is per-second, this affects cost."
+                      >
+                        {Array.from({ length: 15 }, (_, i) => i + 1).map(
+                          (n) => (
+                            <option key={n} value={n}>
+                              {n}s
+                            </option>
+                          ),
+                        )}
+                      </select>
+                    </label>
+
+                    <div
+                      className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap"
+                      title={
+                        falVideoUnitCost == null
+                          ? "Pricing unavailable"
+                          : isPerSecondUnit(falVideoPricingUnit)
+                            ? "Estimated cost = unit price × duration"
+                            : "Estimated cost = unit price"
+                      }
+                    >
+                      Est:{" "}
+                      {estimatedSceneCost == null
+                        ? "—"
+                        : `$${estimatedSceneCost.toFixed(3)}`}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleGenerateVideoForScene(scene.id)}
+                      disabled={
+                        !canGenerate || generatingVideoSceneId === scene.id
+                      }
+                      className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      title={
+                        selectedImageUrl
+                          ? "Generate video for this scene"
+                          : "Select an image first"
+                      }
+                    >
+                      {generatingVideoSceneId === scene.id
+                        ? "Generating..."
+                        : selectedVideoUrl
+                          ? "Regenerate Video"
+                          : "Generate Video"}
+                    </button>
                   </div>
+
+                  {generatingVideoSceneId === scene.id && (
+                    <div className="mt-3" aria-live="polite">
+                      <div className="w-full bg-blue-100 dark:bg-blue-950/30 rounded-full h-2 overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-blue-600 via-violet-600 to-pink-600 rounded-full animate-pulse"
+                          style={{ width: "100%" }}
+                        ></div>
+                      </div>
+                      <div className="mt-2 text-xs text-blue-700 dark:text-blue-200">
+                        Generating video… this can take a bit.
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -6992,38 +8293,102 @@ export default function VideoGeneratorPage() {
               ← Back
             </button>
             <button
-              onClick={handleAssembleVideo}
+              onClick={async () => {
+                if (
+                  !(scriptData?.scenes || []).every((s) =>
+                    videos.some(
+                      (v) => toSceneKey(v?.scene_id) === toSceneKey(s?.id),
+                    ),
+                  )
+                ) {
+                  await alert(
+                    "Generate videos for all scenes before continuing.",
+                    "warning",
+                  );
+                  return;
+                }
+                try {
+                  if (currentProjectId) {
+                    await fetch(`/api/projects/${currentProjectId}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ current_step: 5 }),
+                    });
+                  }
+                } catch {}
+                setStep(5);
+                setMaxStepReached((prev) => Math.max(prev, 5));
+              }}
               disabled={
-                loading ||
                 !(scriptData?.scenes || []).every((s) =>
-                  videos.some((v) => v.scene_id === s.id),
+                  videos.some(
+                    (v) => toSceneKey(v?.scene_id) === toSceneKey(s?.id),
+                  ),
                 )
               }
               className="flex-1 bg-blue-600 text-white py-2 sm:py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
-              title="Generate videos for all scenes to enable assembly"
+              title="Continue to generate background music"
             >
-              {loading ? "Assembling Video..." : "Assemble Final Video →"}
+              Continue to Background Music →
             </button>
           </div>
         </div>
       )}
 
-      {/* Step 5: Final Video & Social Posting */}
-      {step === 5 && finalVideoUrl && (
+      {/* Step 5: Generate Background Music */}
+      {step === 5 && (
         <div className="admin-card p-8">
           <div className="mb-6">
             <h2 className="text-2xl font-bold mb-3">
-              Step 5: Final Video & Post
+              Step 5: Generate Background Music
             </h2>
             <div className="flex flex-wrap gap-2">
-              <div className="bg-green-100 text-green-700 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap">
-                ✓ Video Complete
+              <div className="bg-teal-50 border border-teal-200 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 whitespace-nowrap dark:bg-teal-950/30 dark:border-teal-900">
+                <span className="text-teal-700 dark:text-teal-200">⏱️ Total video:</span>
+                <span className="font-semibold text-teal-900 dark:text-teal-100">
+                  {(() => {
+                    const t = (scriptData?.scenes || []).reduce(
+                      (sum, s) => sum + getSceneDurationSeconds(s),
+                      0,
+                    );
+                    return `${Math.floor(t / 60)}m ${Math.round(t % 60)}s`;
+                  })()}
+                </span>
               </div>
-              {projectCosts?.step5?.shotstack > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-violet-700 text-xs sm:text-sm font-medium">🎵 Model:</span>
+                <select
+                  value={selectedMusicModelId}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setSelectedMusicModelId(id);
+                    if (id !== "elevenlabs") setUseCompositionPlan(false);
+                    loadMusicPricing(id);
+                  }}
+                  className="text-xs sm:text-sm font-medium bg-white dark:bg-gray-900 border border-violet-200 dark:border-violet-800 rounded-lg px-2 py-1.5 text-violet-900 dark:text-violet-100 focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+                >
+                  {MUSIC_MODELS.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="bg-purple-50 border border-purple-200 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
+                <span className="text-purple-700">⚡ Unit:</span>
+                <span className="font-semibold text-purple-900">
+                  {loadingMusicPricing
+                    ? "Loading..."
+                    : musicUnitCost !== null
+                      ? `$${musicUnitCost.toFixed(2)}/${musicPricingUnit || "min"}`
+                      : "Unavailable"}
+                </span>
+              </div>
+              {projectCosts?.step5?.elevenlabs_music > 0 && (
                 <div className="bg-pink-50 border border-pink-200 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
-                  <span className="text-pink-700">🎞️ Shotstack:</span>
+                  <span className="text-pink-700">🎵 Music:</span>
                   <span className="font-semibold text-pink-900">
-                    ${projectCosts.step5.shotstack.toFixed(4)}
+                    ${projectCosts.step5.elevenlabs_music.toFixed(3)}
                   </span>
                 </div>
               )}
@@ -7031,7 +8396,1105 @@ export default function VideoGeneratorPage() {
                 <div className="bg-gray-50 border border-gray-300 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
                   <span className="text-gray-700">💰 Step 5 Total:</span>
                   <span className="font-semibold text-gray-900">
-                    ${projectCosts.step5.total.toFixed(4)}
+                    ${projectCosts.step5.total.toFixed(3)}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <p className="text-sm text-gray-700 mb-6 dark:text-gray-300">
+            Generate instrumental background music using the selected model (via
+            Fal). The music will be mixed under your voiceover when assembling
+            the final video. Music length is set to match the total video length
+            ({(() => {
+              const t = (scriptData?.scenes || []).reduce(
+                (sum, s) => sum + getSceneDurationSeconds(s),
+                0,
+              );
+              return `${Math.floor(t / 60)}m ${Math.round(t % 60)}s`;
+            })()}
+            ).
+          </p>
+
+          {scriptData?.script && (
+            <div className="mb-6">
+              <div className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                Full Voiceover Script
+              </div>
+              <div className="px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                {scriptData.script}
+              </div>
+            </div>
+          )}
+
+          {voiceoverUrl && (
+            <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-950">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-gray-100">
+                  <span className="text-lg">🎤</span>
+                  Voiceover
+                </div>
+                <audio
+                  controls
+                  src={voiceoverUrl}
+                  className="w-full sm:w-auto sm:flex-1 h-9"
+                  style={{ maxWidth: "520px" }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Theme – selected or default */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                Music theme
+              </label>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    loadAvailableMusicThemes();
+                    setShowMusicThemePicker(true);
+                  }}
+                  className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 dark:bg-gray-950 dark:text-gray-200 dark:border-gray-800 dark:hover:bg-gray-900"
+                  title="Select a music theme from the library"
+                >
+                  {selectedMusicThemeId
+                    ? availableMusicThemes.find(
+                        (t) => t.id === selectedMusicThemeId,
+                      )?.name || "Theme"
+                    : defaultMusicThemeId
+                      ? (availableMusicThemes.find(
+                          (t) => t.id === defaultMusicThemeId,
+                        )?.name || "Theme") + " (default)"
+                      : "🎵 Select theme"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    loadAvailableMusicFromCollection();
+                    setShowMusicCollectionPicker(true);
+                  }}
+                  className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 dark:bg-gray-950 dark:text-gray-200 dark:border-gray-800 dark:hover:bg-gray-900"
+                  title="Select previously generated music from the collection"
+                >
+                  📀 Select from collection
+                </button>
+                {selectedMusicThemeId && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMusicThemeId(null)}
+                    className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                    title="Clear theme selection"
+                  >
+                    Clear
+                  </button>
+                )}
+                <a
+                  href="/admin/music-themes"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs px-2 py-1 rounded border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 dark:bg-gray-950 dark:text-gray-300 dark:border-gray-800"
+                  title="Manage music theme library"
+                >
+                  Manage
+                </a>
+              </div>
+            </div>
+
+            {/* Instrument palette – brand rules for prompt generation */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                  Instrument palette
+                </label>
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={useInstrumentPalette}
+                      onChange={(e) =>
+                        setUseInstrumentPalette(e.target.checked)
+                      }
+                      className="rounded border-gray-300"
+                    />
+                    <span className="text-xs text-gray-600 dark:text-gray-300">
+                      Apply instrument rules to prompts
+                    </span>
+                  </label>
+                  <a
+                    href="/admin/instruments"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs px-2 py-1 rounded border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 dark:bg-gray-950 dark:text-gray-300 dark:border-gray-800"
+                    title="Manage instrument palette"
+                  >
+                    Manage
+                  </a>
+                </div>
+              </div>
+              {useInstrumentPalette && availableInstruments.length > 0 && (
+                <details className="px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/30">
+                  <summary className="text-xs font-medium text-gray-500 dark:text-gray-400 cursor-pointer list-none">
+                    {availableInstruments.map((i) => i.name).join(", ")}
+                    {availableInstruments.length > 8 && "…"}
+                  </summary>
+                  <div className="mt-2 text-xs text-gray-600 dark:text-gray-300">
+                    {availableInstruments.map((i) => i.name).join(", ")}
+                  </div>
+                </details>
+              )}
+            </div>
+
+            {(selectedMusicThemeId || defaultMusicThemeId) && (
+              <div className="mb-3 px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/30">
+                <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                  Theme description (read-only)
+                </div>
+                <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                  {(
+                    availableMusicThemes.find(
+                      (t) =>
+                        t.id === (selectedMusicThemeId || defaultMusicThemeId),
+                    )?.description || ""
+                  ).trim() || "—"}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Music prompt – generated from theme + topic + script, or custom */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <label
+                htmlFor="music-prompt"
+                className="text-sm font-medium text-gray-700 dark:text-gray-200"
+              >
+                Music prompt
+              </label>
+              <button
+                type="button"
+                onClick={async () => {
+                  const theme =
+                    selectedMusicThemeId
+                      ? availableMusicThemes.find(
+                          (t) => t.id === selectedMusicThemeId,
+                        )
+                      : defaultMusicThemeId
+                        ? availableMusicThemes.find(
+                            (t) => t.id === defaultMusicThemeId,
+                          )
+                        : null;
+                  const themeDesc = theme?.description?.trim();
+                  if (!themeDesc) {
+                    await alert(
+                      "Select a theme or set a default theme first",
+                      "warning",
+                    );
+                    return;
+                  }
+                  setGeneratingMusicPrompt(true);
+                  try {
+                    const res = await fetch(
+                      "/api/video-generator/generate-music-prompt",
+                      {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          theme_description: themeDesc,
+                          topic: topic?.trim() || "",
+                          script: scriptData?.script?.trim() || "",
+                          scene_locations: (scriptData?.scenes || []).map(
+                            (s) => {
+                              const locId =
+                                locationMapping[s.id] ?? s.location_id;
+                              const loc = selectedLocations.find(
+                                (l) => l.id === locId || l.id === String(locId),
+                              );
+                              return {
+                                scene_id: s.id,
+                                location_name: loc?.name ?? null,
+                              };
+                            },
+                          ),
+                          use_instrument_palette: useInstrumentPalette,
+                          instrument_ids: useInstrumentPalette
+                            ? selectedInstrumentIds.length
+                              ? selectedInstrumentIds
+                              : undefined
+                            : undefined,
+                        }),
+                      },
+                    );
+                    const result = await res.json();
+                    if (result.success && result.prompt?.trim()) {
+                      setMusicPrompt(result.prompt.trim());
+                    } else {
+                      await alert(
+                        "Failed to generate prompt: " +
+                          (result.error || "Unknown"),
+                        "error",
+                      );
+                    }
+                  } catch (err) {
+                    await alert("Error: " + err.message, "error");
+                  } finally {
+                    setGeneratingMusicPrompt(false);
+                  }
+                }}
+                disabled={
+                  generatingMusicPrompt ||
+                  !(selectedMusicThemeId || defaultMusicThemeId)
+                }
+                className="text-xs px-3 py-1.5 rounded-lg bg-violet-100 text-violet-800 hover:bg-violet-200 dark:bg-violet-900/40 dark:text-violet-200 dark:hover:bg-violet-900/60 disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Generate music prompt from theme + topic + voiceover script"
+              >
+                {generatingMusicPrompt ? "Generating…" : "Generate from theme"}
+              </button>
+            </div>
+            <textarea
+              id="music-prompt"
+              value={musicPrompt}
+              onChange={(e) => setMusicPrompt(e.target.value)}
+              rows={4}
+              placeholder="Generated from theme + topic + script, or enter custom prompt…"
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-900 dark:text-gray-100 dark:border-gray-800"
+            />
+          </div>
+
+          {/* Negative prompt – what to avoid in generated music */}
+          <div className="mb-6">
+            <label
+              htmlFor="music-negative-prompt"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2"
+            >
+              Negative prompt (avoid)
+            </label>
+            <textarea
+              id="music-negative-prompt"
+              value={musicNegativePrompt}
+              onChange={(e) => setMusicNegativePrompt(e.target.value)}
+              rows={2}
+              placeholder="e.g. meditation, spa, relaxation, calming, soothing, therapeutic, ambient chill, lo-fi"
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-900 dark:text-gray-100 dark:border-gray-800"
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Terms to avoid in the generated music. Comma-separated. Beatoven
+              uses this as a dedicated API field; other models append it to the
+              prompt.
+            </p>
+          </div>
+
+          {selectedMusicModelId === "elevenlabs" && (
+          <div className="mb-6 flex items-center gap-3">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={useCompositionPlan}
+                onChange={(e) => setUseCompositionPlan(e.target.checked)}
+                className="rounded border-gray-300"
+              />
+              <span className="text-sm text-gray-700 dark:text-gray-200">
+                Use composition plan (advanced)
+              </span>
+            </label>
+            {useCompositionPlan && (
+              <button
+                type="button"
+                onClick={async () => {
+                  const scriptText = scriptData?.script?.trim() || "";
+                  const topicText = topic?.trim() || "";
+                  if (!scriptText && !topicText) {
+                    await alert("Project needs a topic and script first (from Steps 1–2)", "warning");
+                    return;
+                  }
+                  setGeneratingMusicPlan(true);
+                  try {
+                    const sceneDurations = Object.fromEntries(
+                      (scriptData?.scenes || []).map((s) => [
+                        s.id,
+                        getSceneDurationSeconds(s),
+                      ]),
+                    );
+                    const totalMs =
+                      Object.values(sceneDurations).reduce((a, b) => a + b, 0) *
+                      1000;
+                    const res = await fetch(
+                      "/api/video-generator/generate-music-composition-plan",
+                      {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          script: scriptText,
+                          topic: topicText,
+                          music_length_ms: Math.max(
+                            3000,
+                            Math.min(600000, totalMs || 60000),
+                          ),
+                        }),
+                      },
+                    );
+                    const result = await res.json();
+                    if (result.success && result.composition_plan) {
+                      setMusicCompositionPlan(result.composition_plan);
+                    } else {
+                      await alert(
+                        "Failed to generate plan: " + (result.error || "Unknown"),
+                        "error",
+                      );
+                    }
+                  } catch (err) {
+                    await alert("Error: " + err.message, "error");
+                  } finally {
+                    setGeneratingMusicPlan(false);
+                  }
+                }}
+                disabled={
+                  generatingMusicPlan ||
+                  (!(scriptData?.script?.trim()) && !(topic?.trim()))
+                }
+                className="text-xs px-3 py-1.5 rounded-lg bg-violet-100 text-violet-800 hover:bg-violet-200 dark:bg-violet-900/40 dark:text-violet-200 dark:hover:bg-violet-900/60"
+              >
+                {generatingMusicPlan ? "Generating…" : "Generate plan from script & topic"}
+              </button>
+            )}
+          </div>
+          )}
+
+          {useCompositionPlan && selectedMusicModelId === "elevenlabs" && (
+            <div className="mb-6 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/30 p-4 space-y-4">
+              <div>
+                <div className="text-xs font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                  Positive global styles
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {(musicCompositionPlan.positive_global_styles || []).map(
+                    (s, i) => (
+                      <span
+                        key={i}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-green-100 text-green-800 text-xs dark:bg-green-900/40 dark:text-green-200"
+                      >
+                        {s}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setMusicCompositionPlan((prev) => ({
+                              ...prev,
+                              positive_global_styles: (
+                                prev.positive_global_styles || []
+                              ).filter((_, j) => j !== i),
+                            }))
+                          }
+                          className="ml-1 text-green-600 hover:text-green-800"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ),
+                  )}
+                  <input
+                    type="text"
+                    placeholder="+ Add style"
+                    className="text-xs px-2 py-1 border rounded w-24"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        const v = e.target.value.trim();
+                        if (v) {
+                          setMusicCompositionPlan((prev) => ({
+                            ...prev,
+                            positive_global_styles: [
+                              ...(prev.positive_global_styles || []),
+                              v,
+                            ],
+                          }));
+                          e.target.value = "";
+                        }
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+              <div>
+                <div className="text-xs font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                  Negative global styles
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {(musicCompositionPlan.negative_global_styles || []).map(
+                    (s, i) => (
+                      <span
+                        key={i}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-red-100 text-red-800 text-xs dark:bg-red-900/40 dark:text-red-200"
+                      >
+                        {s}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setMusicCompositionPlan((prev) => ({
+                              ...prev,
+                              negative_global_styles: (
+                                prev.negative_global_styles || []
+                              ).filter((_, j) => j !== i),
+                            }))
+                          }
+                          className="ml-1 text-red-600 hover:text-red-800"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ),
+                  )}
+                  <input
+                    type="text"
+                    placeholder="+ Add avoid"
+                    className="text-xs px-2 py-1 border rounded w-24"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        const v = e.target.value.trim();
+                        if (v) {
+                          setMusicCompositionPlan((prev) => ({
+                            ...prev,
+                            negative_global_styles: [
+                              ...(prev.negative_global_styles || []),
+                              v,
+                            ],
+                          }));
+                          e.target.value = "";
+                        }
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+              <div>
+                <div className="text-xs font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                  Sections
+                </div>
+                <div className="space-y-2 max-h-48 overflow-auto">
+                  {(musicCompositionPlan.sections || []).map((sec, si) => (
+                    <div
+                      key={si}
+                      className="flex items-center gap-2 p-2 rounded bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800"
+                    >
+                      <input
+                        value={sec.section_name || ""}
+                        onChange={(e) =>
+                          setMusicCompositionPlan((prev) => {
+                            const s = [...(prev.sections || [])];
+                            s[si] = { ...s[si], section_name: e.target.value };
+                            return { ...prev, sections: s };
+                          })
+                        }
+                        placeholder="Section name"
+                        className="text-xs px-2 py-1 border rounded flex-1 min-w-0"
+                      />
+                      <input
+                        type="number"
+                        value={sec.duration_ms || 0}
+                        onChange={(e) =>
+                          setMusicCompositionPlan((prev) => {
+                            const s = [...(prev.sections || [])];
+                            s[si] = {
+                              ...s[si],
+                              duration_ms: Math.max(
+                                3000,
+                                Math.min(120000, Number(e.target.value) || 0),
+                              ),
+                            };
+                            return { ...prev, sections: s };
+                          })
+                        }
+                        min={3000}
+                        max={120000}
+                        step={1000}
+                        placeholder="ms"
+                        className="text-xs px-2 py-1 border rounded w-20"
+                      />
+                      <span className="text-[10px] text-gray-500">ms</span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setMusicCompositionPlan((prev) => ({
+                            ...prev,
+                            sections: (prev.sections || []).filter(
+                              (_, j) => j !== si,
+                            ),
+                          }))
+                        }
+                        className="text-red-600 hover:text-red-800 text-xs"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setMusicCompositionPlan((prev) => ({
+                        ...prev,
+                        sections: [
+                          ...(prev.sections || []),
+                          {
+                            section_name: "New section",
+                            positive_local_styles: [],
+                            negative_local_styles: [],
+                            duration_ms: 10000,
+                            lines: [],
+                          },
+                        ],
+                      }))
+                    }
+                    className="text-xs px-2 py-1 rounded border border-dashed border-gray-400 text-gray-600 hover:border-gray-600"
+                  >
+                    + Add section
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Generate music – action section */}
+          <div className="mb-6 rounded-xl border border-violet-200 dark:border-violet-800 bg-violet-50/30 dark:bg-violet-950/20 p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <div className="text-sm font-semibold text-violet-900 dark:text-violet-100 mb-1">
+                  Generate new music
+                </div>
+                <p className="text-xs text-gray-600 dark:text-gray-400">
+                  Uses ElevenLabs Music (via Fal). Select a theme or enter a
+                  description above.
+                </p>
+              </div>
+              <button
+                onClick={async () => {
+                  const hasPlan =
+                    useCompositionPlan &&
+                    Array.isArray(musicCompositionPlan?.sections) &&
+                    musicCompositionPlan.sections.length > 0;
+                  const selectedTheme = selectedMusicThemeId
+                    ? availableMusicThemes.find(
+                        (t) => t.id === selectedMusicThemeId,
+                      )
+                    : defaultMusicThemeId
+                      ? availableMusicThemes.find(
+                          (t) => t.id === defaultMusicThemeId,
+                        )
+                      : null;
+                  const hasPrompt =
+                    musicPrompt.trim() || Boolean(selectedTheme?.description);
+
+                  if (!hasPlan && !hasPrompt) {
+                    await alert("Select a music theme or enter a description (or configure a composition plan)", "warning");
+                    return;
+                  }
+                  if (hasPlan && musicCompositionPlan.sections.some((s) => !s.section_name || !s.duration_ms)) {
+                    await alert("All sections need a name and duration", "warning");
+                    return;
+                  }
+
+                  setGeneratingBackgroundMusic(true);
+                  try {
+                    const sceneDurations = Object.fromEntries(
+                      (scriptData?.scenes || []).map((s) => [
+                        s.id,
+                        getSceneDurationSeconds(s),
+                      ]),
+                    );
+                    const totalSeconds = Object.values(sceneDurations).reduce(
+                      (a, b) => a + b,
+                      0,
+                    );
+                    const musicLengthMs = Math.max(
+                      3000,
+                      Math.min(600000, totalSeconds * 1000),
+                    );
+
+                    const themeOrDescription =
+                      (hasPlan ? null : musicPrompt.trim() || selectedTheme?.description) || null;
+
+                    let promptText = themeOrDescription;
+
+                    if (!hasPlan && themeOrDescription) {
+                      try {
+                        const promptRes = await fetch(
+                          "/api/video-generator/generate-music-prompt",
+                          {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              theme_description: themeOrDescription,
+                              topic: topic?.trim() || "",
+                              script: scriptData?.script?.trim() || "",
+                              scene_locations: (scriptData?.scenes || []).map(
+                                (s) => {
+                                  const locId =
+                                    locationMapping[s.id] ?? s.location_id;
+                                  const loc = selectedLocations.find(
+                                    (l) =>
+                                      l.id === locId || l.id === String(locId),
+                                  );
+                                  return {
+                                    scene_id: s.id,
+                                    location_name: loc?.name ?? null,
+                                  };
+                                },
+                              ),
+                              use_instrument_palette: useInstrumentPalette,
+                              instrument_ids: useInstrumentPalette
+                                ? selectedInstrumentIds.length
+                                  ? selectedInstrumentIds
+                                  : undefined
+                                : undefined,
+                            }),
+                          },
+                        );
+                        const promptResult = await promptRes.json();
+                        if (promptResult.success && promptResult.prompt?.trim()) {
+                          promptText = promptResult.prompt.trim();
+                        }
+                      } catch (promptErr) {
+                        console.warn("Music prompt generation failed, using theme directly:", promptErr);
+                      }
+                    }
+
+                    const body = {
+                      project_id: currentProjectId,
+                      session_id: sessionId,
+                      music_length_ms: musicLengthMs,
+                      force_instrumental: !hasPlan,
+                      respect_sections_durations: false,
+                    };
+
+                    if (hasPlan) {
+                      const baseNegative =
+                        musicCompositionPlan.negative_global_styles || [];
+                      const userNegative = musicNegativePrompt
+                        .split(/[,;]/)
+                        .map((t) => t.trim())
+                        .filter(Boolean);
+                      const negative_global_styles = [
+                        ...new Set([...baseNegative, ...userNegative]),
+                      ];
+                      const plan = {
+                        positive_global_styles: musicCompositionPlan.positive_global_styles || [],
+                        negative_global_styles,
+                        sections: musicCompositionPlan.sections.map((s) => ({
+                          section_name: s.section_name || "Section",
+                          positive_local_styles: s.positive_local_styles || [],
+                          negative_local_styles: s.negative_local_styles || [],
+                          duration_ms: Math.max(3000, Math.min(120000, Number(s.duration_ms) || 10000)),
+                          lines: s.lines || [],
+                        })),
+                      };
+                      body.composition_plan = plan;
+                    } else if (promptText) {
+                      const negativeAppend = musicNegativePrompt.trim()
+                        ? "\n\nAvoid: " + musicNegativePrompt.trim()
+                        : "";
+                      // Prepend anti-meditation frame — model strongly associates slow pads with meditation
+                      // Avoid trademarked names (Vangelis, Blade Runner) — Fal content checker flags them
+                      const antiMeditationPrefix =
+                        "1980s retro-futuristic synth film score. NOT meditation, NOT spa, NOT relaxation. ";
+                      const prefixedPrompt =
+                        promptText.toLowerCase().includes("retro-futuristic") ||
+                        promptText.toLowerCase().startsWith("film score")
+                          ? promptText
+                          : antiMeditationPrefix + promptText;
+                      body.prompt = prefixedPrompt + negativeAppend;
+                    }
+
+                    const res = await fetch(
+                      "/api/video-generator/generate-background-music",
+                      {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          ...body,
+                          model_id: selectedMusicModelId,
+                          negative_prompt: musicNegativePrompt.trim()
+                            ? musicNegativePrompt.trim()
+                            : null,
+                        }),
+                      },
+                    );
+                    const result = await res.json();
+                    if (result.success) {
+                      setBackgroundMusicUrl(result.music_url);
+                      setBackgroundMusicPrompt(
+                        hasPlan
+                          ? JSON.stringify(musicCompositionPlan)
+                          : promptText || musicPrompt.trim(),
+                      );
+                      loadAvailableMusicFromCollection();
+                      const projectRes = await fetch(
+                        `/api/projects/${currentProjectId}`,
+                      );
+                      const projectResult = await projectRes.json();
+                      if (projectResult.success) {
+                        setProjectCosts(projectResult.project.costs || null);
+                      }
+                    } else {
+                      await alert(
+                        "Failed to generate music: " + (result.error || "Unknown"),
+                        "error",
+                      );
+                    }
+                  } catch (err) {
+                    await alert("Error: " + err.message, "error");
+                  } finally {
+                    setGeneratingBackgroundMusic(false);
+                  }
+                }}
+                disabled={
+                  generatingBackgroundMusic ||
+                  (useCompositionPlan
+                    ? !(
+                        Array.isArray(musicCompositionPlan?.sections) &&
+                        musicCompositionPlan.sections.length > 0 &&
+                        musicCompositionPlan.sections.every(
+                          (s) => s.section_name && s.duration_ms,
+                        )
+                      )
+                    : !musicPrompt.trim())
+                }
+                className="shrink-0 px-6 py-2.5 rounded-lg bg-violet-600 text-white font-medium hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {generatingBackgroundMusic ? "Generating…" : "Generate music"}
+              </button>
+            </div>
+            {generatingBackgroundMusic && (
+              <div className="mt-4 pt-4 border-t border-violet-200 dark:border-violet-700">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="animate-spin h-4 w-4 border-2 border-violet-600 border-t-transparent rounded-full"></div>
+                  <span className="text-sm font-medium text-violet-900 dark:text-violet-100">
+                    Generating background music with ElevenLabs Music…
+                  </span>
+                </div>
+                <div className="w-full bg-violet-200 dark:bg-violet-900/40 rounded-full h-2 overflow-hidden">
+                  <div
+                    className="h-full bg-violet-600 rounded-full animate-pulse"
+                    style={{ width: "100%" }}
+                  ></div>
+                </div>
+                <p className="text-xs text-violet-700 dark:text-violet-300 mt-2">
+                  This may take 30–60 seconds depending on track length
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Generated music – list of all tracks for this project */}
+          <div className="mb-6 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-4">
+            <div className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3">
+              Generated music
+            </div>
+            {loadingMusicCollection ? (
+              <div className="flex items-center gap-2 py-4 text-sm text-gray-500 dark:text-gray-400">
+                <div className="animate-spin h-4 w-4 border-2 border-violet-600 border-t-transparent rounded-full"></div>
+                Loading…
+              </div>
+            ) : availableMusicFromCollection.length === 0 ? (
+              <p className="text-sm text-gray-500 dark:text-gray-400 py-4">
+                No music generated yet for this project. Generate or select from
+                the full collection below.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {availableMusicFromCollection.map((m) => {
+                  const isSelected = backgroundMusicUrl === m.music_url;
+                  const durationStr = m.duration_ms
+                    ? `${Math.floor(m.duration_ms / 60000)}m ${Math.round((m.duration_ms % 60000) / 1000)}s`
+                    : null;
+                  const promptPreview =
+                    m.prompt ||
+                    (m.composition_plan?.positive_global_styles?.length
+                      ? `Composition plan: ${m.composition_plan.positive_global_styles.slice(0, 2).join(", ")}`
+                      : "—");
+
+                  return (
+                    <div
+                      key={m.id}
+                      className={
+                        "rounded-lg border p-3 space-y-3 " +
+                        (isSelected
+                          ? "border-violet-500 bg-violet-50 dark:bg-violet-950/30 dark:border-violet-600"
+                          : "border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/30")
+                      }
+                    >
+                      <div className="flex flex-wrap items-center gap-3">
+                        <audio
+                          controls
+                          className="h-8 flex-1 min-w-[140px]"
+                          src={m.music_url}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-gray-700 dark:text-gray-300 line-clamp-1">
+                            {promptPreview}
+                          </p>
+                          <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                            {durationStr && <span>⏱️ {durationStr}</span>}
+                            {m.timestamp && (
+                              <span>
+                                {new Date(m.timestamp).toLocaleDateString()}
+                              </span>
+                            )}
+                            {typeof m.cost === "number" && (
+                              <span>• ${m.cost.toFixed(3)}</span>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                          if (currentProjectId && sessionId) {
+                            try {
+                              const res = await fetch(
+                                "/api/video-generator/select-music",
+                                {
+                                  method: "POST",
+                                  headers: {
+                                    "Content-Type": "application/json",
+                                  },
+                                  body: JSON.stringify({
+                                    project_id: currentProjectId,
+                                    session_id: sessionId,
+                                    music_id: m.id,
+                                  }),
+                                },
+                              );
+                              const result = await res.json();
+                              if (result.success) {
+                                setBackgroundMusicUrl(result.music_url);
+                                setBackgroundMusicPrompt(
+                                  result.background_music_prompt || "",
+                                );
+                              }
+                            } catch {
+                              setBackgroundMusicUrl(m.music_url);
+                              setBackgroundMusicPrompt(
+                                m.prompt ||
+                                  (m.composition_plan
+                                    ? JSON.stringify(m.composition_plan)
+                                    : ""),
+                              );
+                            }
+                          } else {
+                            setBackgroundMusicUrl(m.music_url);
+                            setBackgroundMusicPrompt(
+                              m.prompt ||
+                                (m.composition_plan
+                                  ? JSON.stringify(m.composition_plan)
+                                  : ""),
+                            );
+                          }
+                        }}
+                          className={
+                            "text-xs px-3 py-1.5 rounded-lg font-medium shrink-0 " +
+                            (isSelected
+                              ? "bg-violet-600 text-white cursor-default"
+                              : "bg-violet-600 text-white hover:bg-violet-700")
+                          }
+                        >
+                          {isSelected ? "✓ Selected" : "Select"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const ok = await confirm(
+                              "Delete this music track? The file will be removed from storage. This cannot be undone.",
+                            );
+                            if (!ok) return;
+                            try {
+                              const res = await fetch(
+                                "/api/video-generator/delete-music",
+                                {
+                                  method: "POST",
+                                  headers: {
+                                    "Content-Type": "application/json",
+                                  },
+                                  body: JSON.stringify({ music_id: m.id }),
+                                },
+                              );
+                              const result = await res.json();
+                              if (result.success) {
+                                await alert("Music deleted", "success");
+                                if (backgroundMusicUrl === m.music_url) {
+                                  setBackgroundMusicUrl(null);
+                                  setBackgroundMusicPrompt("");
+                                }
+                                loadAvailableMusicFromCollection();
+                              } else {
+                                await alert(
+                                  "Failed to delete: " + (result.error || "Unknown"),
+                                  "error",
+                                );
+                              }
+                            } catch (err) {
+                              await alert(
+                                "Error deleting: " + err.message,
+                                "error",
+                              );
+                            }
+                          }}
+                          className="text-xs px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 hover:text-red-600 hover:border-red-300 dark:text-gray-400 dark:hover:text-red-400 dark:hover:border-red-700 shrink-0"
+                          title="Delete music track"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMusicDetailsModal(m)}
+                          className="text-xs px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 hover:text-blue-600 hover:border-blue-300 dark:text-gray-400 dark:hover:text-blue-400 dark:hover:border-blue-700 shrink-0 flex items-center gap-1"
+                          title="Show generation details"
+                        >
+                          <Info size={14} />
+                          Info
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Selected music – track used for assembly */}
+          <div className="mb-6 rounded-xl border border-violet-200 dark:border-violet-800 bg-violet-50/50 dark:bg-violet-950/20 p-4">
+            <div className="text-sm font-semibold text-violet-900 dark:text-violet-100 mb-3">
+              Selected music (for assembly)
+            </div>
+            {backgroundMusicUrl ? (
+              <>
+                <div className="flex flex-wrap items-center gap-3 mb-3">
+                  <audio
+                    controls
+                    src={backgroundMusicUrl}
+                    className="flex-1 min-w-[200px]"
+                  />
+                  {voiceoverUrl && (
+                    <button
+                      type="button"
+                      onClick={handlePlayWithVoiceover}
+                      className={
+                        "text-xs px-3 py-2 rounded-lg font-medium shrink-0 flex items-center gap-1.5 " +
+                        (isPlayingWithVoiceover
+                          ? "bg-violet-700 text-white"
+                          : "bg-violet-600 text-white hover:bg-violet-700")
+                      }
+                      title="Preview music mixed with voiceover (music at 25% volume)"
+                    >
+                      {isPlayingWithVoiceover ? (
+                        <>⏹ Stop</>
+                      ) : (
+                        <>▶ Play with voiceover</>
+                      )}
+                    </button>
+                  )}
+                </div>
+                {backgroundMusicPrompt && (
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+                    {backgroundMusicPrompt.startsWith("{")
+                      ? "Composition plan (advanced)"
+                      : `Prompt: ${backgroundMusicPrompt}`}
+                  </p>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBackgroundMusicUrl(null);
+                    setBackgroundMusicPrompt("");
+                  }}
+                  className="text-xs text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+                  title="Remove selected music"
+                >
+                  Remove selection
+                </button>
+              </>
+            ) : (
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Select a track from the list above or from the full collection to
+                use for assembly.
+              </p>
+            )}
+          </div>
+
+          <div className="flex gap-4">
+            <button
+              onClick={() => setStep(4)}
+              className="flex-1 bg-gray-200 text-gray-700 py-2 sm:py-3 rounded-lg font-medium hover:bg-gray-300"
+            >
+              ← Back
+            </button>
+            <button
+              onClick={() => {
+                setStep(6);
+                setMaxStepReached((prev) => Math.max(prev, 6));
+              }}
+              disabled={
+                !voiceoverUrl ||
+                !(scriptData?.scenes || []).every((s) =>
+                  videos.some(
+                    (v) => toSceneKey(v?.scene_id) === toSceneKey(s?.id),
+                  ),
+                )
+              }
+              className="flex-1 bg-blue-600 text-white py-2 sm:py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
+              title="Continue to timeline editor and assemble"
+            >
+              Continue to Assemble →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 6: Timeline Editor (FCP/Premiere-style) & Final Video */}
+      {step === 6 && (
+        <div className="admin-card p-8">
+          {loadingProject && !scriptData ? (
+            <div className="flex flex-col items-center justify-center py-16">
+              <div className="inline-block h-8 w-8 animate-spin rounded-full border-2 border-blue-600 border-t-transparent mb-4" />
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                Loading project data…
+              </p>
+            </div>
+          ) : (
+          <>
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold mb-3">
+              Step 6: Assemble & Final Video
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Edit your timeline (Final Cut Pro / Premiere-style) then render
+              via ShotStack. Videos, voiceover, and optional music are combined.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {finalVideoUrl ? (
+                <div className="bg-green-100 text-green-700 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap">
+                  ✓ Video Complete
+                </div>
+              ) : isAssembling ? (
+                <div className="bg-orange-100 text-orange-700 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap">
+                  Rendering...
+                </div>
+              ) : (
+                <div className="bg-teal-100 text-teal-700 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap">
+                  Edit timeline, then click Render
+                </div>
+              )}
+              {projectCosts?.step6?.shotstack > 0 && (
+                <div className="bg-pink-50 border border-pink-200 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
+                  <span className="text-pink-700">🎞️ Shotstack:</span>
+                  <span className="font-semibold text-pink-900">
+                    ${projectCosts.step6.shotstack.toFixed(4)}
+                  </span>
+                </div>
+              )}
+              {projectCosts?.step6?.total > 0 && (
+                <div className="bg-gray-50 border border-gray-300 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
+                  <span className="text-gray-700">💰 Step 6 Total:</span>
+                  <span className="font-semibold text-gray-900">
+                    ${projectCosts.step6.total.toFixed(4)}
                   </span>
                 </div>
               )}
@@ -7046,62 +9509,164 @@ export default function VideoGeneratorPage() {
             </div>
           </div>
 
-          {/* Final Video Player */}
-          <div className="mb-8">
-            <div className="aspect-[9/16] max-w-md mx-auto bg-gray-100 rounded-lg overflow-hidden">
-              <video controls className="w-full h-full">
-                <source src={finalVideoUrl} type="video/mp4" />
-              </video>
+          {isAssembling ? (
+            <div className="mb-8 py-12 text-center text-gray-600 dark:text-gray-400">
+              <p>Video is being rendered. This usually takes 1–2 minutes.</p>
+              <p className="mt-2 text-sm">The page will update automatically.</p>
             </div>
+          ) : (
+            <>
+              {/* Timeline Editor – always shown when not assembling */}
+              <div className="mb-4">
+                <TimelineEditor
+                  ref={timelineEditorRef}
+                  projectId={currentProjectId}
+                  initialTimelineSettings={timelineSettings}
+                  videos={
+                    videos.length
+                      ? videos
+                      : deriveSelectedVideosFromScenes(scriptData?.scenes || [])
+                  }
+                  voiceoverUrl={voiceoverUrl}
+                  backgroundMusicUrl={backgroundMusicUrl || null}
+                  sceneDurations={Object.fromEntries(
+                    (scriptData?.scenes || []).map((s) => [
+                      s.id,
+                      getSceneDurationSeconds(s),
+                    ]),
+                  )}
+                  getSceneDurationSeconds={getSceneDurationSeconds}
+                  scriptData={scriptData}
+                />
+              </div>
+
+              {/* Render button – directly below timeline */}
+              <div className="mb-6">
+                <button
+                  onClick={handleRenderFromEditor}
+                  disabled={loading}
+                  className="w-full bg-blue-600 text-white py-2 sm:py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
+                  title="Render via ShotStack"
+                >
+                  {loading ? "Starting render…" : finalVideoUrl ? "Render Again" : "Render Final Video →"}
+                </button>
+              </div>
+
+              {/* Generated video – show when video exists */}
+              {finalVideoUrl && (
+                <div className="mb-6">
+                  <h3 className="mb-3 text-sm font-semibold text-gray-800 dark:text-gray-200">
+                    Generated Video
+                  </h3>
+                  <div className="aspect-[9/16] max-w-md mx-auto bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
+                    <video controls className="w-full h-full">
+                      <source src={finalVideoUrl} type="video/mp4" />
+                    </video>
+                  </div>
+                </div>
+              )}
+
+              {/* Back + Continue to Post */}
+              <div className="flex flex-wrap gap-4">
+                <button
+                  onClick={() => setStep(5)}
+                  className="flex-1 min-w-[120px] bg-gray-200 text-gray-700 py-2 sm:py-3 rounded-lg font-medium hover:bg-gray-300"
+                >
+                  ← Back
+                </button>
+                {finalVideoUrl && (
+                  <button
+                    onClick={() => {
+                      setStep(7);
+                      setMaxStepReached((prev) => Math.max(prev, 7));
+                    }}
+                    className="flex-1 min-w-[120px] bg-blue-600 text-white py-2 sm:py-3 rounded-lg font-medium hover:bg-blue-700"
+                  >
+                    Continue to Post →
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+          </>
+          )}
+        </div>
+      )}
+
+      {/* Step 7: Post (Download, Social Media, Create Another) */}
+      {step === 7 && (
+        <div className="admin-card p-8">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold mb-3">Step 7: Post</h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Download your video or post to social media.
+            </p>
           </div>
 
-          {/* Download */}
-          <div className="mb-8">
-            <a
-              href={finalVideoUrl}
-              download
-              className="inline-flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700"
+          {finalVideoUrl && (
+            <>
+              <div className="mb-8">
+                <div className="aspect-[9/16] max-w-md mx-auto bg-gray-100 rounded-lg overflow-hidden">
+                  <video controls className="w-full h-full">
+                    <source src={finalVideoUrl} type="video/mp4" />
+                  </video>
+                </div>
+              </div>
+
+              {/* Download */}
+              <div className="mb-8">
+                <a
+                  href={finalVideoUrl}
+                  download
+                  className="inline-flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700"
+                >
+                  <span>📥</span>
+                  Download Video
+                </a>
+              </div>
+
+              {/* Social Media Posting */}
+              <div className="mb-8">
+                <h3 className="text-lg font-semibold mb-4">Post to Social Media</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <button
+                    onClick={() => handlePostToSocial("instagram")}
+                    disabled={loading}
+                    className="flex items-center justify-center gap-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-4 rounded-lg font-medium hover:opacity-90 disabled:opacity-50"
+                  >
+                    <span className="text-2xl">📷</span>
+                    Post to Instagram
+                  </button>
+
+                  <button
+                    onClick={() => handlePostToSocial("youtube")}
+                    disabled={loading}
+                    className="flex items-center justify-center gap-3 bg-red-600 text-white py-4 rounded-lg font-medium hover:bg-red-700 disabled:opacity-50"
+                  >
+                    <span className="text-2xl">▶️</span>
+                    Post to YouTube
+                  </button>
+
+                  <button
+                    onClick={() => handlePostToSocial("tiktok")}
+                    disabled={loading}
+                    className="flex items-center justify-center gap-3 bg-black text-white py-4 rounded-lg font-medium hover:bg-gray-800 disabled:opacity-50"
+                  >
+                    <span className="text-2xl">🎵</span>
+                    Post to TikTok
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+
+          <div className="flex gap-4 mt-8">
+            <button
+              onClick={() => setStep(6)}
+              className="flex-1 bg-gray-200 text-gray-700 py-2 sm:py-3 rounded-lg font-medium hover:bg-gray-300"
             >
-              <span>📥</span>
-              Download Video
-            </a>
-          </div>
-
-          {/* Social Media Posting */}
-          <div className="border-t pt-8">
-            <h3 className="text-lg font-semibold mb-4">Post to Social Media</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <button
-                onClick={() => handlePostToSocial("instagram")}
-                disabled={loading}
-                className="flex items-center justify-center gap-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-4 rounded-lg font-medium hover:opacity-90 disabled:opacity-50"
-              >
-                <span className="text-2xl">📷</span>
-                Post to Instagram
-              </button>
-
-              <button
-                onClick={() => handlePostToSocial("youtube")}
-                disabled={loading}
-                className="flex items-center justify-center gap-3 bg-red-600 text-white py-4 rounded-lg font-medium hover:bg-red-700 disabled:opacity-50"
-              >
-                <span className="text-2xl">▶️</span>
-                Post to YouTube
-              </button>
-
-              <button
-                onClick={() => handlePostToSocial("tiktok")}
-                disabled={loading}
-                className="flex items-center justify-center gap-3 bg-black text-white py-4 rounded-lg font-medium hover:bg-gray-800 disabled:opacity-50"
-              >
-                <span className="text-2xl">🎵</span>
-                Post to TikTok
-              </button>
-            </div>
-          </div>
-
-          {/* Start New Video */}
-          <div className="mt-8 pt-8 border-t">
+              ← Back to Assemble
+            </button>
             <button
               onClick={() => {
                 setStep(0);
@@ -7112,15 +9677,314 @@ export default function VideoGeneratorPage() {
                 setVideos([]);
                 setVoiceoverUrl(null);
                 setFinalVideoUrl(null);
+                setTimelineSettings(null);
+                setBackgroundMusicUrl(null);
+                setBackgroundMusicPrompt("");
                 setSessionId(null);
                 setCurrentProjectId(null);
                 setCurrentProjectName("");
                 loadProjects();
               }}
-              className="w-full bg-blue-600 text-white py-2 sm:py-3 rounded-lg font-medium hover:bg-blue-700"
+              className="flex-1 bg-blue-600 text-white py-2 sm:py-3 rounded-lg font-medium hover:bg-blue-700"
             >
               Create Another Video
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Music Theme Picker Modal */}
+      {showMusicThemePicker && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-950 rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-800">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-800">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                    🎵 Select Music Theme
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
+                    Pick a music theme for background music generation.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <a
+                    href="/admin/music-themes"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs px-3 py-2 rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 dark:bg-gray-950 dark:text-gray-200 dark:border-gray-800 dark:hover:bg-gray-900"
+                    title="Manage music theme library"
+                  >
+                    Manage
+                  </a>
+                  <button
+                    onClick={() => setShowMusicThemePicker(false)}
+                    className="text-gray-400 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-200 text-2xl"
+                    aria-label="Close"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div
+              className="p-6 overflow-y-auto"
+              style={{ maxHeight: "calc(90vh - 180px)" }}
+            >
+              <div className="grid grid-cols-1 gap-4">
+                {availableMusicThemes.map((theme) => {
+                  const isCurrent = selectedMusicThemeId === theme.id;
+
+                  return (
+                    <button
+                      key={theme.id}
+                      onClick={() => {
+                        setSelectedMusicThemeId(theme.id);
+                        setMusicPrompt(theme.description || "");
+                        setShowMusicThemePicker(false);
+                      }}
+                      className={
+                        "text-left p-4 rounded-xl border-2 transition " +
+                        (isCurrent
+                          ? "border-violet-500 bg-violet-50 dark:bg-violet-950/20"
+                          : "border-gray-200 hover:border-violet-400 hover:bg-violet-50 dark:border-gray-800 dark:hover:bg-violet-950/20")
+                      }
+                    >
+                      <div className="flex items-start gap-2">
+                        <span className="text-xl">🎵</span>
+                        <div className="flex-1">
+                          <div className="font-semibold text-gray-900 dark:text-gray-100 text-base">
+                            {theme.name}
+                            {isCurrent && (
+                              <span className="ml-2 text-xs text-green-600 dark:text-green-300 font-normal">
+                                (Current)
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-700 dark:text-gray-200 mt-1">
+                            {theme.description}
+                          </p>
+                          {theme.tags && theme.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-3">
+                              {theme.tags.map((tag, idx) => (
+                                <span
+                                  key={idx}
+                                  className="px-2 py-0.5 bg-violet-100 text-violet-700 text-xs rounded-full dark:bg-violet-950/20 dark:text-violet-200"
+                                >
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+
+                {availableMusicThemes.length === 0 && (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    <p className="mb-2">No music themes available yet.</p>
+                    <p className="text-sm">
+                      Click &quot;Seed defaults&quot; in the{" "}
+                      <a
+                        href="/admin/music-themes"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-violet-600 hover:underline"
+                      >
+                        Music Themes
+                      </a>{" "}
+                      page.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-950/40">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {selectedMusicThemeId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedMusicThemeId(null);
+                      setMusicPrompt("");
+                      setShowMusicThemePicker(false);
+                    }}
+                    className="w-full bg-red-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-red-700"
+                    title="Clear theme selection"
+                  >
+                    ✕ Clear selection
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowMusicThemePicker(false)}
+                  className="w-full bg-gray-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-gray-700"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Music Collection Picker Modal */}
+      {showMusicCollectionPicker && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-950 rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-800">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-800">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                    📀 Select from Music Collection
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
+                    Choose previously generated music to use as background track
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowMusicCollectionPicker(false)}
+                  className="text-gray-400 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-200 text-2xl"
+                  aria-label="Close"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+
+            <div
+              className="p-6 overflow-y-auto"
+              style={{ maxHeight: "calc(90vh - 180px)" }}
+            >
+              {loadingMusicCollection ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin h-8 w-8 border-2 border-violet-500 border-t-transparent rounded-full" />
+                </div>
+              ) : availableMusicFromCollection.length === 0 ? (
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  <p className="mb-2">No music in collection yet.</p>
+                  <p className="text-sm">
+                    Generate background music first to add tracks here.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4">
+                  {availableMusicFromCollection.map((m) => {
+                    const isCurrent = backgroundMusicUrl === m.music_url;
+                    const durationStr = m.duration_ms
+                      ? `${Math.floor(m.duration_ms / 60000)}m ${Math.round((m.duration_ms % 60000) / 1000)}s`
+                      : null;
+                    const promptPreview =
+                      m.prompt ||
+                      (m.composition_plan?.positive_global_styles?.length
+                        ? `Composition plan: ${m.composition_plan.positive_global_styles.slice(0, 2).join(", ")}`
+                        : "—");
+
+                    return (
+                      <button
+                        key={m.id}
+                        onClick={async () => {
+                          if (!currentProjectId || !sessionId) {
+                            setBackgroundMusicUrl(m.music_url);
+                            setBackgroundMusicPrompt(
+                              m.prompt ||
+                                (m.composition_plan
+                                  ? JSON.stringify(m.composition_plan)
+                                  : ""),
+                            );
+                            setShowMusicCollectionPicker(false);
+                            return;
+                          }
+                          try {
+                            const res = await fetch(
+                              "/api/video-generator/select-music",
+                              {
+                                method: "POST",
+                                headers: {
+                                  "Content-Type": "application/json",
+                                },
+                                body: JSON.stringify({
+                                  project_id: currentProjectId,
+                                  session_id: sessionId,
+                                  music_id: m.id,
+                                }),
+                              },
+                            );
+                            const result = await res.json();
+                            if (result.success) {
+                              setBackgroundMusicUrl(result.music_url);
+                              setBackgroundMusicPrompt(
+                                result.background_music_prompt || "",
+                              );
+                              setShowMusicCollectionPicker(false);
+                            } else {
+                              await alert(
+                                "Failed to select music: " +
+                                  (result.error || "Unknown"),
+                                "error",
+                              );
+                            }
+                          } catch (err) {
+                            await alert("Error: " + err.message, "error");
+                          }
+                        }}
+                        className={
+                          "text-left p-4 rounded-xl border-2 transition " +
+                          (isCurrent
+                            ? "border-violet-500 bg-violet-50 dark:bg-violet-950/20"
+                            : "border-gray-200 hover:border-violet-400 hover:bg-violet-50 dark:border-gray-800 dark:hover:bg-violet-950/20")
+                        }
+                      >
+                        <div className="flex items-start gap-3">
+                          <span className="text-2xl">🎵</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-2">
+                              {promptPreview}
+                            </p>
+                            <div className="flex items-center gap-2 mt-2 text-xs text-gray-500 dark:text-gray-400">
+                              {durationStr && (
+                                <span>⏱️ {durationStr}</span>
+                              )}
+                              {m.timestamp && (
+                                <span>
+                                  {new Date(m.timestamp).toLocaleDateString()}
+                                </span>
+                              )}
+                              {isCurrent && (
+                                <span className="text-green-600 dark:text-green-400 font-medium">
+                                  (Current)
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          {m.music_url && (
+                            <audio
+                              controls
+                              className="h-8 max-w-[140px]"
+                              onClick={(e) => e.stopPropagation()}
+                              src={m.music_url}
+                            />
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 border-t border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-950/40">
+              <button
+                onClick={() => setShowMusicCollectionPicker(false)}
+                className="w-full bg-gray-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-gray-700"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -8015,7 +10879,7 @@ export default function VideoGeneratorPage() {
                   onChange={(e) =>
                     setCameraMovementGenerationKeywords(e.target.value)
                   }
-                  placeholder="e.g., slow push-in, handheld, gentle drift, lock-off"
+                  placeholder="e.g., still/lock-off, gentle drift, slow pan, subtle handheld"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                 />
                 <p className="text-xs text-gray-500 mt-1">
@@ -8077,7 +10941,7 @@ export default function VideoGeneratorPage() {
                   onChange={(e) =>
                     setCharacterMotionGenerationKeywords(e.target.value)
                   }
-                  placeholder="e.g., slow head turn, breathing, shifting weight, slight glance"
+                  placeholder="e.g., slow head turn, shifting weight, slight glance"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                 />
                 <p className="text-xs text-gray-500 mt-1">
@@ -8112,6 +10976,598 @@ export default function VideoGeneratorPage() {
               >
                 Cancel
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Image Details Modal (Step 3) */}
+      {imageDetailsModal && (
+        <div
+          className="fixed inset-0 z-[94] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) {
+              handleCloseImageDetailsModal();
+            }
+          }}
+        >
+          <div className="w-full max-w-4xl bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-2xl overflow-hidden">
+            <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-gray-200 dark:border-gray-800">
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+                  Image details — Scene {imageDetailsModal.sceneId}
+                  {typeof imageDetailsModal.imageIndex === "number"
+                    ? ` • v${imageDetailsModal.imageIndex + 1}`
+                    : ""}
+                </div>
+                <div className="text-xs text-gray-600 dark:text-gray-300 mt-1 truncate">
+                  URL: {imageDetailsModal.imageUrl}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {imageDetailsModal.imageUrl ? (
+                  <a
+                    href={imageDetailsModal.imageUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs px-3 py-1.5 rounded-xl border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 dark:bg-gray-950 dark:text-gray-200 dark:border-gray-800 dark:hover:bg-gray-900"
+                  >
+                    Open
+                  </a>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() =>
+                    loadImageDetailsForScene(
+                      imageDetailsModal.sceneId,
+                      imageDetailsModal.imageUrl,
+                      {
+                        imageIndex: imageDetailsModal.imageIndex,
+                        localPrompt: imageDetailsModal.localPrompt,
+                      },
+                    )
+                  }
+                  disabled={loadingImageDetails}
+                  className="text-xs px-3 py-1.5 rounded-xl border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 disabled:opacity-50 dark:bg-gray-950 dark:text-gray-200 dark:border-gray-800 dark:hover:bg-gray-900"
+                >
+                  {loadingImageDetails ? "Refreshing..." : "Refresh"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCloseImageDetailsModal}
+                  className="text-xs px-3 py-1.5 rounded-xl bg-gray-900 text-white hover:bg-black dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+
+            <div
+              className="px-5 py-4 overflow-y-auto"
+              style={{ maxHeight: "calc(85vh - 72px)" }}
+            >
+              {loadingImageDetails ? (
+                <div className="py-10 text-center">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+                  <div className="text-sm text-gray-700 dark:text-gray-200 mt-3">
+                    Loading details...
+                  </div>
+                </div>
+              ) : imageDetailsError ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 text-red-800 p-4 text-sm dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">
+                  {imageDetailsError}
+                </div>
+              ) : (
+                (() => {
+                  const scene = imageDetailsModal.scene || null;
+                  const md = imageDetailsModal.metadata || null;
+
+                  const prompt =
+                    md?.image_prompt || imageDetailsModal.localPrompt || null;
+                  const endpoint =
+                    md?.model_endpoint || md?.fal?.endpoint_id || null;
+                  const source =
+                    md?.source || (md?.regenerated ? "regen" : null);
+
+                  return (
+                    <div className="space-y-4">
+                      {!md ? (
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 text-amber-900 p-4 text-sm dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+                          No generation metadata found for this exact image URL.
+                          <div className="text-xs mt-1 opacity-80">
+                            (This can happen for older images, or images created
+                            via tools that didn’t persist metadata.)
+                          </div>
+                        </div>
+                      ) : null}
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-950/40 p-4">
+                          <div className="text-xs font-semibold text-gray-800 dark:text-gray-100 mb-2">
+                            Settings
+                          </div>
+                          <div className="text-xs text-gray-700 dark:text-gray-200 space-y-1">
+                            <div>
+                              <span className="font-medium">Generated:</span>{" "}
+                              {md?.timestamp || "(unknown)"}
+                            </div>
+                            <div>
+                              <span className="font-medium">Source:</span>{" "}
+                              {md?.source ||
+                                (md?.regenerated ? "regenerate" : "generate")}
+                            </div>
+                            <div>
+                              <span className="font-medium">
+                                Model endpoint:
+                              </span>{" "}
+                              {endpoint || "(unknown)"}
+                            </div>
+                            <div>
+                              <span className="font-medium">Scene:</span>{" "}
+                              {md?.scene_id ?? imageDetailsModal.sceneId}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-950/40 p-4">
+                          <div className="text-xs font-semibold text-gray-800 dark:text-gray-100 mb-2">
+                            Inputs
+                          </div>
+                          <div className="text-xs text-gray-700 dark:text-gray-200 space-y-1">
+                            <div>
+                              <span className="font-medium">Character:</span>{" "}
+                              {md?.character_id || "(unknown)"}
+                            </div>
+                            <div>
+                              <span className="font-medium">
+                                Reference URL:
+                              </span>{" "}
+                              {md?.character_reference_url || "(none)"}
+                            </div>
+                            <div>
+                              <span className="font-medium">Location:</span>{" "}
+                              {md?.location?.name || "(none)"}
+                              {md?.location?.id
+                                ? ` (id: ${md.location.id})`
+                                : ""}
+                            </div>
+                            <div>
+                              <span className="font-medium">Action:</span>{" "}
+                              {md?.action?.name || "(none)"}
+                              {md?.action?.id ? ` (id: ${md.action.id})` : ""}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <details
+                        className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-950/40 p-4"
+                        open
+                      >
+                        <summary className="cursor-pointer text-xs font-semibold text-gray-800 dark:text-gray-100">
+                          Prompt used
+                        </summary>
+                        <div className="mt-3 text-xs font-mono leading-relaxed text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words rounded-xl bg-gray-50/80 dark:bg-gray-900/40 border border-gray-200/80 dark:border-gray-800/80 p-3">
+                          {prompt || "(empty)"}
+                        </div>
+                      </details>
+
+                      <details className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-950/40 p-4">
+                        <summary className="cursor-pointer text-xs font-semibold text-gray-800 dark:text-gray-100">
+                          Settings / angles
+                        </summary>
+                        <pre className="mt-3 text-[11px] font-mono leading-relaxed text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words rounded-xl bg-gray-50/80 dark:bg-gray-900/40 border border-gray-200/80 dark:border-gray-800/80 p-3">
+                          {stringifyJson({
+                            grok_settings: md?.grok_settings || null,
+                            multiple_angles: md?.multiple_angles || null,
+                            source,
+                          })}
+                        </pre>
+                      </details>
+
+                      <details className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-950/40 p-4">
+                        <summary className="cursor-pointer text-xs font-semibold text-gray-800 dark:text-gray-100">
+                          Request payload / response
+                        </summary>
+                        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <div className="text-[11px] font-medium text-gray-600 dark:text-gray-300 mb-1">
+                              request
+                            </div>
+                            <pre className="text-[11px] font-mono leading-relaxed text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words rounded-xl bg-gray-50/80 dark:bg-gray-900/40 border border-gray-200/80 dark:border-gray-800/80 p-3">
+                              {stringifyJson(
+                                md?.fal_request_payload ||
+                                  md?.multiple_angles?.request_payload ||
+                                  null,
+                              )}
+                            </pre>
+                          </div>
+                          <div>
+                            <div className="text-[11px] font-medium text-gray-600 dark:text-gray-300 mb-1">
+                              response
+                            </div>
+                            <pre className="text-[11px] font-mono leading-relaxed text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words rounded-xl bg-gray-50/80 dark:bg-gray-900/40 border border-gray-200/80 dark:border-gray-800/80 p-3">
+                              {stringifyJson(
+                                md?.fal_response || md?.grok_response || null,
+                              )}
+                            </pre>
+                          </div>
+                        </div>
+                      </details>
+
+                      {scene ? (
+                        <details className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-950/40 p-4">
+                          <summary className="cursor-pointer text-xs font-semibold text-gray-800 dark:text-gray-100">
+                            Scene snapshot
+                          </summary>
+                          <pre className="mt-3 text-[11px] font-mono leading-relaxed text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words rounded-xl bg-gray-50/80 dark:bg-gray-900/40 border border-gray-200/80 dark:border-gray-800/80 p-3">
+                            {stringifyJson({
+                              scene_id: scene?.id,
+                              image_urls: scene?.image_urls || null,
+                              image_prompts: scene?.image_prompts || null,
+                              last_generation_metadata:
+                                scene?.last_generation_metadata || null,
+                            })}
+                          </pre>
+                        </details>
+                      ) : null}
+                    </div>
+                  );
+                })()
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Video Details Modal (Step 4) */}
+      {videoDetailsModal && (
+        <div
+          className="fixed inset-0 z-[95] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) {
+              handleCloseVideoDetailsModal();
+            }
+          }}
+        >
+          <div className="w-full max-w-4xl bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-2xl overflow-hidden">
+            <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-gray-200 dark:border-gray-800">
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+                  Video details — Scene {videoDetailsModal.sceneId}
+                </div>
+                <div className="text-xs text-gray-600 dark:text-gray-300 mt-1 truncate">
+                  Version URL: {videoDetailsModal.videoUrl}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {videoDetailsModal.videoUrl ? (
+                  <a
+                    href={videoDetailsModal.videoUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs px-3 py-1.5 rounded-xl border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 dark:bg-gray-950 dark:text-gray-200 dark:border-gray-800 dark:hover:bg-gray-900"
+                  >
+                    Open
+                  </a>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() =>
+                    loadVideoDetailsForScene(
+                      videoDetailsModal.sceneId,
+                      videoDetailsModal.videoUrl,
+                    )
+                  }
+                  disabled={loadingVideoDetails}
+                  className="text-xs px-3 py-1.5 rounded-xl border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 disabled:opacity-50 dark:bg-gray-950 dark:text-gray-200 dark:border-gray-800 dark:hover:bg-gray-900"
+                >
+                  {loadingVideoDetails ? "Refreshing..." : "Refresh"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCloseVideoDetailsModal}
+                  className="text-xs px-3 py-1.5 rounded-xl bg-gray-900 text-white hover:bg-black dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+
+            <div
+              className="px-5 py-4 overflow-y-auto"
+              style={{ maxHeight: "calc(85vh - 72px)" }}
+            >
+              {loadingVideoDetails ? (
+                <div className="py-10 text-center">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+                  <div className="text-sm text-gray-700 dark:text-gray-200 mt-3">
+                    Loading details...
+                  </div>
+                </div>
+              ) : videoDetailsError ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 text-red-800 p-4 text-sm dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">
+                  {videoDetailsError}
+                </div>
+              ) : (
+                (() => {
+                  const scene = videoDetailsModal.scene || null;
+                  const md = videoDetailsModal.metadata || null;
+
+                  const actionId = md?.action_id ?? scene?.action_id ?? null;
+                  const cameraId =
+                    md?.camera_movement_id ?? scene?.camera_movement_id ?? null;
+                  const characterId =
+                    md?.character_motion_id ??
+                    scene?.character_motion_id ??
+                    null;
+
+                  const actionName = getLibraryItemNameById(
+                    availableActions,
+                    actionId,
+                  );
+                  const cameraName = getLibraryItemNameById(
+                    availableCameraMovements,
+                    cameraId,
+                  );
+                  const characterName = getLibraryItemNameById(
+                    availableCharacterMotions,
+                    characterId,
+                  );
+
+                  return (
+                    <div className="space-y-4">
+                      {!md ? (
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 text-amber-900 p-4 text-sm dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+                          No generation metadata found for this exact video URL.
+                          <div className="text-xs mt-1 opacity-80">
+                            (This can happen for older videos created before we
+                            started saving history, or if the URL changed.)
+                          </div>
+                        </div>
+                      ) : null}
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-950/40 p-4">
+                          <div className="text-xs font-semibold text-gray-800 dark:text-gray-100 mb-2">
+                            Settings
+                          </div>
+                          <div className="text-xs text-gray-700 dark:text-gray-200 space-y-1">
+                            <div>
+                              <span className="font-medium">Generated:</span>{" "}
+                              {md?.timestamp || "(unknown)"}
+                            </div>
+                            <div>
+                              <span className="font-medium">Duration:</span>{" "}
+                              {md?.settings_used?.duration ??
+                                md?.model_request_payload?.duration ??
+                                "(unknown)"}
+                              s
+                            </div>
+                            <div>
+                              <span className="font-medium">
+                                Model endpoint:
+                              </span>{" "}
+                              {md?.settings_used?.model_endpoint ||
+                                md?.fal?.model_endpoint ||
+                                "(unknown)"}
+                            </div>
+                            <div>
+                              <span className="font-medium">Request ID:</span>{" "}
+                              {md?.fal?.request_id || "(unknown)"}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-950/40 p-4">
+                          <div className="text-xs font-semibold text-gray-800 dark:text-gray-100 mb-2">
+                            Motion selections
+                          </div>
+                          <div className="text-xs text-gray-700 dark:text-gray-200 space-y-1">
+                            <div>
+                              <span className="font-medium">Action:</span>{" "}
+                              {actionName || "(none)"}
+                              {actionId ? ` (id: ${actionId})` : ""}
+                            </div>
+                            <div>
+                              <span className="font-medium">Camera:</span>{" "}
+                              {cameraName || "Still (lock-off)"}
+                              {cameraId ? ` (id: ${cameraId})` : ""}
+                            </div>
+                            <div>
+                              <span className="font-medium">Character:</span>{" "}
+                              {characterName || "Default"}
+                              {characterId ? ` (id: ${characterId})` : ""}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <details className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-950/40 p-4">
+                        <summary className="cursor-pointer text-xs font-semibold text-gray-800 dark:text-gray-100">
+                          Prompt used
+                        </summary>
+                        <div className="mt-3 text-xs font-mono leading-relaxed text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words rounded-xl bg-gray-50/80 dark:bg-gray-900/40 border border-gray-200/80 dark:border-gray-800/80 p-3">
+                          {md?.prompt_used || "(empty)"}
+                        </div>
+                      </details>
+
+                      <details className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-950/40 p-4">
+                        <summary className="cursor-pointer text-xs font-semibold text-gray-800 dark:text-gray-100">
+                          Negative prompt used
+                        </summary>
+                        <div className="mt-3 text-xs font-mono leading-relaxed text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words rounded-xl bg-gray-50/80 dark:bg-gray-900/40 border border-gray-200/80 dark:border-gray-800/80 p-3">
+                          {md?.negative_prompt_used || "(empty)"}
+                        </div>
+                      </details>
+
+                      <details className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-950/40 p-4">
+                        <summary className="cursor-pointer text-xs font-semibold text-gray-800 dark:text-gray-100">
+                          Prompt sent to model
+                        </summary>
+                        <div className="mt-3 text-xs font-mono leading-relaxed text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words rounded-xl bg-gray-50/80 dark:bg-gray-900/40 border border-gray-200/80 dark:border-gray-800/80 p-3">
+                          {md?.prompt_sent_to_model || "(empty)"}
+                        </div>
+                      </details>
+
+                      <details className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-950/40 p-4">
+                        <summary className="cursor-pointer text-xs font-semibold text-gray-800 dark:text-gray-100">
+                          Request payload + storage
+                        </summary>
+                        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <div className="text-[11px] font-medium text-gray-600 dark:text-gray-300 mb-1">
+                              model_request_payload
+                            </div>
+                            <pre className="text-[11px] font-mono leading-relaxed text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words rounded-xl bg-gray-50/80 dark:bg-gray-900/40 border border-gray-200/80 dark:border-gray-800/80 p-3">
+                              {stringifyJson(md?.model_request_payload)}
+                            </pre>
+                          </div>
+                          <div>
+                            <div className="text-[11px] font-medium text-gray-600 dark:text-gray-300 mb-1">
+                              storage / fal
+                            </div>
+                            <pre className="text-[11px] font-mono leading-relaxed text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words rounded-xl bg-gray-50/80 dark:bg-gray-900/40 border border-gray-200/80 dark:border-gray-800/80 p-3">
+                              {stringifyJson({
+                                storage: md?.storage || null,
+                                fal: md?.fal || null,
+                                settings_used: md?.settings_used || null,
+                              })}
+                            </pre>
+                          </div>
+                        </div>
+                      </details>
+                    </div>
+                  );
+                })()
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Music Details Modal (Step 5) */}
+      {musicDetailsModal && (
+        <div
+          className="fixed inset-0 z-[96] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) {
+              setMusicDetailsModal(null);
+            }
+          }}
+        >
+          <div className="w-full max-w-4xl bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-2xl overflow-hidden">
+            <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-gray-200 dark:border-gray-800">
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+                  Music details
+                </div>
+                <div className="text-xs text-gray-600 dark:text-gray-300 mt-1 truncate">
+                  URL: {musicDetailsModal.music_url}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {musicDetailsModal.music_url ? (
+                  <a
+                    href={musicDetailsModal.music_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs px-3 py-1.5 rounded-xl border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 dark:bg-gray-950 dark:text-gray-200 dark:border-gray-800 dark:hover:bg-gray-900"
+                  >
+                    Open
+                  </a>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => setMusicDetailsModal(null)}
+                  className="text-xs px-3 py-1.5 rounded-xl bg-gray-900 text-white hover:bg-black dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+
+            <div
+              className="px-5 py-4 overflow-y-auto"
+              style={{ maxHeight: "calc(85vh - 72px)" }}
+            >
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-950/40 p-4">
+                    <div className="text-xs font-semibold text-gray-800 dark:text-gray-100 mb-2">
+                      Settings
+                    </div>
+                    <div className="text-xs text-gray-700 dark:text-gray-200 space-y-1">
+                      <div>
+                        <span className="font-medium">Generated:</span>{" "}
+                        {musicDetailsModal.timestamp
+                          ? new Date(
+                              musicDetailsModal.timestamp,
+                            ).toLocaleString()
+                          : "(unknown)"}
+                      </div>
+                      <div>
+                        <span className="font-medium">Duration:</span>{" "}
+                        {musicDetailsModal.duration_ms
+                          ? `${Math.floor(musicDetailsModal.duration_ms / 60000)}m ${Math.round((musicDetailsModal.duration_ms % 60000) / 1000)}s`
+                          : "(unknown)"}
+                      </div>
+                      <div>
+                        <span className="font-medium">Model:</span>{" "}
+                        {musicDetailsModal.model_endpoint || "(unknown)"}
+                      </div>
+                      {typeof musicDetailsModal.cost === "number" && (
+                        <div>
+                          <span className="font-medium">Cost:</span> $
+                          {musicDetailsModal.cost.toFixed(3)}
+                        </div>
+                      )}
+                      {musicDetailsModal.output_format && (
+                        <div>
+                          <span className="font-medium">Format:</span>{" "}
+                          {musicDetailsModal.output_format}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {musicDetailsModal.negative_prompt && (
+                    <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-950/40 p-4">
+                      <div className="text-xs font-semibold text-gray-800 dark:text-gray-100 mb-2">
+                        Negative prompt (avoid)
+                      </div>
+                      <div className="text-xs text-amber-600 dark:text-amber-400">
+                        {musicDetailsModal.negative_prompt}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <details
+                  className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-950/40 p-4"
+                  open
+                >
+                  <summary className="cursor-pointer text-xs font-semibold text-gray-800 dark:text-gray-100">
+                    Prompt / composition plan
+                  </summary>
+                  <div className="mt-3 text-xs font-mono leading-relaxed text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words rounded-xl bg-gray-50/80 dark:bg-gray-900/40 border border-gray-200/80 dark:border-gray-800/80 p-3 max-h-64 overflow-y-auto">
+                    {musicDetailsModal.prompt ||
+                      (musicDetailsModal.composition_plan
+                        ? JSON.stringify(
+                            musicDetailsModal.composition_plan,
+                            null,
+                            2,
+                          )
+                        : "(empty)")}
+                  </div>
+                </details>
+              </div>
             </div>
           </div>
         </div>
@@ -8570,6 +12026,260 @@ export default function VideoGeneratorPage() {
                 className="bg-gray-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-gray-700"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Angle Edit Modal (Step 3) */}
+      {angleEditModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-950 rounded-2xl shadow-xl max-w-xl w-full overflow-hidden border border-gray-200 dark:border-gray-800">
+            <div className="p-5 border-b border-gray-200 dark:border-gray-800">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                    Edit angle (Scene {angleEditModal.sceneId})
+                  </div>
+                  <div className="text-xs text-gray-600 dark:text-gray-300 mt-1">
+                    Uses FAL:{" "}
+                    {multipleAnglesEndpointId ||
+                      "fal-ai/flux-2-lora-gallery/multiple-angles"}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAngleEditModal(null)}
+                  className="text-gray-500 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white text-2xl leading-none"
+                  aria-label="Close"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-200 mb-1">
+                    Horizontal angle (0–360)
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min={0}
+                      max={360}
+                      step={1}
+                      value={angleEditSettings.horizontal_angle}
+                      onChange={(e) =>
+                        setAngleEditSettings((prev) => ({
+                          ...prev,
+                          horizontal_angle: Math.max(
+                            0,
+                            Math.min(360, Number(e.target.value)),
+                          ),
+                        }))
+                      }
+                      className="w-full"
+                    />
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      max={360}
+                      step={1}
+                      value={angleEditSettings.horizontal_angle}
+                      onChange={(e) => {
+                        const next = Number(e.target.value);
+                        setAngleEditSettings((prev) => ({
+                          ...prev,
+                          horizontal_angle: Math.max(
+                            0,
+                            Math.min(360, Number.isFinite(next) ? next : 0),
+                          ),
+                        }));
+                      }}
+                      className="w-24 px-3 py-2 rounded-xl border border-gray-200 bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100 dark:border-gray-800"
+                    />
+                  </div>
+                  <div className="text-xs text-gray-600 dark:text-gray-300 mt-1">
+                    {angleEditSettings.horizontal_angle}°
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-200 mb-1">
+                    Vertical angle (0–60)
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min={0}
+                      max={60}
+                      step={1}
+                      value={angleEditSettings.vertical_angle}
+                      onChange={(e) =>
+                        setAngleEditSettings((prev) => ({
+                          ...prev,
+                          vertical_angle: Math.max(
+                            0,
+                            Math.min(60, Number(e.target.value)),
+                          ),
+                        }))
+                      }
+                      className="w-full"
+                    />
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      max={60}
+                      step={1}
+                      value={angleEditSettings.vertical_angle}
+                      onChange={(e) => {
+                        const next = Number(e.target.value);
+                        setAngleEditSettings((prev) => ({
+                          ...prev,
+                          vertical_angle: Math.max(
+                            0,
+                            Math.min(60, Number.isFinite(next) ? next : 0),
+                          ),
+                        }));
+                      }}
+                      className="w-24 px-3 py-2 rounded-xl border border-gray-200 bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100 dark:border-gray-800"
+                    />
+                  </div>
+                  <div className="text-xs text-gray-600 dark:text-gray-300 mt-1">
+                    {angleEditSettings.vertical_angle}°
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-200 mb-1">
+                    Zoom (0–10)
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min={0}
+                      max={10}
+                      step={0.5}
+                      value={angleEditSettings.zoom}
+                      onChange={(e) =>
+                        setAngleEditSettings((prev) => ({
+                          ...prev,
+                          zoom: Math.max(
+                            0,
+                            Math.min(10, Number(e.target.value)),
+                          ),
+                        }))
+                      }
+                      className="w-full"
+                    />
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      max={10}
+                      step={0.5}
+                      value={angleEditSettings.zoom}
+                      onChange={(e) => {
+                        const next = Number(e.target.value);
+                        setAngleEditSettings((prev) => ({
+                          ...prev,
+                          zoom: Math.max(
+                            0,
+                            Math.min(10, Number.isFinite(next) ? next : 0),
+                          ),
+                        }));
+                      }}
+                      className="w-24 px-3 py-2 rounded-xl border border-gray-200 bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100 dark:border-gray-800"
+                    />
+                  </div>
+                  <div className="text-xs text-gray-600 dark:text-gray-300 mt-1">
+                    {angleEditSettings.zoom}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-200 mb-1">
+                    Outputs
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <select
+                      value={angleEditSettings.num_images}
+                      onChange={(e) =>
+                        setAngleEditSettings((prev) => ({
+                          ...prev,
+                          num_images: Math.max(
+                            1,
+                            Math.min(6, Number(e.target.value)),
+                          ),
+                        }))
+                      }
+                      className="w-full px-3 py-2 rounded-xl border border-gray-200 bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100 dark:border-gray-800"
+                    >
+                      {[1, 2, 3, 4].map((n) => (
+                        <option key={n} value={n}>
+                          {n} image{n === 1 ? "" : "s"}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      max={6}
+                      step={1}
+                      value={angleEditSettings.num_images}
+                      onChange={(e) => {
+                        const next = Number(e.target.value);
+                        setAngleEditSettings((prev) => ({
+                          ...prev,
+                          num_images: Math.max(
+                            1,
+                            Math.min(6, Number.isFinite(next) ? next : 1),
+                          ),
+                        }));
+                      }}
+                      className="w-24 px-3 py-2 rounded-xl border border-gray-200 bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100 dark:border-gray-800"
+                      title="Type a value (max 6)"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/30 p-3">
+                <div className="text-xs text-gray-600 dark:text-gray-300 mb-2">
+                  Source image
+                </div>
+                <div className="w-full flex justify-center">
+                  <img
+                    src={angleEditModal.url}
+                    alt="Source"
+                    className="max-h-64 rounded-lg object-contain border border-gray-200 dark:border-gray-800"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="p-5 border-t border-gray-200 dark:border-gray-800 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setAngleEditModal(null)}
+                className="text-xs px-4 py-2 rounded-xl border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 dark:bg-gray-950 dark:text-gray-200 dark:border-gray-800 dark:hover:bg-gray-900"
+                disabled={loading}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleGenerateAngleEdit}
+                className="text-xs px-4 py-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+                disabled={loading}
+              >
+                {loading ? "Generating..." : "Generate angle"}
               </button>
             </div>
           </div>

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdminDb, getAdminStorage } from "@/utils/firebaseAdmin";
 import { v4 as uuidv4 } from "uuid";
 import { FieldValue } from "firebase-admin/firestore";
+import { getPrompt } from "@/utils/promptService";
 
 function getImageToVideoModelEndpoint() {
   return process.env.FAL_IMAGE_TO_VIDEO_MODEL || process.env.FAL_VEO_MODEL;
@@ -35,6 +36,9 @@ function clampDurationSeconds(value, fallback = 8) {
   const numeric = Number.isFinite(n) ? n : fallback;
   return Math.max(1, Math.min(15, Math.round(numeric)));
 }
+
+const DEFAULT_VIDEO_NEGATIVE_PROMPT =
+  "lip-sync/speaking, breathing/chest rise-fall, background music/soundtrack/singing, text overlays, logos/watermarks, flicker/jitter, warping/morphing, camera shake";
 
 export async function POST(request) {
   try {
@@ -95,8 +99,25 @@ export async function POST(request) {
     const videoPromises = images.map(async (image) => {
       const scene = script_data.scenes.find((s) => s.id === image.scene_id);
 
+      const promptUsed = scene?.motion_prompt || "";
+      const rawNegative = scene?.video_negative_prompt;
+      const negativePromptUsed =
+        rawNegative === undefined || rawNegative === null
+          ? DEFAULT_VIDEO_NEGATIVE_PROMPT
+          : String(rawNegative || "").trim();
       const durationSeconds = clampDurationSeconds(image?.duration, 8);
       durationsBySceneId.set(image.scene_id, durationSeconds);
+
+      const audioInstruction = getPrompt("video-audio-instructions").trim();
+
+      const promptSentToModel = negativePromptUsed
+        ? `${promptUsed}\n\n${audioInstruction}\nAvoid: ${negativePromptUsed}`
+        : `${promptUsed}\n\n${audioInstruction}`;
+
+      const settingsUsed = {
+        model_endpoint: modelEndpoint,
+        duration: durationSeconds,
+      };
 
       const videoResponse = await fetch(`https://fal.run/${modelEndpoint}`, {
         method: "POST",
@@ -106,7 +127,7 @@ export async function POST(request) {
         },
         body: JSON.stringify({
           image_url: image.image_url,
-          prompt: scene?.motion_prompt || "",
+          prompt: promptSentToModel,
           duration: durationSeconds,
         }),
       });
@@ -154,10 +175,40 @@ export async function POST(request) {
       const encodedPath = encodeURIComponent(videoFileName);
       const publicVideoUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodedPath}?alt=media&token=${downloadToken}`;
 
+      const generationMetadata = {
+        timestamp: new Date().toISOString(),
+        scene_id: image.scene_id,
+        input_image_url: image.image_url,
+        video_url: publicVideoUrl,
+        prompt_used: promptUsed,
+        negative_prompt_used: negativePromptUsed || null,
+        prompt_sent_to_model: promptSentToModel,
+        model_request_payload: {
+          image_url: image.image_url,
+          prompt: promptSentToModel,
+          duration: durationSeconds,
+        },
+        settings_used: settingsUsed,
+        action_id: scene?.action_id || null,
+        camera_movement_id: scene?.camera_movement_id || null,
+        character_motion_id: scene?.character_motion_id || null,
+        fal: {
+          model_endpoint: modelEndpoint,
+          output_url: videoUrl,
+          request_id: videoResult?.request_id || videoResult?.requestId || null,
+        },
+        storage: {
+          bucket: bucket.name,
+          path: videoFileName,
+          content_type: contentType,
+        },
+      };
+
       return {
         scene_id: image.scene_id,
         video_url: publicVideoUrl,
         storage_path: videoFileName,
+        generation_metadata: generationMetadata,
       };
     });
 
@@ -181,6 +232,15 @@ export async function POST(request) {
           sceneRef,
           {
             video_urls: FieldValue.arrayUnion(v.video_url),
+            selected_video_url: v.video_url,
+            ...(v.generation_metadata
+              ? {
+                  video_generation_history: FieldValue.arrayUnion(
+                    v.generation_metadata,
+                  ),
+                  last_video_generation_metadata: v.generation_metadata,
+                }
+              : null),
             updated_at: nowIso,
           },
           { merge: true },

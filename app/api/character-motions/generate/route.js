@@ -38,6 +38,7 @@ CHARACTER MOTION REQUIREMENTS:
 - No location/environment descriptions.
 - Avoid chaotic / action-heavy motion.
 - Should work well in short vertical clips (9:16).
+- Do NOT include breathing in any form: no chest rise/fall, inhale, exhale, breath, breathing, or similar. Image-to-video models handle breathing poorly.
 
 Each character motion should include:
 1) name (2–5 words)

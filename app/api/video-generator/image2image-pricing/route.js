@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+
 function getImageToImageModelEndpoint() {
   return process.env.FAL_IMAGE_TO_IMAGE_MODEL;
 }
@@ -22,6 +24,7 @@ export async function GET() {
     const pricingResponse = await fetch(
       `https://api.fal.ai/v1/models/pricing?endpoint_id=${modelEndpoint}`,
       {
+        cache: "no-store",
         headers: {
           Authorization: `Key ${process.env.FAL_API_KEY}`,
         },
@@ -65,13 +68,16 @@ export async function GET() {
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      cost,
-      endpoint_id: modelEndpoint,
-      model: "image-to-image",
-      source: "fal_api",
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        cost,
+        endpoint_id: modelEndpoint,
+        model: "image-to-image",
+        source: "fal_api",
+      },
+      { headers: { "Cache-Control": "no-store, max-age=0" } },
+    );
   } catch (error) {
     return NextResponse.json(
       {

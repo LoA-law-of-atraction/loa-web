@@ -7,6 +7,20 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
+function stripBreathingMentions(text) {
+  if (!text) return text;
+
+  const withoutBreathing = String(text)
+    .replace(/\b(breathing|breathes|breathe|breath)\b/gi, "")
+    .replace(/\b(inhale|inhales|inhaling|inhaled)\b/gi, "")
+    .replace(/\b(exhale|exhales|exhaling|exhaled)\b/gi, "");
+
+  return withoutBreathing
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+([,.;:])/g, "$1")
+    .trim();
+}
+
 // Pricing for Claude 3.5 Sonnet (20241022)
 const CLAUDE_PRICING = {
   input: 3.0 / 1_000_000, // $3.00 per million input tokens
@@ -25,6 +39,7 @@ export async function POST(request) {
       action = null,
       camera_movement = null,
       character_motion = null,
+      temperature: requestedTemperature,
     } = await request.json();
 
     if (!scene_id || !voiceover || scene_index === undefined || !total_scenes) {
@@ -35,6 +50,28 @@ export async function POST(request) {
     }
 
     const db = getAdminDb();
+
+    const hydrateSelectionDoc = async (collectionName, selection) => {
+      if (!selection?.id) return null;
+
+      // If we already have meaningful guidance, keep it.
+      const hasGuidance =
+        Boolean(selection?.name) ||
+        Boolean(selection?.description) ||
+        (Array.isArray(selection?.tags) && selection.tags.length > 0);
+      if (hasGuidance) return selection;
+
+      try {
+        const doc = await db
+          .collection(String(collectionName))
+          .doc(String(selection.id))
+          .get();
+        if (!doc.exists) return selection;
+        return { id: doc.id, ...doc.data() };
+      } catch {
+        return selection;
+      }
+    };
 
     // Fetch location from scene doc (best-effort)
     let locationDescription = "";
@@ -59,10 +96,16 @@ export async function POST(request) {
     const requestedCharacterMotion = coerceSelection(character_motion);
 
     if (requestedCameraMovement?.id) {
-      cameraMovementDoc = requestedCameraMovement;
+      cameraMovementDoc = await hydrateSelectionDoc(
+        "camera_movements",
+        requestedCameraMovement,
+      );
     }
     if (requestedCharacterMotion?.id) {
-      characterMotionDoc = requestedCharacterMotion;
+      characterMotionDoc = await hydrateSelectionDoc(
+        "character_motions",
+        requestedCharacterMotion,
+      );
     }
 
     if (project_id) {
@@ -241,8 +284,11 @@ export async function POST(request) {
         cameraMovementGuidance += `Selected Camera Movement: ${cameraMovementDoc.name}\n`;
       if (cameraMovementDoc.description)
         cameraMovementGuidance += `Description: ${cameraMovementDoc.description}\n`;
+
+      // Root rule: the selected camera movement is authoritative.
+      // Do not invent additional camera motion beyond what the selected movement describes.
       cameraMovementGuidance +=
-        "Prefer subtle, smooth motion; do not change framing drastically.";
+        "Follow the selected camera movement EXACTLY. Do NOT add any extra camera movement not described above.";
       cameraMovementGuidance = `\n\n${cameraMovementGuidance}`;
     }
 
@@ -254,8 +300,11 @@ export async function POST(request) {
         characterMotionGuidance += `Selected Character Motion: ${characterMotionDoc.name}\n`;
       if (characterMotionDoc.description)
         characterMotionGuidance += `Description: ${characterMotionDoc.description}\n`;
+
+      // Root rule: the selected character motion is authoritative.
+      // Do not invent additional character actions beyond what the selected motion describes.
       characterMotionGuidance +=
-        "Keep motion minimal and realistic; avoid big gestures and lip-sync.";
+        "Follow the selected character motion EXACTLY. Do NOT add extra character actions not described above. Avoid lip-sync.";
       characterMotionGuidance = `\n\n${characterMotionGuidance}`;
     }
 
@@ -268,13 +317,20 @@ export async function POST(request) {
       character_motion_guidance: characterMotionGuidance,
     });
 
+    const temperature =
+      requestedTemperature !== undefined && requestedTemperature !== null
+        ? Math.min(1, Math.max(0, Number(requestedTemperature)))
+        : 0.8;
+
     const message = await anthropic.messages.create({
       model: process.env.NEXT_PUBLIC_CLAUDE_MODEL,
       max_tokens: 250,
+      temperature,
       messages: [{ role: "user", content: prompt }],
     });
 
-    const motionPrompt = (message.content?.[0]?.text || "").trim();
+    const motionPromptRaw = (message.content?.[0]?.text || "").trim();
+    const motionPrompt = stripBreathingMentions(motionPromptRaw);
 
     // Calculate cost
     const inputTokens = message.usage.input_tokens;

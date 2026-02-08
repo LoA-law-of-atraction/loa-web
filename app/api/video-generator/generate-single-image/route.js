@@ -317,10 +317,13 @@ export async function POST(request) {
       try {
         const generationMetadata = {
           timestamp: new Date().toISOString(),
+          source: "image-to-image",
           image_url: publicImageUrl,
           image_prompt: image_prompt,
           character_reference_url: character_image_url,
           character_id: character_id,
+          model_endpoint: endpointId,
+          fal_request_payload: requestBody,
           grok_settings: settings,
           location: location
             ? {
@@ -342,6 +345,11 @@ export async function POST(request) {
             : null,
           grok_response: {
             revised_prompt: imageResult.revised_prompt || null,
+          },
+          fal_response: {
+            revised_prompt: imageResult.revised_prompt || null,
+            seed: imageResult?.seed ?? null,
+            output_image_url: imageUrl || null,
           },
         };
 

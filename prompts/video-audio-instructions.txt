@@ -1,0 +1,3 @@
+Audio rules:
+- SFX only (environmental sounds like rain, distant traffic, footsteps).
+- Do NOT include background music, soundtrack, songs, singing, or BGM.

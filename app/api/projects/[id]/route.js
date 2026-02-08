@@ -21,6 +21,43 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
+    const projectData = projectDoc.data() || {};
+
+    // Load session videos and background music (best-effort) so clients can
+    // rehydrate Step 4/5 even if per-scene video fields are missing (older data).
+    let sessionVideos = [];
+    let backgroundMusicUrl = null;
+    let backgroundMusicPrompt = null;
+    const sessionId = projectData?.session_id;
+    if (sessionId) {
+      try {
+        const sessionDoc = await db
+          .collection("video_sessions")
+          .doc(String(sessionId))
+          .get();
+        if (sessionDoc.exists) {
+          const data = sessionDoc.data() || {};
+          sessionVideos = Array.isArray(data.videos) ? data.videos : [];
+          backgroundMusicUrl = data.background_music_url || null;
+          backgroundMusicPrompt = data.background_music_prompt || null;
+        }
+      } catch (err) {
+        console.warn("Get project: failed to load session data", err);
+      }
+    }
+
+    const sessionVideoUrlBySceneId = new Map(
+      (sessionVideos || [])
+        .map((v) => {
+          const sid = v?.scene_id;
+          const url = v?.video_url;
+          if (sid === null || sid === undefined) return null;
+          if (!url || typeof url !== "string") return null;
+          return [String(sid), url];
+        })
+        .filter(Boolean),
+    );
+
     // Get scenes subcollection
     const scenesSnapshot = await db
       .collection("projects")
@@ -31,6 +68,19 @@ export async function GET(request, { params }) {
     const scenes = scenesSnapshot.docs.map((doc) => {
       const data = doc.data() || {};
       const next = { ...data };
+
+      // Best-effort backfill for display/hydration.
+      const sceneId =
+        next?.id === null || next?.id === undefined ? doc.id : String(next.id);
+      const fallbackVideoUrl = sessionVideoUrlBySceneId.get(String(sceneId));
+      if (fallbackVideoUrl) {
+        if (!next.selected_video_url)
+          next.selected_video_url = fallbackVideoUrl;
+        if (!Array.isArray(next.video_urls) || next.video_urls.length === 0) {
+          next.video_urls = [fallbackVideoUrl];
+        }
+      }
+
       if (Object.prototype.hasOwnProperty.call(next, "duration")) {
         next.duration = clampDurationSeconds(next.duration, 8);
       }
@@ -45,14 +95,30 @@ export async function GET(request, { params }) {
       scenes,
     };
 
-    return NextResponse.json({
-      success: true,
-      project: {
-        id: projectDoc.id,
-        ...projectDoc.data(),
+    // Prefer project doc for background music (saved from music collection), fall back to session
+    const finalBackgroundMusicUrl =
+      projectData.background_music_url || backgroundMusicUrl;
+    const finalBackgroundMusicPrompt =
+      projectData.background_music_prompt || backgroundMusicPrompt;
+
+    return NextResponse.json(
+      {
+        success: true,
+        project: {
+          id: projectDoc.id,
+          ...projectData,
+          background_music_url: finalBackgroundMusicUrl,
+          background_music_prompt: finalBackgroundMusicPrompt,
+        },
+        scriptData,
+        sessionVideos,
       },
-      scriptData,
-    });
+      {
+        headers: {
+          "Cache-Control": "no-store, max-age=0",
+        },
+      },
+    );
   } catch (error) {
     console.error("Get project error:", error);
     return NextResponse.json(
@@ -76,6 +142,51 @@ export async function PATCH(request, { params }) {
     }
 
     const updates = await request.json();
+
+    // Normalize timeline_settings so clipAudioSettings keys are strings (Firestore map keys).
+    // Ensures scene volume, fade in/out, clip order, voiceover/music volume persist correctly.
+    if (
+      updates &&
+      Object.prototype.hasOwnProperty.call(updates, "timeline_settings")
+    ) {
+      const ts = updates.timeline_settings;
+      if (ts && typeof ts === "object") {
+        const normalized = { ...ts };
+        if (normalized.clipAudioSettings && typeof normalized.clipAudioSettings === "object") {
+          const cas = {};
+          for (const [k, v] of Object.entries(normalized.clipAudioSettings)) {
+            if (v && typeof v === "object") {
+              cas[String(k)] = {
+                volume: v.volume != null ? Math.max(0, Math.min(1, Number(v.volume))) : 0.4,
+                fadeIn: !!v.fadeIn,
+                fadeOut: !!v.fadeOut,
+              };
+            }
+          }
+          normalized.clipAudioSettings = cas;
+        }
+        if (Array.isArray(normalized.clipOrder)) {
+          normalized.clipOrder = normalized.clipOrder.map((v) =>
+            typeof v === "number" ? v : (Number.isFinite(Number(v)) ? Number(v) : v)
+          );
+        }
+        if (normalized.voiceoverVolume != null) {
+          normalized.voiceoverVolume = Math.max(0, Math.min(1, Number(normalized.voiceoverVolume)));
+        }
+        if (normalized.musicVolume != null) {
+          normalized.musicVolume = Math.max(0, Math.min(1, Number(normalized.musicVolume)));
+        }
+        // Ensure gapTransitions keys are strings for Firestore
+        if (normalized.gapTransitions && typeof normalized.gapTransitions === "object") {
+          const gt = {};
+          for (const [k, v] of Object.entries(normalized.gapTransitions)) {
+            if (v != null && typeof v === "string") gt[String(k)] = v;
+          }
+          normalized.gapTransitions = gt;
+        }
+        updates.timeline_settings = normalized;
+      }
+    }
 
     // Firestore does not allow nested arrays. If a client sends legacy
     // `scene_group` like [[1,2],[3]], convert to an array of objects:

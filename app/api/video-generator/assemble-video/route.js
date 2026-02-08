@@ -4,76 +4,148 @@ import { calculateShotstackCost } from "@/utils/costCalculator";
 
 export async function POST(request) {
   try {
-    const { project_id, session_id, videos, voiceover_url, scene_durations } =
-      await request.json();
+    const body = await request.json();
+    const {
+      project_id,
+      session_id,
+      edit: editFromStudio,
+      videos,
+      voiceover_url,
+      scene_durations,
+      background_music_url = null,
+    } = body;
 
-    if (!project_id || !session_id || !videos || !voiceover_url) {
+    if (!project_id || !session_id) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: "Missing project_id or session_id" },
         { status: 400 },
       );
     }
 
-    console.log("Assembling final video with Shotstack...");
+    let shotstackPayload;
 
-    const clampDurationSeconds = (value, fallback = 8) => {
-      const n = Number(value);
-      const numeric = Number.isFinite(n) ? n : fallback;
-      return Math.max(1, Math.min(15, Math.round(numeric)));
-    };
+    if (editFromStudio?.timeline && editFromStudio?.output) {
+      // Use edit from ShotStack Studio (timeline editor)
+      // Convert proxy URLs back to original – ShotStack cloud fetches directly, needs real URLs
+      const resolveProxyUrl = (src) => {
+        if (!src || typeof src !== "string") return src;
+        if (src.includes("/api/video-generator/proxy-media?url=")) {
+          try {
+            return decodeURIComponent(
+              src.split("url=")[1]?.split("&")[0] || src,
+            );
+          } catch {}
+        }
+        return src;
+      };
 
-    // Build Shotstack payload
-    let currentStart = 0;
-    const sortedVideos = videos.sort((a, b) => a.scene_id - b.scene_id);
+      const timeline = JSON.parse(JSON.stringify(editFromStudio.timeline));
+      (timeline.tracks || []).forEach((track) => {
+        (track.clips || []).forEach((clip) => {
+          if (clip?.asset?.src) {
+            clip.asset.src = resolveProxyUrl(clip.asset.src);
+          }
+        });
+      });
 
-    const shotstackPayload = {
-      timeline: {
-        tracks: [
-          {
-            clips: videos
-              .sort((a, b) => a.scene_id - b.scene_id)
-              .map((video) => {
-                const durationSeconds = clampDurationSeconds(
-                  scene_durations?.[video.scene_id],
-                  8,
-                );
-                const clip = {
-                  asset: {
-                    type: "video",
-                    src: video.video_url,
-                    volume: 0, // Mute video audio
-                  },
-                  start: currentStart,
-                  length: durationSeconds,
-                };
-                currentStart += durationSeconds;
-                return clip;
-              }),
-          },
-          {
-            clips: [
-              {
-                asset: {
-                  type: "audio",
-                  src: voiceover_url,
-                  volume: 1,
-                },
-                start: 0,
-                length: "auto",
-              },
-            ],
-          },
-        ],
-      },
-      output: {
-        format: "mp4",
-        resolution: "hd",
-        size: {
-          width: 1080,
-          height: 1920,
+      shotstackPayload = {
+        timeline,
+        output: {
+          ...editFromStudio.output,
+          resolution: editFromStudio.output.resolution || "hd",
         },
-      },
-    };
+      };
+      console.log("Assembling final video with Shotstack (from Studio edit)...");
+    } else if (videos && voiceover_url) {
+      // Build from videos + voiceover (legacy)
+      if (!videos.length || !voiceover_url) {
+        return NextResponse.json(
+          { error: "Missing required fields: videos, voiceover_url" },
+          { status: 400 },
+        );
+      }
+      console.log("Assembling final video with Shotstack...");
+
+      const clampDurationSeconds = (value, fallback = 8) => {
+        const n = Number(value);
+        const numeric = Number.isFinite(n) ? n : fallback;
+        return Math.max(1, Math.min(15, Math.round(numeric)));
+      };
+
+      let currentStart = 0;
+      const sortedVideos = videos.sort((a, b) => a.scene_id - b.scene_id);
+
+      shotstackPayload = {
+        timeline: {
+          tracks: [
+            {
+              clips: videos
+                .sort((a, b) => a.scene_id - b.scene_id)
+                .map((video) => {
+                  const durationSeconds = clampDurationSeconds(
+                    scene_durations?.[video.scene_id],
+                    8,
+                  );
+                  const clip = {
+                    asset: {
+                      type: "video",
+                      src: video.video_url,
+                      volume: 0,
+                    },
+                    start: currentStart,
+                    length: durationSeconds,
+                  };
+                  currentStart += durationSeconds;
+                  return clip;
+                }),
+            },
+            {
+              clips: [
+                {
+                  asset: {
+                    type: "audio",
+                    src: voiceover_url,
+                    volume: 1,
+                  },
+                  start: 0,
+                  length: "auto",
+                },
+              ],
+            },
+            ...(background_music_url
+              ? [
+                  {
+                    clips: [
+                      {
+                        asset: {
+                          type: "audio",
+                          src: background_music_url,
+                          volume: 0.25,
+                        },
+                        start: 0,
+                        length: "auto",
+                      },
+                    ],
+                  },
+                ]
+              : []),
+          ],
+        },
+        output: {
+          format: "mp4",
+          resolution: "hd",
+          size: {
+            width: 1080,
+            height: 1920,
+          },
+        },
+      };
+    } else {
+      return NextResponse.json(
+        { error: "Provide either edit (from Studio) or videos+voiceover_url" },
+        { status: 400 },
+      );
+    }
 
     // Call Shotstack API
     const shotstackResponse = await fetch(
@@ -97,9 +169,26 @@ export async function POST(request) {
     const renderId = shotstackResult.response.id;
 
     // Calculate Shotstack cost based on actual clip duration
-    const totalDuration = sortedVideos.reduce((sum, video) => {
-      return sum + clampDurationSeconds(scene_durations?.[video.scene_id], 8);
-    }, 0);
+    let totalDuration;
+    if (editFromStudio?.timeline && editFromStudio?.output) {
+      // Derive duration from edit timeline (first track = video clips)
+      const tracks = editFromStudio.timeline?.tracks || [];
+      totalDuration = tracks.reduce((sum, track) => {
+        const clips = track.clips || [];
+        return sum + clips.reduce((s, c) => s + (Number(c.length) || 0), 0);
+      }, 0);
+      if (totalDuration <= 0) totalDuration = 60; // fallback 1 min
+    } else {
+      const clampDurationSeconds = (value, fallback = 8) => {
+        const n = Number(value);
+        const numeric = Number.isFinite(n) ? n : fallback;
+        return Math.max(1, Math.min(15, Math.round(numeric)));
+      };
+      const sortedVideos = videos.sort((a, b) => a.scene_id - b.scene_id);
+      totalDuration = sortedVideos.reduce((sum, video) => {
+        return sum + clampDurationSeconds(scene_durations?.[video.scene_id], 8);
+      }, 0);
+    }
     const shotstackCost = calculateShotstackCost(totalDuration);
 
     // Update Firestore
@@ -115,26 +204,26 @@ export async function POST(request) {
     const projectDoc = await projectRef.get();
     const existingCosts = projectDoc.data()?.costs || {};
 
-    // Calculate new costs
+    // Calculate new costs (step6 = assemble / Shotstack)
     const newShotstackCost = (existingCosts.shotstack || 0) + shotstackCost;
-    const newStep5ShotstackCost =
-      (existingCosts.step5?.shotstack || 0) + shotstackCost;
-    const newStep5Total = (existingCosts.step5?.total || 0) + shotstackCost;
+    const newStep6ShotstackCost =
+      (existingCosts.step6?.shotstack || 0) + shotstackCost;
+    const newStep6Total = (existingCosts.step6?.total || 0) + shotstackCost;
     const newTotal = (existingCosts.total || 0) + shotstackCost;
 
     // Update project progress
     await projectRef.update({
-      current_step: 5,
+      current_step: 6,
       status: "rendering",
       costs: {
         ...existingCosts,
         // Legacy API-level
         shotstack: newShotstackCost,
-        // Step-level
-        step5: {
-          ...existingCosts.step5,
-          shotstack: newStep5ShotstackCost,
-          total: newStep5Total,
+        // Step-level (step6 = assemble)
+        step6: {
+          ...existingCosts.step6,
+          shotstack: newStep6ShotstackCost,
+          total: newStep6Total,
         },
         total: newTotal,
       },
@@ -195,7 +284,7 @@ async function pollShotstackStatus(projectId, sessionId, renderId) {
 
         // Update project
         await db.collection("projects").doc(projectId).update({
-          current_step: 5,
+          current_step: 6,
           status: "completed",
           final_video_url: finalVideoUrl,
           updated_at: new Date().toISOString(),
@@ -227,7 +316,7 @@ async function pollShotstackStatus(projectId, sessionId, renderId) {
 
       // Update project
       await db.collection("projects").doc(projectId).update({
-        current_step: 5,
+        current_step: 6,
         status: "failed",
         updated_at: new Date().toISOString(),
       });

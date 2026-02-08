@@ -7,6 +7,52 @@ function clampDurationSeconds(value, fallback = 8) {
   return Math.max(1, Math.min(15, Math.round(numeric)));
 }
 
+// GET - Read scene in subcollection
+export async function GET(_request, { params }) {
+  try {
+    // Next.js 15: await params before accessing properties
+    const { id, sceneId } = await params;
+
+    const db = getAdminDb();
+    const sceneRef = db
+      .collection("projects")
+      .doc(id)
+      .collection("scenes")
+      .doc(sceneId);
+
+    const sceneDoc = await sceneRef.get();
+    if (!sceneDoc.exists) {
+      return NextResponse.json(
+        { error: "Scene not found" },
+        {
+          status: 404,
+          headers: { "Cache-Control": "no-store" },
+        },
+      );
+    }
+
+    return NextResponse.json(
+      {
+        success: true,
+        scene: {
+          id: sceneId,
+          ...sceneDoc.data(),
+        },
+      },
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  } catch (error) {
+    console.error("Get scene error:", error);
+    return NextResponse.json(
+      { error: "Failed to get scene", message: error.message },
+      {
+        status: 500,
+        headers: { "Cache-Control": "no-store" },
+      },
+    );
+  }
+}
+
 // PATCH - Update scene in subcollection
 export async function PATCH(request, { params }) {
   try {
