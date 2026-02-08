@@ -1,0 +1,39 @@
+# Example Prompt Template
+# This is an example showing how to create new prompts
+#
+# Variables:
+# - {{topic}}: The blog post topic
+# - {{tone}}: Writing tone (inspirational, professional, casual)
+# - {{word_count}}: Target word count
+#
+# To use this prompt:
+# import { getPrompt } from '@/utils/promptService';
+# const prompt = getPrompt('example-blog-post', {
+#   topic: 'Law of Attraction',
+#   tone: 'inspirational',
+#   word_count: 1500
+# });
+
+Write a blog post about the following topic.
+
+Topic: {{topic}}
+
+Requirements:
+- Tone: {{tone}}
+- Word count: {{word_count}} words
+- Include practical examples
+- End with a clear call-to-action
+
+Format the output as valid JSON:
+{
+  "title": "Blog post title",
+  "introduction": "Opening paragraph...",
+  "sections": [
+    {
+      "heading": "Section 1 heading",
+      "content": "Section content..."
+    }
+  ],
+  "conclusion": "Closing paragraph...",
+  "cta": "Call to action"
+}

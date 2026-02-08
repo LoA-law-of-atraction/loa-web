@@ -1,0 +1,11 @@
+# Instrument rules format for music prompt generation
+# Used by generate-music-prompt to build the INSTRUMENT PALETTE section
+# Format: key=value (one per line, # for comments)
+# LOA music concept: existential, not wellness. Unresolved, inevitable. Retro-futuristic noir, no trademarked names.
+
+primary_label=PRIMARY (sustained analog synth pad — main voice)
+secondary_label=SECONDARY (low harmonic pad / drone — optional support)
+conditional_label=CONDITIONAL (soft felt piano — very rare, distant, non-melodic accent only)
+forbidden_label=DO NOT USE
+fallback_empty=None configured. Film score, NOT meditation. Use sustained analog synth pads, heavy static harmonic weight, cold urban undertone, metallic restraint, no rhythm, no drums, no vocals, no melody.
+closing=If more than two instruments are noticeable, it's wrong. Sustained, static, heavy — unresolved and inevitable. Solitary, not calming. Cold urban undertone, metallic restraint. Avoid cinematic builds, tension arcs, relaxation intent, calming, soothing, or therapeutic language.

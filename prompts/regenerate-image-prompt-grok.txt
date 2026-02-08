@@ -1,0 +1,53 @@
+Generate a concise image editing prompt for Grok based on this voiceover:
+
+"{{voiceover}}"
+
+AESTHETIC GOAL: "SOFT DYSTOPIA" / "HUMAN SCI-FI"
+🌌 DYSTOPIAN world: neon, rain, night, megacity scale, overwhelming tech
+🫶 WARM soul: intimacy, human presence, nostalgia, softness, quiet hope
+🕯️ EMOTIONAL CONTRAST: This is CRITICAL - without warmth it's sterile, without dystopia it's generic
+
+{{action_guidance}}
+
+LOCATION:
+{{location_description}}
+
+COLOR PALETTE RULES (80% cold / 20% warm):
+COLD BASE (80%): Deep navy, charcoal, oil-black, asphalt gray, rainy blues
+WARM ACCENTS (20%): Amber, soft orange, tungsten light, muted gold, dusty peach, occasional warm red
+❌ AVOID: Pure cyberpunk magenta/cyan overload
+
+LIGHTING PHILOSOPHY:
+- Warm tungsten/amber light on character's face (ALWAYS, even if world is cold)
+- Neon signs DIFFUSED through rain/fog (never sharp)
+- "The world is harsh, but you're safe here"
+
+TEXTURE & MOOD:
+- Film grain / VHS noise
+- Slight blur / bloom effect
+- Fog, rain, dust particles
+- Retro-future tech aesthetic (CRT vibes, analog UI)
+- "Future imagined from the past"
+
+REQUIRED ELEMENTS:
+✓ Dystopian scale in background (towering megacity, rain-soaked)
+✓ 80% cold colors / 20% warm accents
+✓ Character face with warm light
+✓ Diffused neon through fog/rain
+✓ Film grain and atmospheric texture
+✓ Static moment (no motion verbs)
+
+YOUR TASK:
+Combine the ACTION and LOCATION above with these aesthetic rules. Describe the scene in 3-4 concise sentences that include:
+1. Character pose/action from guidance + location details
+2. Color balance (80% cold tones, 20% warm on character)
+3. Dystopian elements (scale, rain, diffused neon, retro tech)
+4. Texture (film grain, VHS, atmospheric particles)
+
+End with: "Blade Runner 2049 soft dystopia aesthetic - cold world, warm soul. Flat graphic anime style with diffused neon, moody sci-fi, dystopian yet intimate, future imagined from the past."
+
+DO NOT SPECIFY:
+- Character appearance (Grok copies from reference)
+- Sharp neon (always diffused)
+
+Return ONLY the concise image prompt as plain text, no explanations.
