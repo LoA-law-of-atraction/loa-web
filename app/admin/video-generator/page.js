@@ -146,6 +146,7 @@ function VideoGeneratorContent() {
     stability: 0.65,
     similarity_boost: 0.75,
     style: 0.1,
+    speed: 1.0,
     use_speaker_boost: true,
   });
   const [scriptSaving, setScriptSaving] = useState(false);
@@ -205,6 +206,11 @@ function VideoGeneratorContent() {
   const [videoDetailsError, setVideoDetailsError] = useState(null);
   const [musicDetailsModal, setMusicDetailsModal] = useState(null); // music object for details modal
   const [voiceoverUrl, setVoiceoverUrl] = useState(null);
+  const [availableVoiceoversFromCollection, setAvailableVoiceoversFromCollection] =
+    useState([]);
+  const [loadingVoiceoversCollection, setLoadingVoiceoversCollection] =
+    useState(false);
+  const [playingVoicePreviewId, setPlayingVoicePreviewId] = useState(null);
   const [falVideoUnitCost, setFalVideoUnitCost] = useState(null);
   const [falVideoPricingUnit, setFalVideoPricingUnit] = useState(null);
   const [loadingFalVideoPricing, setLoadingFalVideoPricing] = useState(false);
@@ -1239,6 +1245,35 @@ function VideoGeneratorContent() {
       .catch(() => {});
   }, [step, musicDefaultDescription]);
 
+  // Load project-generated voiceovers and refresh character from Firestore when entering step 2
+  useEffect(() => {
+    if (step !== 2) return;
+    if (currentProjectId) loadAvailableVoiceoversFromCollection();
+    // Load character voice_id and name from characters collection (source of truth)
+    if (selectedCharacter?.character_id) {
+      fetch(`/api/characters/${selectedCharacter.character_id}`)
+        .then((r) => r.json())
+        .then((result) => {
+          if (result.success && result.character) {
+            const c = result.character;
+            setSelectedCharacter((prev) =>
+              prev && prev.character_id === c.id
+                ? {
+                    ...prev,
+                    character_id: c.id,
+                    id: c.id,
+                    name: c.name ?? prev.name,
+                    voice_id: c.voice_id ?? prev.voice_id,
+                    image_urls: c.image_urls ?? prev.image_urls,
+                  }
+                : prev,
+            );
+          }
+        })
+        .catch(() => {});
+    }
+  }, [step, currentProjectId, selectedCharacter?.character_id]);
+
   // Load project-generated music, themes, and instruments when entering step 5
   useEffect(() => {
     if (step !== 5) return;
@@ -1611,6 +1646,58 @@ function VideoGeneratorContent() {
       setAvailableMusicFromCollection([]);
     } finally {
       setLoadingMusicCollection(false);
+    }
+  };
+
+  const loadAvailableVoiceoversFromCollection = async () => {
+    setLoadingVoiceoversCollection(true);
+    try {
+      const url = currentProjectId
+        ? `/api/video-generator/voiceover-list?project_id=${currentProjectId}&limit=50`
+        : "/api/video-generator/voiceover-list?limit=50";
+      const response = await fetch(url);
+      const result = await response.json();
+      if (result.success && result.voiceovers) {
+        setAvailableVoiceoversFromCollection(result.voiceovers);
+      } else {
+        setAvailableVoiceoversFromCollection([]);
+      }
+    } catch (error) {
+      console.error("Failed to load voiceover collection:", error);
+      setAvailableVoiceoversFromCollection([]);
+    } finally {
+      setLoadingVoiceoversCollection(false);
+    }
+  };
+
+  const playVoicePreview = async (voiceId, characterName) => {
+    if (!voiceId) return;
+    try {
+      setPlayingVoicePreviewId(voiceId);
+      const response = await fetch("/api/voice-preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          voice_id: voiceId,
+          text: `Hi, I'm ${characterName || "the character"}. This is what my voice sounds like.`,
+        }),
+      });
+      if (!response.ok) throw new Error("Failed to load voice preview");
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+      audio.onended = () => {
+        setPlayingVoicePreviewId(null);
+        URL.revokeObjectURL(audioUrl);
+      };
+      audio.onerror = () => {
+        setPlayingVoicePreviewId(null);
+        URL.revokeObjectURL(audioUrl);
+      };
+      await audio.play();
+    } catch (err) {
+      setPlayingVoicePreviewId(null);
+      await alert("Failed to play voice preview: " + err.message, "error");
     }
   };
 
@@ -3218,7 +3305,7 @@ function VideoGeneratorContent() {
       if (result.success) {
         setVoiceoverUrl(result.voiceover_url);
         setSessionId(result.session_id);
-        // Duration will be calculated when audio loads
+        loadAvailableVoiceoversFromCollection();
         // Refresh ElevenLabs credits after generation
         loadElevenLabsInfo();
         // Reload project costs
@@ -6251,6 +6338,54 @@ function VideoGeneratorContent() {
           {/* Voiceover Generation */}
           <div className="mb-6">
             <div className="bg-purple-50 border border-purple-200 rounded-lg p-6 dark:bg-purple-950/30 dark:border-purple-900">
+              {/* Selected character info */}
+              {selectedCharacter && (
+                <div className="mb-4 p-4 rounded-lg bg-white dark:bg-gray-900/50 border border-purple-200 dark:border-purple-800">
+                  <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
+                    Selected character
+                  </div>
+                  <div className="flex flex-wrap items-center gap-4">
+                    <div>
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        Name:
+                      </span>{" "}
+                      <span className="font-medium text-gray-900 dark:text-gray-100">
+                        {selectedCharacter.name || "—"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        Voice ID:
+                      </span>{" "}
+                      <code className="text-xs font-mono bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded text-gray-800 dark:text-gray-200">
+                        {selectedCharacter.voice_id || "—"}
+                      </code>
+                    </div>
+                    {selectedCharacter.voice_id && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          playVoicePreview(
+                            selectedCharacter.voice_id,
+                            selectedCharacter.name,
+                          )
+                        }
+                        disabled={playingVoicePreviewId === selectedCharacter.voice_id}
+                        className="text-xs px-3 py-1.5 rounded-lg font-medium shrink-0 flex items-center gap-1.5 bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-70 disabled:cursor-not-allowed"
+                        title="Play sample voice"
+                      >
+                        {playingVoicePreviewId === selectedCharacter.voice_id ? (
+                          <>
+                            <span className="animate-pulse">🔊</span> Playing…
+                          </>
+                        ) : (
+                          <>🔊 Sample voice</>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <h3 className="font-semibold">Generate Voiceover</h3>
@@ -6419,6 +6554,35 @@ function VideoGeneratorContent() {
                       </p>
                     </div>
 
+                    {/* Speed */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-medium text-gray-700">
+                          Speed
+                        </label>
+                        <span className="text-xs text-gray-500">
+                          {voiceSettings.speed?.toFixed(2)}
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0.7"
+                        max="1.2"
+                        step="0.01"
+                        value={voiceSettings.speed ?? 1.0}
+                        onChange={(e) =>
+                          setVoiceSettings({
+                            ...voiceSettings,
+                            speed: parseFloat(e.target.value),
+                          })
+                        }
+                        className="w-full"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        1.0 = normal, lower = slower, higher = faster
+                      </p>
+                    </div>
+
                     {/* Speaker Boost */}
                     <div>
                       <label className="flex items-center gap-2 cursor-pointer">
@@ -6445,96 +6609,220 @@ function VideoGeneratorContent() {
                 </details>
               </div>
 
-              {!voiceoverUrl ? (
-                <>
-                  <button
-                    onClick={handleGenerateVoiceover}
-                    disabled={generatingVoiceover}
-                    className="w-full bg-purple-600 text-white py-2 sm:py-3 rounded-lg font-medium hover:bg-purple-700 disabled:opacity-50"
-                  >
-                    {generatingVoiceover
-                      ? "Generating Voiceover..."
-                      : "🎤 Generate Voiceover from Script"}
-                  </button>
+              <button
+                onClick={handleGenerateVoiceover}
+                disabled={generatingVoiceover}
+                className="w-full bg-purple-600 text-white py-2 sm:py-3 rounded-lg font-medium hover:bg-purple-700 disabled:opacity-50 dark:bg-purple-600 dark:hover:bg-purple-700"
+              >
+                {generatingVoiceover
+                  ? "Generating Voiceover..."
+                  : "🎤 Generate Voiceover from Script"}
+              </button>
 
-                  {/* Voiceover Generation Loading Bar */}
-                  {generatingVoiceover && (
-                    <div className="mt-4 bg-white border border-purple-300 rounded-lg p-4">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="animate-spin h-4 w-4 border-2 border-purple-600 border-t-transparent rounded-full"></div>
-                        <span className="text-sm font-medium text-purple-900">
-                          Generating voiceover with {selectedCharacter?.name}
-                          &apos;s voice...
-                        </span>
-                      </div>
-                      <div className="w-full bg-purple-200 rounded-full h-2 overflow-hidden">
+              {generatingVoiceover && (
+                <div className="mt-4 bg-white border border-purple-300 rounded-lg p-4 dark:bg-gray-900 dark:border-purple-900">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="animate-spin h-4 w-4 border-2 border-purple-600 border-t-transparent rounded-full"></div>
+                    <span className="text-sm font-medium text-purple-900 dark:text-purple-100">
+                      Generating voiceover with {selectedCharacter?.name}
+                      &apos;s voice...
+                    </span>
+                  </div>
+                  <div className="w-full bg-purple-200 rounded-full h-2 overflow-hidden dark:bg-purple-900/40">
+                    <div
+                      className="h-full bg-purple-600 rounded-full animate-pulse"
+                      style={{ width: "100%" }}
+                    ></div>
+                  </div>
+                  <p className="text-xs text-purple-700 dark:text-purple-300 mt-2">
+                    Processing with ElevenLabs API... (~15-20 seconds)
+                  </p>
+                </div>
+              )}
+
+              {/* Generated voiceovers – list of all for this project */}
+              <div className="mt-6 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-4">
+                <div className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3">
+                  Generated voiceovers
+                </div>
+                {loadingVoiceoversCollection ? (
+                  <div className="flex items-center gap-2 py-4 text-sm text-gray-500 dark:text-gray-400">
+                    <div className="animate-spin h-4 w-4 border-2 border-purple-600 border-t-transparent rounded-full"></div>
+                    Loading…
+                  </div>
+                ) : availableVoiceoversFromCollection.length === 0 ? (
+                  <p className="text-sm text-gray-500 dark:text-gray-400 py-4">
+                    No voiceovers generated yet. Click &quot;Generate Voiceover from
+                    Script&quot; above to create one.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {availableVoiceoversFromCollection.map((v) => {
+                      const isSelected = voiceoverUrl === v.voiceover_url;
+                      return (
                         <div
-                          className="h-full bg-purple-600 rounded-full animate-pulse"
-                          style={{ width: "100%" }}
-                        ></div>
-                      </div>
-                      <p className="text-xs text-purple-700 mt-2">
-                        Processing with ElevenLabs API... (~15-20 seconds)
-                      </p>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div>
-                  {!generatingVoiceover ? (
-                    <>
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-sm font-medium text-green-700">
-                          ✓ Voiceover Generated
-                        </span>
-                        {voiceoverDuration && (
-                          <span className="text-sm text-gray-600">
-                            Duration: {Math.floor(voiceoverDuration / 60)}:
-                            {String(
-                              Math.floor(voiceoverDuration % 60),
-                            ).padStart(2, "0")}
-                          </span>
+                          key={v.id}
+                          className={
+                            "rounded-lg border p-3 space-y-3 " +
+                            (isSelected
+                              ? "border-purple-500 bg-purple-50 dark:bg-purple-950/30 dark:border-purple-600"
+                              : "border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/30")
+                          }
+                        >
+                          <div className="flex flex-wrap items-center gap-3">
+                            <audio
+                              controls
+                              className="h-8 flex-1 min-w-[140px]"
+                              src={v.voiceover_url}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                                {v.script_length && (
+                                  <span>
+                                    {v.script_length.toLocaleString()} chars
+                                  </span>
+                                )}
+                                {v.timestamp && (
+                                  <span>
+                                    {new Date(v.timestamp).toLocaleDateString()}
+                                  </span>
+                                )}
+                                {typeof v.cost === "number" && (
+                                  <span>• ${v.cost.toFixed(3)}</span>
+                                )}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (currentProjectId) {
+                                  try {
+                                    const res = await fetch(
+                                      "/api/video-generator/select-voiceover",
+                                      {
+                                        method: "POST",
+                                        headers: {
+                                          "Content-Type": "application/json",
+                                        },
+                                        body: JSON.stringify({
+                                          project_id: currentProjectId,
+                                          session_id: sessionId,
+                                          voiceover_id: v.id,
+                                        }),
+                                      },
+                                    );
+                                    const result = await res.json();
+                                    if (result.success) {
+                                      setVoiceoverUrl(result.voiceover_url);
+                                    }
+                                  } catch {
+                                    setVoiceoverUrl(v.voiceover_url);
+                                  }
+                                } else {
+                                  setVoiceoverUrl(v.voiceover_url);
+                                }
+                              }}
+                              className={
+                                "text-xs px-3 py-1.5 rounded-lg font-medium shrink-0 " +
+                                (isSelected
+                                  ? "bg-purple-600 text-white cursor-default"
+                                  : "bg-purple-600 text-white hover:bg-purple-700")
+                              }
+                            >
+                              {isSelected ? "✓ Selected" : "Select"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                const ok = await confirm(
+                                  "Delete this voiceover? The file will be removed from storage. This cannot be undone.",
+                                );
+                                if (!ok) return;
+                                try {
+                                  const res = await fetch(
+                                    "/api/video-generator/delete-voiceover",
+                                    {
+                                      method: "POST",
+                                      headers: {
+                                        "Content-Type": "application/json",
+                                      },
+                                      body: JSON.stringify({
+                                        voiceover_id: v.id,
+                                      }),
+                                    },
+                                  );
+                                  const result = await res.json();
+                                  if (result.success) {
+                                    await alert("Voiceover deleted", "success");
+                                    if (voiceoverUrl === v.voiceover_url) {
+                                      setVoiceoverUrl(null);
+                                    }
+                                    loadAvailableVoiceoversFromCollection();
+                                  } else {
+                                    await alert(
+                                      "Failed to delete: " +
+                                        (result.error || "Unknown"),
+                                      "error",
+                                    );
+                                  }
+                                } catch (err) {
+                                  await alert(
+                                    "Error deleting: " + err.message,
+                                    "error",
+                                  );
+                                }
+                              }}
+                              className="text-xs px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 hover:text-red-600 hover:border-red-300 dark:text-gray-400 dark:hover:text-red-400 dark:hover:border-red-700 shrink-0"
+                              title="Delete voiceover"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Selected voiceover (for assembly) */}
+              {voiceoverUrl && (
+                <div className="mt-6 rounded-xl border border-purple-200 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-950/20 p-4">
+                  <div className="text-sm font-semibold text-purple-900 dark:text-purple-100 mb-3">
+                    Selected voiceover (for assembly)
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <audio
+                      key={voiceoverUrl}
+                      controls
+                      className="flex-1 min-w-[200px]"
+                      onLoadedMetadata={(e) =>
+                        setVoiceoverDuration(e.target.duration)
+                      }
+                    >
+                      <source src={voiceoverUrl} type="audio/mpeg" />
+                    </audio>
+                    {voiceoverDuration && (
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        Duration: {Math.floor(voiceoverDuration / 60)}:
+                        {String(Math.floor(voiceoverDuration % 60)).padStart(
+                          2,
+                          "0",
                         )}
-                      </div>
-                      <audio
-                        key={voiceoverUrl}
-                        controls
-                        className="w-full mb-3"
-                        onLoadedMetadata={(e) =>
-                          setVoiceoverDuration(e.target.duration)
-                        }
-                      >
-                        <source src={voiceoverUrl} type="audio/mpeg" />
-                      </audio>
-                      <button
-                        onClick={handleGenerateVoiceover}
-                        disabled={generatingVoiceover}
-                        className="text-sm text-purple-600 hover:underline disabled:opacity-50"
-                      >
-                        Regenerate Voiceover
-                      </button>
-                    </>
-                  ) : (
-                    /* Regenerating Voiceover Loading Bar */
-                    <div className="bg-white border border-purple-300 rounded-lg p-4">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="animate-spin h-4 w-4 border-2 border-purple-600 border-t-transparent rounded-full"></div>
-                        <span className="text-sm font-medium text-purple-900">
-                          Regenerating voiceover with {selectedCharacter?.name}
-                          &apos;s voice...
-                        </span>
-                      </div>
-                      <div className="w-full bg-purple-200 rounded-full h-2 overflow-hidden">
-                        <div
-                          className="h-full bg-purple-600 rounded-full animate-pulse"
-                          style={{ width: "100%" }}
-                        ></div>
-                      </div>
-                      <p className="text-xs text-purple-700 mt-2">
-                        Processing with ElevenLabs API... (~15-20 seconds)
-                      </p>
-                    </div>
-                  )}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setVoiceoverUrl(null);
+                      setVoiceoverDuration(null);
+                    }}
+                    className="text-xs text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 mt-2"
+                    title="Remove selected voiceover"
+                  >
+                    Remove selection
+                  </button>
                 </div>
               )}
               <p className="text-xs text-gray-500 mt-3">
