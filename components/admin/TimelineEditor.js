@@ -68,6 +68,10 @@ const TimelineEditor = forwardRef(function TimelineEditor(
   const [transitionGap, setTransitionGap] = useState(
     init.transitionGap != null ? Number(init.transitionGap) : 0.5,
   );
+  // Per-gap transition duration (seconds): { 0: 0.5, 1: 1.0, ... }; fallback to transitionGap
+  const [transitionGapByIndex, setTransitionGapByIndex] = useState(
+    init.transitionGapByIndex ?? {},
+  );
   const [previewTransitionGapIndex, setPreviewTransitionGapIndex] = useState(null);
   // Per-clip audio settings (FCP style): { scene_id: { volume: 0–1, fadeIn: bool, fadeOut: bool } }
   const [clipAudioSettings, setClipAudioSettings] = useState(init.clipAudioSettings ?? {});
@@ -96,8 +100,10 @@ const TimelineEditor = forwardRef(function TimelineEditor(
   const lastMusicSrcRef = useRef("");
   const gapTransitionsRef = useRef(gapTransitions);
   const transitionGapRef = useRef(transitionGap);
+  const transitionGapByIndexRef = useRef(transitionGapByIndex);
   gapTransitionsRef.current = gapTransitions;
   transitionGapRef.current = transitionGap;
+  transitionGapByIndexRef.current = transitionGapByIndex;
 
   // Re-init from initialTimelineSettings when project loads or settings arrive
   const prevProjectIdRef = useRef(null);
@@ -119,6 +125,7 @@ const TimelineEditor = forwardRef(function TimelineEditor(
     skipNextSaveRef.current = true; // avoid redundant save right after load
     setGapTransitions(init.gapTransitions ?? {});
     setTransitionGap(init.transitionGap != null ? Number(init.transitionGap) : 0.5);
+    setTransitionGapByIndex(init.transitionGapByIndex ?? {});
     setClipAudioSettings(init.clipAudioSettings ?? {});
     setClipOrder(Array.isArray(init.clipOrder) ? init.clipOrder : []);
     setVoiceoverVolume(init.voiceoverVolume != null ? Math.max(0, Math.min(1, Number(init.voiceoverVolume))) : 1);
@@ -152,6 +159,7 @@ const TimelineEditor = forwardRef(function TimelineEditor(
         timeline_settings: {
           gapTransitions: { ...gapTransitions },
           transitionGap,
+          transitionGapByIndex: { ...transitionGapByIndex },
           clipAudioSettings: { ...clipAudioSettings },
           clipOrder: [...clipOrder],
           voiceoverVolume,
@@ -167,7 +175,7 @@ const TimelineEditor = forwardRef(function TimelineEditor(
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
-  }, [projectId, gapTransitions, transitionGap, clipAudioSettings, clipOrder, voiceoverVolume, musicVolume]);
+  }, [projectId, gapTransitions, transitionGap, transitionGapByIndex, clipAudioSettings, clipOrder, voiceoverVolume, musicVolume]);
 
   const clampDurationSeconds = (value, fallback = 8) => {
     const n = Number(value);
@@ -176,6 +184,11 @@ const TimelineEditor = forwardRef(function TimelineEditor(
   };
 
   const getGapTransition = (gapIdx) => gapTransitions[gapIdx] ?? "fade";
+
+  const getGapDuration = (gapIdx) => {
+    const v = transitionGapByIndex[gapIdx];
+    return v != null ? Math.max(0.2, Math.min(2, Number(v))) : (transitionGap ?? 0.5);
+  };
 
   const getClipAudioSetting = (sceneId) => {
     const s = clipAudioSettings[sceneId];
@@ -193,9 +206,10 @@ const TimelineEditor = forwardRef(function TimelineEditor(
     });
   };
 
-  const buildEdit = (vids, gapTrans, clipSettings = {}, order = [], gap = transitionGap) => {
+  const buildEdit = (vids, gapTrans, clipSettings = {}, order = [], gapByIndex = transitionGapByIndex, defaultGap = transitionGap) => {
     const list = vids || videos;
     let sumPrev = 0;
+    let sumOverlapPrev = 0;
     const sortedVideos = (() => {
       const arr = [...list];
       if (order?.length === arr.length) {
@@ -205,11 +219,16 @@ const TimelineEditor = forwardRef(function TimelineEditor(
       return arr.sort((a, b) => Number(a?.scene_id) - Number(b?.scene_id));
     })();
     const numGaps = Math.max(0, sortedVideos.length - 1);
+    const getOverlap = (i) => {
+      if ((gapTrans[i] ?? "fade") === "none") return 0;
+      const d = gapByIndex[i];
+      const sec = d != null ? Math.max(0.2, Math.min(2, Number(d))) : (defaultGap ?? 0.5);
+      return Math.min(sec, 2);
+    };
     const hasAnyTransition = Array.from({ length: numGaps }, (_, i) => i).some(
       (i) => (gapTrans[i] ?? "fade") !== "none"
     );
-    const useGap = hasAnyTransition && gap > 0 && sortedVideos.length > 1;
-    const overlap = useGap ? Math.min(gap, 1.5) : 0;
+    const useGaps = hasAnyTransition && sortedVideos.length > 1;
 
     const videoClips = sortedVideos.map((video, idx) => {
       const durationSeconds = clampDurationSeconds(
@@ -229,7 +248,7 @@ const TimelineEditor = forwardRef(function TimelineEditor(
       const fadeOut = s?.fadeOut ?? false;
       const volumeEffect =
         fadeIn && fadeOut ? "fadeInFadeOut" : fadeIn ? "fadeIn" : fadeOut ? "fadeOut" : undefined;
-      const start = sumPrev - idx * overlap;
+      const start = Math.max(0, sumPrev - sumOverlapPrev);
       const inTransition = idx > 0 ? (gapTrans[idx - 1] ?? "fade") : "none";
       const outTransition = idx < sortedVideos.length - 1 ? (gapTrans[idx] ?? "fade") : "none";
       const asset = { type: "video", src: video.video_url, volume };
@@ -243,6 +262,7 @@ const TimelineEditor = forwardRef(function TimelineEditor(
         clip.transition = { in: inTransition, out: outTransition };
       }
       sumPrev += durationSeconds;
+      if (useGaps && idx < numGaps) sumOverlapPrev += getOverlap(idx);
       return clip;
     });
 
@@ -298,7 +318,7 @@ const TimelineEditor = forwardRef(function TimelineEditor(
       }
       return arr.sort((a, b) => Number(a?.scene_id) - Number(b?.scene_id));
     })();
-    const e = buildEdit(vids, gapTransitions, clipAudioSettings, clipOrder, transitionGap);
+    const e = buildEdit(vids, gapTransitions, clipAudioSettings, clipOrder, transitionGapByIndex, transitionGap);
     const clips = e.timeline.tracks[0]?.clips || [];
     const totalSeconds = clips.length
       ? Math.max(...clips.map((c) => (Number(c.start) || 0) + (Number(c.length) || 0)))
@@ -325,6 +345,7 @@ const TimelineEditor = forwardRef(function TimelineEditor(
     scriptData,
     gapTransitions,
     transitionGap,
+    transitionGapByIndex,
     clipAudioSettings,
     clipOrder,
     voiceoverVolume,
@@ -396,7 +417,8 @@ const TimelineEditor = forwardRef(function TimelineEditor(
       ? getGapTransition(previewTransitionGapIndex)
       : "none";
     if (trans === "none") return 0;
-    return Math.round(transitionGap * 1000);
+    const sec = getGapDuration(previewTransitionGapIndex);
+    return Math.round(sec * 1000);
   };
 
   const transitionTypeToPreviewClass = (type) => {
@@ -507,7 +529,9 @@ const TimelineEditor = forwardRef(function TimelineEditor(
       setCurrentTime(t);
       const endOfClip = (c.start ?? 0) + (c.length ?? 0);
       const gapTrans = gapTransitionsRef.current[curIdx] ?? "fade";
-      const transitionMs = gapTrans !== "none" ? Math.round(transitionGapRef.current * 1000) : 0;
+      const gapSec = transitionGapByIndexRef.current[curIdx];
+      const sec = gapSec != null ? Math.max(0.2, Math.min(2, Number(gapSec))) : (transitionGapRef.current ?? 0.5);
+      const transitionMs = gapTrans !== "none" ? Math.round(sec * 1000) : 0;
       const leadTime = transitionMs > 0 ? transitionMs / 1000 + 0.05 : 0.15;
       if (t >= endOfClip - leadTime) {
         playingClipIndexRef.current = curIdx + 1;
@@ -541,7 +565,7 @@ const TimelineEditor = forwardRef(function TimelineEditor(
       voiceover?.pause();
       music?.pause();
     };
-  }, [isPlaying]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isPlaying, timelineData?.videoClips, timelineData?.totalSeconds]);
 
   // Sync mute state and volume during playback
   useEffect(() => {
@@ -743,8 +767,8 @@ const TimelineEditor = forwardRef(function TimelineEditor(
         </span>
         <div className="flex flex-wrap items-center gap-3">
           {timelineData.videoClips && timelineData.videoClips.length > 1 && (
-            <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-              Gap (sec):
+            <label className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
+              <span className="shrink-0">Default:</span>
               <input
                 type="number"
                 min={0.2}
@@ -752,8 +776,10 @@ const TimelineEditor = forwardRef(function TimelineEditor(
                 step={0.1}
                 value={transitionGap}
                 onChange={(e) => setTransitionGap(Math.max(0.2, Math.min(2, parseFloat(e.target.value) || 0.5)))}
-                className="w-16 rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                className="w-12 rounded border border-gray-300 bg-white px-1.5 py-0.5 text-xs text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                title="Default duration for transitions (used when not set per-gap)"
               />
+              <span className="text-gray-500">s</span>
             </label>
           )}
           <span className="text-xs text-gray-600 dark:text-gray-400">
@@ -855,10 +881,11 @@ const TimelineEditor = forwardRef(function TimelineEditor(
                 const gapEnd = nextClip?.start ?? gapStart;
                 const centerX = ((gapStart + gapEnd) / 2) * PIXELS_PER_SECOND;
                 const trans = getGapTransition(i);
+                const duration = getGapDuration(i);
                 return (
                   <div
                     key={`gap-${i}`}
-                    className="absolute top-1/2 z-10 -translate-y-1/2"
+                    className="absolute top-1/2 z-10 flex -translate-y-1/2 items-center gap-1"
                     style={{ left: centerX, transform: "translate(-50%, -50%)" }}
                     onClick={(e) => e.stopPropagation()}
                   >
@@ -874,9 +901,28 @@ const TimelineEditor = forwardRef(function TimelineEditor(
                         </option>
                       ))}
                     </select>
+                    {trans !== "none" && (
+                      <label className="flex items-center gap-0.5" title="Duration (seconds)">
+                        <input
+                          type="number"
+                          min={0.2}
+                          max={2}
+                          step={0.1}
+                          value={duration}
+                          onChange={(e) => {
+                            const v = parseFloat(e.target.value);
+                            if (Number.isFinite(v)) {
+                              setTransitionGapByIndex((prev) => ({ ...prev, [i]: Math.max(0.2, Math.min(2, v)) }));
+                            }
+                          }}
+                          className="w-10 rounded border border-purple-300 bg-white px-1 py-0.5 text-[10px] text-purple-800 dark:border-purple-700 dark:bg-purple-950/50 dark:text-purple-200"
+                        />
+                        <span className="text-[10px] text-purple-600 dark:text-purple-400">s</span>
+                      </label>
+                    )}
                   </div>
                 );
-              })}
+  })}
             </div>
           </div>
 

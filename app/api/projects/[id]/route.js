@@ -184,6 +184,15 @@ export async function PATCH(request, { params }) {
           }
           normalized.gapTransitions = gt;
         }
+        // Ensure transitionGapByIndex keys are strings, values are numbers
+        if (normalized.transitionGapByIndex && typeof normalized.transitionGapByIndex === "object") {
+          const tgi = {};
+          for (const [k, v] of Object.entries(normalized.transitionGapByIndex)) {
+            const n = Number(v);
+            if (Number.isFinite(n)) tgi[String(k)] = Math.max(0.2, Math.min(2, n));
+          }
+          normalized.transitionGapByIndex = tgi;
+        }
         updates.timeline_settings = normalized;
       }
     }
