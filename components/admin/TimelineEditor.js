@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo, useImperativeHandle, forwardRef } from "react";
+import { Edit } from "@/lib/edit";
 
 /**
  * Custom timeline editor – FCP/Premiere-style layout.
@@ -54,6 +55,8 @@ const TimelineEditor = forwardRef(function TimelineEditor(
     videos = [],
     voiceoverUrl,
     backgroundMusicUrl = null,
+    voiceoverDuration = null,
+    musicDuration = null,
     sceneDurations = {},
     getSceneDurationSeconds,
     scriptData,
@@ -84,16 +87,33 @@ const TimelineEditor = forwardRef(function TimelineEditor(
   const [musicVolume, setMusicVolume] = useState(
     init.musicVolume != null ? Math.max(0, Math.min(1, Number(init.musicVolume))) : 0.25,
   );
+  // Phase 3: Audio clips as first-class – trim (start offset) and length (duration in timeline)
+  const [voiceoverTrim, setVoiceoverTrim] = useState(
+    init.voiceoverTrim != null ? Math.max(0, Number(init.voiceoverTrim)) : 0,
+  );
+  const [voiceoverLength, setVoiceoverLength] = useState(
+    init.voiceoverLength != null && init.voiceoverLength !== "auto"
+      ? Math.max(0.1, Number(init.voiceoverLength))
+      : "auto",
+  );
+  const [musicTrim, setMusicTrim] = useState(
+    init.musicTrim != null ? Math.max(0, Number(init.musicTrim)) : 0,
+  );
+  const [musicLength, setMusicLength] = useState(
+    init.musicLength != null && init.musicLength !== "auto"
+      ? Math.max(0.1, Number(init.musicLength))
+      : "auto",
+  );
   // Playback
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [previewError, setPreviewError] = useState(null);
   const [previewTransitioning, setPreviewTransitioning] = useState(false);
+  const [resizingAudio, setResizingAudio] = useState(null);
   const previewVideoRef = useRef(null);
   const voiceoverAudioRef = useRef(null);
   const musicAudioRef = useRef(null);
-  const playIntervalRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const isDraggingPlayheadRef = useRef(false);
   const lastVoiceoverSrcRef = useRef("");
@@ -130,6 +150,10 @@ const TimelineEditor = forwardRef(function TimelineEditor(
     setClipOrder(Array.isArray(init.clipOrder) ? init.clipOrder : []);
     setVoiceoverVolume(init.voiceoverVolume != null ? Math.max(0, Math.min(1, Number(init.voiceoverVolume))) : 1);
     setMusicVolume(init.musicVolume != null ? Math.max(0, Math.min(1, Number(init.musicVolume))) : 0.25);
+    setVoiceoverTrim(init.voiceoverTrim != null ? Math.max(0, Number(init.voiceoverTrim)) : 0);
+    setVoiceoverLength(init.voiceoverLength != null && init.voiceoverLength !== "auto" ? Math.max(0.1, Number(init.voiceoverLength)) : "auto");
+    setMusicTrim(init.musicTrim != null ? Math.max(0, Number(init.musicTrim)) : 0);
+    setMusicLength(init.musicLength != null && init.musicLength !== "auto" ? Math.max(0.1, Number(init.musicLength)) : "auto");
   }, [projectId, initialTimelineSettings]);
 
   // Reset clip order when video set changes (e.g. different project)
@@ -164,6 +188,10 @@ const TimelineEditor = forwardRef(function TimelineEditor(
           clipOrder: [...clipOrder],
           voiceoverVolume,
           musicVolume,
+          voiceoverTrim,
+          voiceoverLength,
+          musicTrim,
+          musicLength,
         },
       };
       fetch(`/api/projects/${projectId}`, {
@@ -175,7 +203,7 @@ const TimelineEditor = forwardRef(function TimelineEditor(
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
-  }, [projectId, gapTransitions, transitionGap, transitionGapByIndex, clipAudioSettings, clipOrder, voiceoverVolume, musicVolume]);
+  }, [projectId, gapTransitions, transitionGap, transitionGapByIndex, clipAudioSettings, clipOrder, voiceoverVolume, musicVolume, voiceoverTrim, voiceoverLength, musicTrim, musicLength]);
 
   const clampDurationSeconds = (value, fallback = 8) => {
     const n = Number(value);
@@ -268,24 +296,30 @@ const TimelineEditor = forwardRef(function TimelineEditor(
 
     const voVol = Math.max(0, Math.min(1, Number(voiceoverVolume)));
     const musVol = Math.max(0, Math.min(1, Number(musicVolume)));
+    const voTrim = Math.max(0, Number(voiceoverTrim) || 0);
+    const voLen = voiceoverLength === "auto" || voiceoverLength == null ? "auto" : Math.max(0.1, Number(voiceoverLength));
+    const musTrim = Math.max(0, Number(musicTrim) || 0);
+    const musLen = musicLength === "auto" || musicLength == null ? "auto" : Math.max(0.1, Number(musicLength));
+
+    const voiceoverClip = {
+      asset: { type: "audio", src: voiceoverUrl, volume: voVol },
+      start: 0,
+      length: voLen,
+    };
+    if (voTrim > 0) voiceoverClip.trim = voTrim;
+
     const tracks = [
       { clips: videoClips },
-      {
-        clips: [
-          { asset: { type: "audio", src: voiceoverUrl, volume: voVol }, start: 0, length: "auto" },
-        ],
-      },
+      { clips: [voiceoverClip] },
     ];
     if (backgroundMusicUrl) {
-      tracks.push({
-        clips: [
-          {
-            asset: { type: "audio", src: backgroundMusicUrl, volume: musVol },
-            start: 0,
-            length: "auto",
-          },
-        ],
-      });
+      const musicClip = {
+        asset: { type: "audio", src: backgroundMusicUrl, volume: musVol },
+        start: 0,
+        length: musLen,
+      };
+      if (musTrim > 0) musicClip.trim = musTrim;
+      tracks.push({ clips: [musicClip] });
     }
 
     return {
@@ -318,23 +352,21 @@ const TimelineEditor = forwardRef(function TimelineEditor(
       }
       return arr.sort((a, b) => Number(a?.scene_id) - Number(b?.scene_id));
     })();
-    const e = buildEdit(vids, gapTransitions, clipAudioSettings, clipOrder, transitionGapByIndex, transitionGap);
-    const clips = e.timeline.tracks[0]?.clips || [];
-    const totalSeconds = clips.length
-      ? Math.max(...clips.map((c) => (Number(c.start) || 0) + (Number(c.length) || 0)))
-      : 0;
-    const videoClips = (e.timeline.tracks[0]?.clips || []).map((c, i) => ({
-      ...c,
-      label: `Scene ${i + 1}`,
-      scene_id: sortedVids[i]?.scene_id,
-    }));
+    const config = buildEdit(vids, gapTransitions, clipAudioSettings, clipOrder, transitionGapByIndex, transitionGap);
+    const editInstance = Edit.fromConfig(config);
+    const sceneMetadata = sortedVids.map((v, i) => ({ scene_id: v?.scene_id, label: `Scene ${i + 1}` }));
+    const videoClips = editInstance.getVideoClips(sceneMetadata);
+    console.log("[TimelineEditor] build timelineData", {
+      totalSeconds: editInstance.totalDurationSeconds,
+      videoClipsCount: videoClips.length,
+    });
     return {
-      edit: e,
+      edit: editInstance.getEdit(),
       timelineData: {
-        totalSeconds,
+        totalSeconds: editInstance.totalDurationSeconds,
         videoClips,
-        hasVoiceover: !!voiceoverUrl,
-        hasMusic: !!backgroundMusicUrl,
+        hasVoiceover: editInstance.hasVoiceover,
+        hasMusic: editInstance.hasMusic,
       },
     };
   }, [
@@ -350,6 +382,10 @@ const TimelineEditor = forwardRef(function TimelineEditor(
     clipOrder,
     voiceoverVolume,
     musicVolume,
+    voiceoverTrim,
+    voiceoverLength,
+    musicTrim,
+    musicLength,
   ]);
 
   const handleClipAudioDragStart = (e, fromIndex) => {
@@ -413,12 +449,22 @@ const TimelineEditor = forwardRef(function TimelineEditor(
   }, [currentTime, timelineData.videoClips, isMuted, isPlaying]);
 
   const getTransitionDurationMs = () => {
-    const trans = previewTransitioning && previewTransitionGapIndex != null
-      ? getGapTransition(previewTransitionGapIndex)
-      : "none";
-    if (trans === "none") return 0;
+    const trans =
+      previewTransitioning && previewTransitionGapIndex != null
+        ? getGapTransition(previewTransitionGapIndex)
+        : "none";
+    if (trans === "none" || previewTransitionGapIndex == null) return 0;
     const sec = getGapDuration(previewTransitionGapIndex);
-    return Math.round(sec * 1000);
+    // Preview-only tweak: use a shorter visual duration so it FEELS snappier.
+    // Keep the underlying Shotstack overlap (edit.build) using the full duration.
+    const ms = Math.round(sec * 500); // e.g. 0.2s -> 100ms, 1.0s -> 500ms
+    console.log("[TimelineEditor] getTransitionDurationMs (preview adjusted)", {
+      trans,
+      gapIndex: previewTransitionGapIndex,
+      sec,
+      ms,
+    });
+    return ms;
   };
 
   const transitionTypeToPreviewClass = (type) => {
@@ -444,59 +490,63 @@ const TimelineEditor = forwardRef(function TimelineEditor(
   };
 
   const getPreviewTransitionClass = () => {
-    const trans = previewTransitioning && previewTransitionGapIndex != null
-      ? getGapTransition(previewTransitionGapIndex)
-      : "none";
-    return transitionTypeToPreviewClass(trans);
+    const trans =
+      previewTransitioning && previewTransitionGapIndex != null
+        ? getGapTransition(previewTransitionGapIndex)
+        : "none";
+    const cls = transitionTypeToPreviewClass(trans);
+    console.log("[TimelineEditor] getPreviewTransitionClass", {
+      trans,
+      cls,
+      previewTransitioning,
+      previewTransitionGapIndex,
+    });
+    return cls;
   };
 
-  // Playback: drive from video element when isPlaying
+  useEffect(() => {
+    if (previewTransitionGapIndex == null && !previewTransitioning) return;
+    console.log("[TimelineEditor] preview transition state changed", {
+      previewTransitioning,
+      previewTransitionGapIndex,
+      cssDurationMs: getTransitionDurationMs(),
+    });
+  }, [
+    previewTransitioning,
+    previewTransitionGapIndex,
+    transitionGapByIndex,
+    transitionGap,
+  ]);
+
+  // Phase 2: rAF-based playhead engine – single timebase for smooth UI updates
   const playingClipIndexRef = useRef(0);
   const currentTimeRef = useRef(0);
   currentTimeRef.current = currentTime;
+  const rafIdRef = useRef(null);
 
   useEffect(() => {
     if (!isPlaying || !timelineData?.videoClips?.length) return;
+
     const video = previewVideoRef.current;
     const voiceover = voiceoverAudioRef.current;
     const music = musicAudioRef.current;
     const clips = timelineData.videoClips;
-    const total = timelineData.totalSeconds;
+    const total = timelineData.totalSeconds || 0;
     const t0 = currentTimeRef.current;
 
-    let idx = clips.findIndex(
-      (c) => t0 >= (c.start ?? 0) && t0 < (c.start ?? 0) + (c.length ?? 0)
-    );
-    if (idx < 0) idx = 0;
-    playingClipIndexRef.current = idx;
-    const clip = clips[idx];
-    const clipStart = clip?.start ?? 0;
-    const clipLen = clip?.length ?? 0;
-    const offsetInClip = Math.max(0, Math.min(t0 - clipStart, clipLen));
-
-    // Start voiceover and music once – let them play continuously (no seeking on clip switches)
-    if (voiceover && voiceoverUrl) {
-      const audioUrl = getPreviewUrl(voiceoverUrl);
-      if (lastVoiceoverSrcRef.current !== audioUrl) {
-        voiceover.src = audioUrl;
-        lastVoiceoverSrcRef.current = audioUrl;
+    const getClipIndexAtTime = (t) => {
+      for (let i = 0; i < clips.length; i++) {
+        const start = clips[i].start ?? 0;
+        const len = clips[i].length ?? 0;
+        if (t >= start && t < start + len) return i;
       }
-      voiceover.currentTime = t0;
-      voiceover.volume = isMuted ? 0 : Math.max(0, Math.min(1, voiceoverVolume));
-      voiceover.play().catch(() => {});
-    }
-    if (music && backgroundMusicUrl) {
-      const musicUrl = getPreviewUrl(backgroundMusicUrl);
-      if (lastMusicSrcRef.current !== musicUrl) {
-        music.src = musicUrl;
-        lastMusicSrcRef.current = musicUrl;
+      if (clips.length > 0 && t >= (clips[clips.length - 1].start ?? 0) + (clips[clips.length - 1].length ?? 0)) {
+        return clips.length - 1;
       }
-      music.currentTime = t0;
-      music.volume = isMuted ? 0 : Math.max(0, Math.min(1, musicVolume));
-      music.play().catch(() => {});
-    }
+      return 0;
+    };
 
-    const playClip = (clipIdx) => {
+    const playClip = (clipIdx, globalTimeSec) => {
       if (clipIdx >= clips.length) {
         setIsPlaying(false);
         setCurrentTime(total);
@@ -508,8 +558,30 @@ const TimelineEditor = forwardRef(function TimelineEditor(
       const c = clips[clipIdx];
       const url = getPreviewUrl(c?.asset?.src);
       if (!url || !video) return;
+      const clipStart = c.start ?? 0;
+      const clipLen = c.length ?? 0;
+      const offsetInClip = Math.max(0, Math.min(globalTimeSec - clipStart, clipLen));
+
+      console.log("[TimelineEditor] playClip", {
+        clipIdx,
+        src: c?.asset?.src,
+        previewUrl: url,
+        clipStart,
+        clipLen,
+        globalTimeSec,
+        offsetInClip,
+      });
+
       video.src = url;
-      video.currentTime = clipIdx === idx ? offsetInClip : 0;
+      video.currentTime = offsetInClip;
+      // Log when the browser reports the video as ready to play – helps debug long black gaps.
+      video.onloadeddata = () => {
+        console.log("[TimelineEditor] video onloadeddata", {
+          clipIdx,
+          readyState: video.readyState,
+          currentTime: video.currentTime,
+        });
+      };
       const clipVol = c?.asset?.volume ?? 0.4;
       video.muted = isMuted;
       video.volume = isMuted ? 0 : clipVol;
@@ -518,74 +590,181 @@ const TimelineEditor = forwardRef(function TimelineEditor(
         setPreviewError("Preview unavailable (check CORS or URL)");
         setIsPlaying(false);
       });
-      // Voiceover and music keep playing – do not seek or restart on clip switch
     };
 
-    const onTimeUpdate = () => {
-      const curIdx = playingClipIndexRef.current;
-      const c = clips[curIdx];
-      if (!video || !c) return;
-      const t = Math.min(total, (c.start ?? 0) + video.currentTime);
-      setCurrentTime(t);
-      const endOfClip = (c.start ?? 0) + (c.length ?? 0);
-      const gapTrans = gapTransitionsRef.current[curIdx] ?? "fade";
-      const gapSec = transitionGapByIndexRef.current[curIdx];
-      const sec = gapSec != null ? Math.max(0.2, Math.min(2, Number(gapSec))) : (transitionGapRef.current ?? 0.5);
-      const transitionMs = gapTrans !== "none" ? Math.round(sec * 1000) : 0;
-      const leadTime = transitionMs > 0 ? transitionMs / 1000 + 0.05 : 0.15;
-      if (t >= endOfClip - leadTime) {
-        playingClipIndexRef.current = curIdx + 1;
-        video.removeEventListener("timeupdate", onTimeUpdate);
-        const nextIdx = curIdx + 1;
-        if (transitionMs > 0) {
-          setPreviewTransitionGapIndex(curIdx);
-          setPreviewTransitioning(true);
-          setTimeout(() => {
-            playClip(nextIdx);
-            setPreviewTransitioning(false);
-            setPreviewTransitionGapIndex(null);
-            if (nextIdx < clips.length) {
-              video.addEventListener("timeupdate", onTimeUpdate);
+    let idx = getClipIndexAtTime(t0);
+    playingClipIndexRef.current = idx;
+    const startClip = clips[idx];
+    const clipStart = startClip?.start ?? 0;
+    const clipLen = startClip?.length ?? 0;
+    const offsetInClip = Math.max(0, Math.min(t0 - clipStart, clipLen));
+    console.log("[TimelineEditor] playback start (rAF)", {
+      isPlaying,
+      currentTime: t0,
+      totalSeconds: total,
+      startClipIndex: idx,
+      clipStart,
+      clipLen,
+      offsetInClip,
+    });
+
+    const voTrim = Math.max(0, Number(voiceoverTrim) || 0);
+    const musTrim = Math.max(0, Number(musicTrim) || 0);
+
+    // Start voiceover and music once – Phase 3: respect trim (seek to timeline + trim)
+    if (voiceover && voiceoverUrl) {
+      const audioUrl = getPreviewUrl(voiceoverUrl);
+      if (lastVoiceoverSrcRef.current !== audioUrl) {
+        voiceover.src = audioUrl;
+        lastVoiceoverSrcRef.current = audioUrl;
+      }
+      voiceover.currentTime = t0 + voTrim;
+      voiceover.volume = isMuted ? 0 : Math.max(0, Math.min(1, voiceoverVolume));
+      voiceover.play().catch(() => {});
+    }
+    if (music && backgroundMusicUrl) {
+      const musicUrl = getPreviewUrl(backgroundMusicUrl);
+      if (lastMusicSrcRef.current !== musicUrl) {
+        music.src = musicUrl;
+        lastMusicSrcRef.current = musicUrl;
+      }
+      music.currentTime = t0 + musTrim;
+      music.volume = isMuted ? 0 : Math.max(0, Math.min(1, musicVolume));
+      music.play().catch(() => {});
+    }
+
+    // Start initial clip at current time
+    playClip(idx, t0);
+
+    let lastNow = performance.now();
+    let activeTransitionGapIndex = null;
+    let transitionStartMs = null;
+
+    const tick = (now) => {
+      const dtSec = (now - lastNow) / 1000;
+      lastNow = now;
+
+      if (activeTransitionGapIndex != null) {
+        console.log("[TimelineEditor] rAF tick during transition", {
+          now,
+          dtSec,
+          activeTransitionGapIndex,
+          transitionStartMs,
+          elapsedMs: transitionStartMs != null ? now - transitionStartMs : null,
+        });
+      }
+
+      setCurrentTime((prev) => {
+        let next = prev + dtSec;
+        if (next >= total) {
+          next = total;
+          setIsPlaying(false);
+        }
+
+        const curIdx = playingClipIndexRef.current;
+        const curClip = clips[curIdx];
+        if (curClip) {
+          const curEnd = (curClip.start ?? 0) + (curClip.length ?? 0);
+          // Detect crossing the end of the current clip
+          if (prev < curEnd && next >= curEnd && curIdx < clips.length - 1) {
+            const nextIdx = getClipIndexAtTime(next);
+            if (nextIdx !== curIdx && nextIdx < clips.length) {
+              playingClipIndexRef.current = nextIdx;
+              playClip(nextIdx, next);
+
+              // Trigger visual transition (CSS only) – no pause in playback
+              const gapIdx = curIdx;
+              const gapTrans = gapTransitionsRef.current[gapIdx] ?? "fade";
+              const gapSec = transitionGapByIndexRef.current[gapIdx];
+              const sec =
+                gapSec != null
+                  ? Math.max(0.2, Math.min(2, Number(gapSec)))
+                  : transitionGapRef.current ?? 0.5;
+              // Use a shorter visual duration in preview while keeping the logical
+              // transition length (overlap) unchanged in the edit model.
+              const transitionMs = gapTrans !== "none" ? Math.round(sec * 500) : 0;
+
+              if (transitionMs > 0) {
+                console.log("[TimelineEditor] start transition", {
+                  gapIdx,
+                  gapTrans,
+                  configuredSec: sec,
+                  transitionMs,
+                  prevTime: prev,
+                  nextTime: next,
+                  curEnd,
+                });
+                activeTransitionGapIndex = gapIdx;
+                transitionStartMs = now;
+                setPreviewTransitionGapIndex(gapIdx);
+                setPreviewTransitioning(true);
+              } else {
+                activeTransitionGapIndex = null;
+                transitionStartMs = null;
+                setPreviewTransitioning(false);
+                setPreviewTransitionGapIndex(null);
+              }
             }
-          }, transitionMs);
-        } else {
-          playClip(nextIdx);
-          if (nextIdx < clips.length) {
-            video.addEventListener("timeupdate", onTimeUpdate);
           }
         }
-      }
+
+        // End visual transition once its duration has elapsed
+        if (activeTransitionGapIndex != null && transitionStartMs != null) {
+          const gapIdx = activeTransitionGapIndex;
+          const gapTrans = gapTransitionsRef.current[gapIdx] ?? "fade";
+          const gapSec = transitionGapByIndexRef.current[gapIdx];
+          const sec =
+            gapSec != null
+              ? Math.max(0.2, Math.min(2, Number(gapSec)))
+              : transitionGapRef.current ?? 0.5;
+          const transitionMs = gapTrans !== "none" ? Math.round(sec * 500) : 0;
+          if (transitionMs <= 0 || now - transitionStartMs >= transitionMs) {
+            console.log("[TimelineEditor] end transition", {
+              gapIdx,
+              gapTrans,
+              configuredSec: sec,
+              transitionMs,
+              elapsedMs: now - transitionStartMs,
+            });
+            activeTransitionGapIndex = null;
+            transitionStartMs = null;
+            setPreviewTransitioning(false);
+            setPreviewTransitionGapIndex(null);
+          }
+        }
+
+        return next;
+      });
+
+      rafIdRef.current = requestAnimationFrame(tick);
     };
 
-    playClip(idx);
-    video?.addEventListener("timeupdate", onTimeUpdate);
+    rafIdRef.current = requestAnimationFrame(tick);
+
     return () => {
-      video?.removeEventListener("timeupdate", onTimeUpdate);
+      if (rafIdRef.current != null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
       video?.pause();
       voiceover?.pause();
       music?.pause();
     };
   }, [isPlaying, timelineData?.videoClips, timelineData?.totalSeconds]);
 
-  // Sync mute state and volume during playback
+  // Sync mute state and volume during playback (Phase 3: mute when past clip length)
   useEffect(() => {
     const v = previewVideoRef.current;
     const voiceover = voiceoverAudioRef.current;
     const music = musicAudioRef.current;
     if (v) v.muted = isMuted;
-    if (voiceover) voiceover.volume = isMuted ? 0 : Math.max(0, Math.min(1, voiceoverVolume));
-    if (music) music.volume = isMuted ? 0 : Math.max(0, Math.min(1, musicVolume));
-  }, [isMuted, voiceoverVolume, musicVolume]);
-
-  // When pausing, sync voiceover and music position for next play
-  useEffect(() => {
-    if (!isPlaying) {
-      const voiceover = voiceoverAudioRef.current;
-      const music = musicAudioRef.current;
-      if (voiceover) voiceover.currentTime = currentTime;
-      if (music) music.currentTime = currentTime;
-    }
-  }, [isPlaying, currentTime]);
+    const voLen = voiceoverLength === "auto" || voiceoverLength == null ? Infinity : Number(voiceoverLength);
+    const musLen = musicLength === "auto" || musicLength == null ? Infinity : Number(musicLength);
+    const voMuted = isMuted || currentTime >= voLen;
+    const musMuted = isMuted || currentTime >= musLen;
+    if (voiceover) voiceover.volume = voMuted ? 0 : Math.max(0, Math.min(1, voiceoverVolume));
+    if (music) music.volume = musMuted ? 0 : Math.max(0, Math.min(1, musicVolume));
+  }, [isMuted, voiceoverVolume, musicVolume, currentTime, voiceoverLength, musicLength]);
 
   const handleTimelineClick = (e) => {
     if (isDraggingPlayheadRef.current || e.target.closest("[data-playhead]")) return;
@@ -596,6 +775,12 @@ const TimelineEditor = forwardRef(function TimelineEditor(
     const contentX = e.clientX - rect.left + scrollLeft;
     const timelineX = Math.max(0, contentX - LABEL_WIDTH);
     const t = Math.max(0, Math.min(timelineData.totalSeconds, timelineX / PIXELS_PER_SECOND));
+    console.log("[TimelineEditor] timeline click", {
+      contentX,
+      timelineX,
+      t,
+      totalSeconds: timelineData.totalSeconds,
+    });
     setCurrentTime(t);
   };
 
@@ -612,6 +797,12 @@ const TimelineEditor = forwardRef(function TimelineEditor(
       const contentX = ev.clientX - rect.left + scrollLeft;
       const timelineX = Math.max(0, contentX - LABEL_WIDTH);
       const t = Math.max(0, Math.min(timelineData.totalSeconds, timelineX / PIXELS_PER_SECOND));
+      console.log("[TimelineEditor] playhead drag", {
+        contentX,
+        timelineX,
+        t,
+        totalSeconds: timelineData.totalSeconds,
+      });
       setCurrentTime(t);
     };
     const onUp = () => {
@@ -651,6 +842,42 @@ const TimelineEditor = forwardRef(function TimelineEditor(
           }))
           .filter((v) => v.video_url);
 
+  // Keep currentTime within new timeline bounds when clips/durations change
+  useEffect(() => {
+    const total = timelineData.totalSeconds || 0;
+    if (currentTime > total) {
+      console.log("[TimelineEditor] clamp currentTime to totalSeconds", {
+        prevCurrentTime: currentTime,
+        totalSeconds: total,
+      });
+      setCurrentTime(total);
+    }
+  }, [timelineData.totalSeconds, currentTime]);
+
+  // If the timeline structure (clip start/length) changes, reset playhead to avoid desync
+  const prevTimelineSignatureRef = useRef(null);
+  useEffect(() => {
+    const clips = timelineData.videoClips || [];
+    const signature = JSON.stringify(
+      clips.map((c) => ({
+        start: c.start ?? 0,
+        length: c.length ?? 0,
+      })),
+    );
+    if (
+      prevTimelineSignatureRef.current &&
+      prevTimelineSignatureRef.current !== signature
+    ) {
+      console.log("[TimelineEditor] timeline structure changed, resetting playhead", {
+        prevSignature: prevTimelineSignatureRef.current,
+        nextSignature: signature,
+      });
+      setIsPlaying(false);
+      setCurrentTime(0);
+    }
+    prevTimelineSignatureRef.current = signature;
+  }, [timelineData.videoClips]);
+
   if (!effectiveVideos.length || !voiceoverUrl) {
     return (
       <div className="rounded-xl border border-gray-300 bg-gray-50 p-8 text-center text-sm text-gray-600 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400">
@@ -683,7 +910,9 @@ const TimelineEditor = forwardRef(function TimelineEditor(
               previewTransitioning ? "preview-transition-out" : "preview-transition-in"
             }`}
             style={{
-              transitionDuration: `${getTransitionDurationMs()}ms`,
+              transitionDuration: previewTransitioning
+                ? `${getTransitionDurationMs()}ms`
+                : "0ms",
             }}
           >
             <video
@@ -775,7 +1004,15 @@ const TimelineEditor = forwardRef(function TimelineEditor(
                 max={2}
                 step={0.1}
                 value={transitionGap}
-                onChange={(e) => setTransitionGap(Math.max(0.2, Math.min(2, parseFloat(e.target.value) || 0.5)))}
+                onChange={(e) => {
+                  const raw = parseFloat(e.target.value);
+                  const clamped = Math.max(0.2, Math.min(2, raw || 0.5));
+                  console.log("[TimelineEditor] change global default transitionGap", {
+                    raw,
+                    clamped,
+                  });
+                  setTransitionGap(clamped);
+                }}
                 className="w-12 rounded border border-gray-300 bg-white px-1.5 py-0.5 text-xs text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                 title="Default duration for transitions (used when not set per-gap)"
               />
@@ -1021,7 +1258,7 @@ const TimelineEditor = forwardRef(function TimelineEditor(
             </div>
           </div>
 
-          {/* Voiceover track */}
+          {/* Voiceover track – Phase 3: first-class audio clip with trim handles */}
           <div
             className="flex border-b border-gray-200 dark:border-gray-700"
             style={{ height: TRACK_HEIGHT }}
@@ -1030,70 +1267,175 @@ const TimelineEditor = forwardRef(function TimelineEditor(
               Voiceover
             </div>
             <div className="relative flex flex-1 bg-gray-100 dark:bg-gray-800">
-              {timelineData.hasVoiceover && (
-                <div
-                  className="absolute top-1.5 bottom-1.5 flex items-center gap-2 overflow-hidden rounded-lg border-2 border-emerald-400 bg-emerald-500 px-2 shadow-md dark:border-emerald-500 dark:bg-emerald-600"
-                  style={{
-                    left: 4,
-                    width: Math.max(100, timelineWidth - 8),
-                    minWidth: 100,
-                  }}
-                >
-                  <span className="shrink-0 text-xs font-medium text-white">Voiceover</span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={Math.round(voiceoverVolume * 100)}
-                    onChange={(e) =>
-                      setVoiceoverVolume(Math.max(0, Math.min(1, parseInt(e.target.value, 10) / 100)))
-                    }
-                    onClick={(e) => e.stopPropagation()}
-                    className="h-1.5 w-16 shrink-0 accent-emerald-200"
-                    title="Voiceover volume"
-                  />
-                  <span className="shrink-0 text-[10px] text-white/90">{Math.round(voiceoverVolume * 100)}%</span>
-                </div>
-              )}
+              {timelineData.hasVoiceover && (() => {
+                const maxLen = (voiceoverDuration ?? timelineData.totalSeconds) || 60;
+                const effLen = voiceoverLength === "auto" || voiceoverLength == null
+                  ? timelineData.totalSeconds
+                  : Math.min(Math.max(0.1, Number(voiceoverLength)), Math.max(0.1, maxLen - voiceoverTrim));
+                const w = Math.max(80, effLen * PIXELS_PER_SECOND - 8);
+                return (
+                  <div
+                    className="absolute top-1.5 bottom-1.5 flex items-center gap-2 overflow-hidden rounded-lg border-2 border-emerald-400 bg-emerald-500 px-2 shadow-md dark:border-emerald-500 dark:bg-emerald-600"
+                    style={{
+                      left: 4,
+                      width: w,
+                      minWidth: 100,
+                    }}
+                  >
+                    <div
+                      className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-emerald-400/50 rounded-l"
+                      title="Drag to trim start"
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        if (!voiceoverDuration) return;
+                        setResizingAudio("voiceover-left");
+                        const onMove = (ev) => {
+                          const container = scrollContainerRef.current;
+                          if (!container) return;
+                          const rect = container.getBoundingClientRect();
+                          const x = ev.clientX - rect.left + (container.scrollLeft ?? 0) - LABEL_WIDTH - 4;
+                          const sec = Math.max(0, Math.min(voiceoverDuration - 0.5, x / PIXELS_PER_SECOND));
+                          setVoiceoverTrim(sec);
+                        };
+                        const onUp = () => {
+                          setResizingAudio(null);
+                          document.removeEventListener("mousemove", onMove);
+                          document.removeEventListener("mouseup", onUp);
+                        };
+                        document.addEventListener("mousemove", onMove);
+                        document.addEventListener("mouseup", onUp);
+                      }}
+                    />
+                    <span className="shrink-0 text-xs font-medium text-white pl-2">Voiceover</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={Math.round(voiceoverVolume * 100)}
+                      onChange={(e) =>
+                        setVoiceoverVolume(Math.max(0, Math.min(1, parseInt(e.target.value, 10) / 100)))
+                      }
+                      onClick={(e) => e.stopPropagation()}
+                      className="h-1.5 w-16 shrink-0 accent-emerald-200"
+                      title="Voiceover volume"
+                    />
+                    <span className="shrink-0 text-[10px] text-white/90">{Math.round(voiceoverVolume * 100)}%</span>
+                    <div
+                      className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-emerald-400/50 rounded-r"
+                      title="Drag to trim end"
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        setResizingAudio("voiceover-right");
+                        const onMove = (ev) => {
+                          const container = scrollContainerRef.current;
+                          if (!container) return;
+                          const rect = container.getBoundingClientRect();
+                          const x = ev.clientX - rect.left + (container.scrollLeft ?? 0) - LABEL_WIDTH - 4;
+                          const sec = Math.max(0.5, Math.min(maxLen - voiceoverTrim, x / PIXELS_PER_SECOND));
+                          setVoiceoverLength(sec);
+                        };
+                        const onUp = () => {
+                          setResizingAudio(null);
+                          document.removeEventListener("mousemove", onMove);
+                          document.removeEventListener("mouseup", onUp);
+                        };
+                        document.addEventListener("mousemove", onMove);
+                        document.addEventListener("mouseup", onUp);
+                      }}
+                    />
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
-          {/* Music track */}
-          {timelineData.hasMusic && (
-            <div
-              className="flex border-b border-gray-200 dark:border-gray-700"
-              style={{ height: TRACK_HEIGHT }}
-            >
-              <div className="flex w-28 shrink-0 items-center border-r border-gray-200 bg-amber-50 px-2 text-xs font-semibold text-amber-800 dark:border-gray-700 dark:bg-amber-950/50 dark:text-amber-200">
-                Music
-              </div>
-              <div className="relative flex flex-1 bg-gray-100 dark:bg-gray-800">
-                <div
-                  className="absolute top-1.5 bottom-1.5 flex items-center gap-2 overflow-hidden rounded-lg border-2 border-amber-400 bg-amber-500 px-2 shadow-md dark:border-amber-500 dark:bg-amber-600"
-                  style={{
-                    left: 4,
-                    width: Math.max(100, timelineWidth - 8),
-                    minWidth: 100,
-                  }}
-                >
-                  <span className="shrink-0 text-xs font-medium text-white">Background music</span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={Math.round(musicVolume * 100)}
-                    onChange={(e) =>
-                      setMusicVolume(Math.max(0, Math.min(1, parseInt(e.target.value, 10) / 100)))
-                    }
-                    onClick={(e) => e.stopPropagation()}
-                    className="h-1.5 w-16 shrink-0 accent-amber-200"
-                    title="Music volume"
-                  />
-                  <span className="shrink-0 text-[10px] text-white/90">{Math.round(musicVolume * 100)}%</span>
+          {/* Music track – Phase 3: first-class audio clip with trim handles */}
+          {timelineData.hasMusic && (() => {
+            const maxLen = musicDuration ? musicDuration / 1000 : timelineData.totalSeconds;
+            const effLen = musicLength === "auto" ? timelineData.totalSeconds : Math.min(musicLength, maxLen - musicTrim);
+            const w = Math.max(80, effLen * PIXELS_PER_SECOND - 8);
+            return (
+              <div
+                className="flex border-b border-gray-200 dark:border-gray-700"
+                style={{ height: TRACK_HEIGHT }}
+              >
+                <div className="flex w-28 shrink-0 items-center border-r border-gray-200 bg-amber-50 px-2 text-xs font-semibold text-amber-800 dark:border-gray-700 dark:bg-amber-950/50 dark:text-amber-200">
+                  Music
+                </div>
+                <div className="relative flex flex-1 bg-gray-100 dark:bg-gray-800">
+                  <div
+                    className="absolute top-1.5 bottom-1.5 flex items-center gap-2 overflow-hidden rounded-lg border-2 border-amber-400 bg-amber-500 px-2 shadow-md dark:border-amber-500 dark:bg-amber-600"
+                    style={{
+                      left: 4,
+                      width: w,
+                      minWidth: 100,
+                    }}
+                  >
+                    <div
+                      className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-amber-400/50 rounded-l"
+                      title="Drag to trim start"
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        setResizingAudio("music-left");
+                        const onMove = (ev) => {
+                          const container = scrollContainerRef.current;
+                          if (!container) return;
+                          const rect = container.getBoundingClientRect();
+                          const x = ev.clientX - rect.left + (container.scrollLeft ?? 0) - LABEL_WIDTH - 4;
+                          const sec = Math.max(0, Math.min(maxLen - 0.5, x / PIXELS_PER_SECOND));
+                          setMusicTrim(sec);
+                        };
+                        const onUp = () => {
+                          setResizingAudio(null);
+                          document.removeEventListener("mousemove", onMove);
+                          document.removeEventListener("mouseup", onUp);
+                        };
+                        document.addEventListener("mousemove", onMove);
+                        document.addEventListener("mouseup", onUp);
+                      }}
+                    />
+                    <span className="shrink-0 text-xs font-medium text-white pl-2">Background music</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={Math.round(musicVolume * 100)}
+                      onChange={(e) =>
+                        setMusicVolume(Math.max(0, Math.min(1, parseInt(e.target.value, 10) / 100)))
+                      }
+                      onClick={(e) => e.stopPropagation()}
+                      className="h-1.5 w-16 shrink-0 accent-amber-200"
+                      title="Music volume"
+                    />
+                    <span className="shrink-0 text-[10px] text-white/90">{Math.round(musicVolume * 100)}%</span>
+                    <div
+                      className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-amber-400/50 rounded-r"
+                      title="Drag to trim end"
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        setResizingAudio("music-right");
+                        const onMove = (ev) => {
+                          const container = scrollContainerRef.current;
+                          if (!container) return;
+                          const rect = container.getBoundingClientRect();
+                          const x = ev.clientX - rect.left + (container.scrollLeft ?? 0) - LABEL_WIDTH - 4;
+                          const sec = Math.max(0.5, Math.min(maxLen - musicTrim, x / PIXELS_PER_SECOND));
+                          setMusicLength(sec);
+                        };
+                        const onUp = () => {
+                          setResizingAudio(null);
+                          document.removeEventListener("mousemove", onMove);
+                          document.removeEventListener("mouseup", onUp);
+                        };
+                        document.addEventListener("mousemove", onMove);
+                        document.addEventListener("mouseup", onUp);
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
           </div>
         </div>
       </div>

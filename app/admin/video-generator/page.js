@@ -9817,6 +9817,7 @@ function VideoGeneratorContent() {
                   }
                   voiceoverUrl={voiceoverUrl}
                   backgroundMusicUrl={backgroundMusicUrl || null}
+                  voiceoverDuration={voiceoverDuration}
                   sceneDurations={Object.fromEntries(
                     (scriptData?.scenes || []).map((s) => [
                       s.id,
