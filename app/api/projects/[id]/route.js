@@ -176,6 +176,18 @@ export async function PATCH(request, { params }) {
         if (normalized.musicVolume != null) {
           normalized.musicVolume = Math.max(0, Math.min(1, Number(normalized.musicVolume)));
         }
+        if (normalized.voiceoverTrim != null) {
+          normalized.voiceoverTrim = Math.max(0, Number(normalized.voiceoverTrim));
+        }
+        if (normalized.voiceoverLength != null && normalized.voiceoverLength !== "auto") {
+          normalized.voiceoverLength = Math.max(0.1, Number(normalized.voiceoverLength));
+        }
+        if (normalized.musicTrim != null) {
+          normalized.musicTrim = Math.max(0, Number(normalized.musicTrim));
+        }
+        if (normalized.musicLength != null && normalized.musicLength !== "auto") {
+          normalized.musicLength = Math.max(0.1, Number(normalized.musicLength));
+        }
         // Ensure gapTransitions keys are strings for Firestore
         if (normalized.gapTransitions && typeof normalized.gapTransitions === "object") {
           const gt = {};
