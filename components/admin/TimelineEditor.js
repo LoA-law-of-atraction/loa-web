@@ -104,9 +104,10 @@ const TimelineEditor = forwardRef(function TimelineEditor(
       ? Math.max(0.1, Number(init.musicLength))
       : "auto",
   );
-  // Playback
+  // Playback (original editor = top preview + audio)
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isStudioPlaying, setIsStudioPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [previewError, setPreviewError] = useState(null);
   const [previewTransitioning, setPreviewTransitioning] = useState(false);
@@ -118,6 +119,8 @@ const TimelineEditor = forwardRef(function TimelineEditor(
   const isDraggingPlayheadRef = useRef(false);
   const lastVoiceoverSrcRef = useRef("");
   const lastMusicSrcRef = useRef("");
+  const lastVideoSrcRef = useRef("");
+  const studioEditRef = useRef(null);
   const gapTransitionsRef = useRef(gapTransitions);
   const transitionGapRef = useRef(transitionGap);
   const transitionGapByIndexRef = useRef(transitionGapByIndex);
@@ -388,6 +391,172 @@ const TimelineEditor = forwardRef(function TimelineEditor(
     musicLength,
   ]);
 
+  // Stable key for Studio effect so we only re-init when edit content actually changes
+  // (avoids re-running on every parent re-render when edit is a new object ref but same content)
+  const editRef = useRef(edit);
+  editRef.current = edit;
+  const editKey = useMemo(() => {
+    try {
+      return edit ? JSON.stringify(edit) : "";
+    } catch {
+      return "";
+    }
+  }, [edit]);
+
+  // Optional: embed Shotstack Studio SDK for an "exact" preview of transitions.
+  // This uses the @shotstack/shotstack-studio Edit/Canvas/Timeline against the same
+  // Shotstack edit JSON we already build, but only for in-browser preview (export
+  // still uses the JSON from our own Edit model).
+  useEffect(() => {
+    const editToLoad = editRef.current;
+    if (!editKey) return;
+
+    let cancelled = false;
+
+    async function initStudioSdk() {
+      try {
+        if (typeof window === "undefined") return;
+        const studioRoot = document.querySelector("[data-shotstack-studio]");
+        const timelineRoot = document.querySelector("[data-shotstack-timeline]");
+        if (!studioRoot || !timelineRoot) return;
+
+        // Clear any previous instance
+        studioRoot.innerHTML = "";
+        timelineRoot.innerHTML = "";
+
+        // Wait for layout so the container has non-zero dimensions (Pixi needs this)
+        await new Promise((r) => {
+          requestAnimationFrame(() => requestAnimationFrame(r));
+        });
+        if (cancelled) return;
+
+        const {
+          Edit: StudioEdit,
+          Canvas,
+          Controls,
+          Timeline: StudioTimeline,
+        } = await import("@shotstack/shotstack-studio");
+
+        if (cancelled) return;
+
+        // Clone edit JSON for Studio: include all tracks (video + voiceover + music) so
+        // the Studio timeline shows audio clips. Strip alias (Zod rejects it), normalize URLs.
+        const studioEditJson = JSON.parse(JSON.stringify(editToLoad || {}));
+        const origin = typeof window !== "undefined" ? window.location.origin : "";
+        try {
+          const allTracks = studioEditJson.timeline?.tracks || [];
+          const tracks = allTracks.map((t) => JSON.parse(JSON.stringify(t)));
+
+          for (const track of tracks) {
+            const clips = track.clips || [];
+            for (let i = 0; i < clips.length; i++) {
+              const clip = clips[i];
+              delete clip.alias;
+              const asset = clip?.asset;
+              if (asset?.src && typeof asset.src === "string") {
+                let src = asset.src;
+                if (src.startsWith("/")) {
+                  src = origin ? origin + src : "";
+                }
+                // Studio Zod schema requires valid url format (http/https only); do not use proxy URLs
+                if (src.startsWith("http://") || src.startsWith("https://")) {
+                  asset.src = src;
+                }
+              }
+              if (clip.transition) {
+                const tr = clip.transition;
+                if (tr.in === "none") tr.in = "fade";
+                if (tr.out === "none") tr.out = "fade";
+              }
+            }
+          }
+          studioEditJson.timeline.tracks = tracks;
+        } catch {
+          // best-effort only
+        }
+
+        const size =
+          studioEditJson.output?.size || {
+            width: 1080,
+            height: 1920,
+          };
+        const bg = studioEditJson.timeline?.background || "#000000";
+
+        const studioEdit = new StudioEdit(size, bg);
+        await studioEdit.load();
+        try {
+          await studioEdit.loadEdit(studioEditJson);
+        } catch (loadErr) {
+          console.warn("[TimelineEditor] Studio loadEdit with all tracks failed, retrying video-only", loadErr);
+          studioEditJson.timeline.tracks = studioEditJson.timeline.tracks.slice(0, 1);
+          await studioEdit.loadEdit(studioEditJson);
+        }
+
+        if (cancelled) return;
+
+        const canvas = new Canvas(size, studioEdit);
+        await canvas.load(); // Renders into [data-shotstack-studio]
+
+        if (cancelled) return;
+
+        // Force Studio canvas to fit contained and centered (SDK draws at 1080x1920, we show it in a small box)
+        const canvasEl = studioRoot.querySelector("canvas");
+        if (canvasEl) {
+          canvasEl.style.maxWidth = "100%";
+          canvasEl.style.maxHeight = "100%";
+          canvasEl.style.width = "auto";
+          canvasEl.style.height = "auto";
+          canvasEl.style.objectFit = "contain";
+          canvasEl.style.objectPosition = "center";
+        }
+        studioRoot.style.display = "flex";
+        studioRoot.style.alignItems = "center";
+        studioRoot.style.justifyContent = "center";
+        studioRoot.style.overflow = "hidden";
+
+        const controls = new Controls(studioEdit);
+        await controls.load();
+
+        if (cancelled) return;
+
+        const timeline = new StudioTimeline(studioEdit, {
+          width: size.width,
+          height: 260,
+        });
+        await timeline.load(); // Renders into [data-shotstack-timeline]
+
+        studioEditRef.current = studioEdit;
+        console.log("[TimelineEditor] Studio SDK preview initialised");
+      } catch (err) {
+        console.warn("[TimelineEditor] Studio SDK preview failed to init", err);
+        studioEditRef.current = null;
+      }
+    }
+
+    initStudioSdk();
+
+    return () => {
+      cancelled = true;
+      const edit = studioEditRef.current;
+      if (edit && typeof edit.pause === "function") edit.pause();
+      studioEditRef.current = null;
+      setIsStudioPlaying(false);
+      const studioRoot = document.querySelector("[data-shotstack-studio]");
+      const timelineRoot = document.querySelector("[data-shotstack-timeline]");
+      if (studioRoot) studioRoot.innerHTML = "";
+      if (timelineRoot) timelineRoot.innerHTML = "";
+    };
+  }, [editKey]);
+
+  // Seek Studio SDK to current time only when scrubbing (not during our editor playback)
+  useEffect(() => {
+    if (isPlaying) return;
+    const edit = studioEditRef.current;
+    if (edit && typeof edit.seek === "function") {
+      edit.seek(Math.round(currentTime * 1000));
+    }
+  }, [currentTime, isPlaying]);
+
   const handleClipAudioDragStart = (e, fromIndex) => {
     e.dataTransfer.setData("text/plain", String(fromIndex));
     e.dataTransfer.effectAllowed = "move";
@@ -523,16 +692,37 @@ const TimelineEditor = forwardRef(function TimelineEditor(
   const currentTimeRef = useRef(0);
   currentTimeRef.current = currentTime;
   const rafIdRef = useRef(null);
+  const pauseTimeoutRef = useRef(null);
+
+  // Keep timeline data in a ref so playback effect reads latest without re-running on parent re-renders
+  const timelineDataRef = useRef(timelineData);
+  timelineDataRef.current = timelineData;
 
   useEffect(() => {
-    if (!isPlaying || !timelineData?.videoClips?.length) return;
+    if (pauseTimeoutRef.current) {
+      clearTimeout(pauseTimeoutRef.current);
+      pauseTimeoutRef.current = null;
+    }
+    const timelineDataCurrent = timelineDataRef.current;
+    if (!isPlaying || !timelineDataCurrent?.videoClips?.length) return;
 
     const video = previewVideoRef.current;
     const voiceover = voiceoverAudioRef.current;
     const music = musicAudioRef.current;
-    const clips = timelineData.videoClips;
-    const total = timelineData.totalSeconds || 0;
+    const clips = timelineDataCurrent.videoClips;
+    const total = timelineDataCurrent.totalSeconds || 0;
     const t0 = currentTimeRef.current;
+
+    console.log("[TimelineEditor] preview effect RUN", {
+      isPlaying,
+      clipsCount: clips.length,
+      total,
+      t0,
+      currentTimeRef: currentTimeRef.current,
+      hasVideo: !!video,
+      hasVoiceover: !!voiceover,
+      hasMusic: !!music,
+    });
 
     const getClipIndexAtTime = (t) => {
       for (let i = 0; i < clips.length; i++) {
@@ -548,6 +738,7 @@ const TimelineEditor = forwardRef(function TimelineEditor(
 
     const playClip = (clipIdx, globalTimeSec) => {
       if (clipIdx >= clips.length) {
+        console.log("[TimelineEditor] playClip end-of-timeline", { clipIdx, clipsLength: clips.length });
         setIsPlaying(false);
         setCurrentTime(total);
         video?.pause();
@@ -557,24 +748,55 @@ const TimelineEditor = forwardRef(function TimelineEditor(
       }
       const c = clips[clipIdx];
       const url = getPreviewUrl(c?.asset?.src);
-      if (!url || !video) return;
+      if (!url || !video) {
+        console.warn("[TimelineEditor] playClip skip no url or video", { clipIdx, hasUrl: !!url, hasVideo: !!video });
+        return;
+      }
       const clipStart = c.start ?? 0;
       const clipLen = c.length ?? 0;
       const offsetInClip = Math.max(0, Math.min(globalTimeSec - clipStart, clipLen));
 
+      const clipVol = c?.asset?.volume ?? 0.4;
+      video.muted = isMuted;
+      video.volume = isMuted ? 0 : clipVol;
+      setPreviewError(null);
+
+      // Same clip already loaded (e.g. started in click handler): don't load() or we abort playback
+      const currentSrc = video.currentSrc || "";
+      const lastSrc = lastVideoSrcRef.current || "";
+      const alreadyLoaded = currentSrc && (currentSrc === url || lastSrc === url);
       console.log("[TimelineEditor] playClip", {
         clipIdx,
-        src: c?.asset?.src,
-        previewUrl: url,
-        clipStart,
-        clipLen,
-        globalTimeSec,
+        url: url?.slice?.(0, 60),
+        currentSrc: currentSrc?.slice?.(0, 60),
+        lastVideoSrcRef: lastSrc?.slice?.(0, 60),
+        alreadyLoaded,
         offsetInClip,
       });
 
-      video.src = url;
-      video.currentTime = offsetInClip;
-      // Log when the browser reports the video as ready to play – helps debug long black gaps.
+      if (alreadyLoaded) {
+        console.log("[TimelineEditor] playClip skip load (same src), seek + play");
+        video.currentTime = offsetInClip;
+        video.play().catch((err) => {
+          console.warn("[TimelineEditor] playClip (skip-load) video.play() failed", err);
+          setPreviewError("Preview unavailable (check CORS or URL)");
+          setIsPlaying(false);
+        });
+        return;
+      }
+
+      lastVideoSrcRef.current = url;
+      console.log("[TimelineEditor] playClip full load", { clipIdx, url: url?.slice?.(0, 60) });
+
+      const tryPlay = () => {
+        video.currentTime = offsetInClip;
+        video.play().catch((err) => {
+          console.warn("[TimelineEditor] playClip tryPlay() failed", err);
+          setPreviewError("Preview unavailable (check CORS or URL)");
+          setIsPlaying(false);
+        });
+      };
+
       video.onloadeddata = () => {
         console.log("[TimelineEditor] video onloadeddata", {
           clipIdx,
@@ -582,14 +804,22 @@ const TimelineEditor = forwardRef(function TimelineEditor(
           currentTime: video.currentTime,
         });
       };
-      const clipVol = c?.asset?.volume ?? 0.4;
-      video.muted = isMuted;
-      video.volume = isMuted ? 0 : clipVol;
-      setPreviewError(null);
-      video.play().catch(() => {
-        setPreviewError("Preview unavailable (check CORS or URL)");
+      video.oncanplay = () => {
+        video.oncanplay = null;
+        tryPlay();
+      };
+      video.onerror = (e) => {
+        console.warn("[TimelineEditor] playClip video onerror", { clipIdx, url: url?.slice?.(0, 60), error: e });
+        setPreviewError("Video failed to load");
         setIsPlaying(false);
-      });
+      };
+
+      video.src = url;
+      video.load();
+      if (video.readyState >= 2) {
+        video.oncanplay = null;
+        tryPlay();
+      }
     };
 
     let idx = getClipIndexAtTime(t0);
@@ -614,23 +844,31 @@ const TimelineEditor = forwardRef(function TimelineEditor(
     // Start voiceover and music once – Phase 3: respect trim (seek to timeline + trim)
     if (voiceover && voiceoverUrl) {
       const audioUrl = getPreviewUrl(voiceoverUrl);
-      if (lastVoiceoverSrcRef.current !== audioUrl) {
+      const voSrcChanged = lastVoiceoverSrcRef.current !== audioUrl;
+      if (voSrcChanged) {
         voiceover.src = audioUrl;
         lastVoiceoverSrcRef.current = audioUrl;
       }
       voiceover.currentTime = t0 + voTrim;
       voiceover.volume = isMuted ? 0 : Math.max(0, Math.min(1, voiceoverVolume));
-      voiceover.play().catch(() => {});
+      voiceover.play().catch((err) => {
+        console.warn("[TimelineEditor] effect voiceover.play() failed", err);
+      });
+      console.log("[TimelineEditor] effect voiceover", { voSrcChanged, currentTime: voiceover.currentTime });
     }
     if (music && backgroundMusicUrl) {
       const musicUrl = getPreviewUrl(backgroundMusicUrl);
-      if (lastMusicSrcRef.current !== musicUrl) {
+      const musSrcChanged = lastMusicSrcRef.current !== musicUrl;
+      if (musSrcChanged) {
         music.src = musicUrl;
         lastMusicSrcRef.current = musicUrl;
       }
       music.currentTime = t0 + musTrim;
       music.volume = isMuted ? 0 : Math.max(0, Math.min(1, musicVolume));
-      music.play().catch(() => {});
+      music.play().catch((err) => {
+        console.warn("[TimelineEditor] effect music.play() failed", err);
+      });
+      console.log("[TimelineEditor] effect music", { musSrcChanged, currentTime: music.currentTime });
     }
 
     // Start initial clip at current time
@@ -746,11 +984,28 @@ const TimelineEditor = forwardRef(function TimelineEditor(
         cancelAnimationFrame(rafIdRef.current);
         rafIdRef.current = null;
       }
-      video?.pause();
-      voiceover?.pause();
-      music?.pause();
+      // Defer pause so that if this effect re-runs immediately (e.g. Strict Mode or quick re-render),
+      // the next run cancels this timeout and we avoid "play() interrupted by pause()"
+      const v = video;
+      const vo = voiceover;
+      const mus = music;
+      pauseTimeoutRef.current = setTimeout(() => {
+        pauseTimeoutRef.current = null;
+        v?.pause();
+        vo?.pause();
+        mus?.pause();
+      }, 0);
     };
-  }, [isPlaying, timelineData?.videoClips, timelineData?.totalSeconds]);
+    // Do not add timelineKey/timelineData – we read from timelineDataRef.current to avoid
+    // effect re-runs when parent re-renders with a new object reference but same content.
+  }, [
+    isPlaying,
+    voiceoverUrl,
+    backgroundMusicUrl,
+    isMuted,
+    voiceoverVolume,
+    musicVolume,
+  ]);
 
   // Sync mute state and volume during playback (Phase 3: mute when past clip length)
   useEffect(() => {
@@ -765,6 +1020,99 @@ const TimelineEditor = forwardRef(function TimelineEditor(
     if (voiceover) voiceover.volume = voMuted ? 0 : Math.max(0, Math.min(1, voiceoverVolume));
     if (music) music.volume = musMuted ? 0 : Math.max(0, Math.min(1, musicVolume));
   }, [isMuted, voiceoverVolume, musicVolume, currentTime, voiceoverLength, musicLength]);
+
+  // Start preview playback in the same user gesture so the browser allows audio/video (autoplay policy)
+  const handlePreviewPlayPause = () => {
+    if (isPlaying) {
+      setIsPlaying(false);
+      return;
+    }
+    const clips = timelineData?.videoClips ?? [];
+    const total = timelineData?.totalSeconds ?? 0;
+    if (!clips.length) {
+      setIsPlaying(true);
+      return;
+    }
+    const t0 = currentTime;
+    let idx = 0;
+    for (let i = 0; i < clips.length; i++) {
+      const start = clips[i].start ?? 0;
+      const len = clips[i].length ?? 0;
+      if (t0 >= start && t0 < start + len) {
+        idx = i;
+        break;
+      }
+      if (i === clips.length - 1 && t0 >= start + len) idx = clips.length - 1;
+    }
+    const video = previewVideoRef.current;
+    const voiceover = voiceoverAudioRef.current;
+    const music = musicAudioRef.current;
+
+    console.log("[TimelineEditor] preview PLAY click", {
+      t0,
+      idx,
+      clipsCount: clips.length,
+      hasVideo: !!video,
+      hasVoiceover: !!voiceover,
+      hasMusic: !!music,
+      voiceoverUrl: voiceoverUrl ? "set" : null,
+      backgroundMusicUrl: backgroundMusicUrl ? "set" : null,
+    });
+
+    const voTrim = Math.max(0, Number(voiceoverTrim) || 0);
+    const musTrim = Math.max(0, Number(musicTrim) || 0);
+
+    // Start audio in same user gesture so it isn't blocked
+    if (voiceover && voiceoverUrl) {
+      const audioUrl = getPreviewUrl(voiceoverUrl);
+      voiceover.src = audioUrl;
+      lastVoiceoverSrcRef.current = audioUrl;
+      voiceover.currentTime = t0 + voTrim;
+      voiceover.volume = isMuted ? 0 : Math.max(0, Math.min(1, voiceoverVolume));
+      voiceover.play().catch((err) => {
+        console.warn("[TimelineEditor] preview PLAY voiceover.play() failed", err);
+      });
+      console.log("[TimelineEditor] preview PLAY voiceover started", { audioUrl: audioUrl?.slice?.(0, 60), currentTime: voiceover.currentTime });
+    }
+    if (music && backgroundMusicUrl) {
+      const musicUrl = getPreviewUrl(backgroundMusicUrl);
+      music.src = musicUrl;
+      lastMusicSrcRef.current = musicUrl;
+      music.currentTime = t0 + musTrim;
+      music.volume = isMuted ? 0 : Math.max(0, Math.min(1, musicVolume));
+      music.play().catch((err) => {
+        console.warn("[TimelineEditor] preview PLAY music.play() failed", err);
+      });
+      console.log("[TimelineEditor] preview PLAY music started", { musicUrl: musicUrl?.slice?.(0, 60), currentTime: music.currentTime });
+    }
+
+    // Start video in same user gesture (effect will sync clip/seek when it runs)
+    if (video && clips[idx]) {
+      const c = clips[idx];
+      const url = getPreviewUrl(c?.asset?.src);
+      if (url) {
+        const clipStart = c.start ?? 0;
+        const clipLen = c.length ?? 0;
+        const offsetInClip = Math.max(0, Math.min(t0 - clipStart, clipLen));
+        video.muted = isMuted;
+        video.volume = isMuted ? 0 : (c?.asset?.volume ?? 0.4);
+        video.src = url;
+        lastVideoSrcRef.current = url;
+        video.load();
+        video.currentTime = offsetInClip;
+        video.play().catch((err) => {
+          console.warn("[TimelineEditor] preview PLAY video.play() failed", err);
+        });
+        console.log("[TimelineEditor] preview PLAY video started", { clipIdx: idx, url: url?.slice?.(0, 60), offsetInClip });
+      } else {
+        console.warn("[TimelineEditor] preview PLAY no video url for clip", { idx, c: c?.asset?.src });
+      }
+    } else {
+      console.warn("[TimelineEditor] preview PLAY no video ref or no clip", { hasVideo: !!video, hasClip: !!clips[idx] });
+    }
+
+    setIsPlaying(true);
+  };
 
   const handleTimelineClick = (e) => {
     if (isDraggingPlayheadRef.current || e.target.closest("[data-playhead]")) return;
@@ -904,9 +1252,13 @@ const TimelineEditor = forwardRef(function TimelineEditor(
             {formatTime(currentTime)} / {formatTime(timelineData.totalSeconds)}
           </span>
         </div>
-        <div className="relative aspect-video w-full max-w-[560px] overflow-hidden rounded-lg bg-black">
+        {/* Portrait 9:16 – video fit contained and centered (no zoom/crop) */}
+        <div
+          className="relative w-full max-w-[360px] overflow-hidden rounded-lg bg-black"
+          style={{ aspectRatio: "9/16" }}
+        >
           <div
-            className={`h-full w-full preview-transition-container ${getPreviewTransitionClass()} ${
+            className={`absolute inset-0 preview-transition-container ${getPreviewTransitionClass()} ${
               previewTransitioning ? "preview-transition-out" : "preview-transition-in"
             }`}
             style={{
@@ -917,7 +1269,8 @@ const TimelineEditor = forwardRef(function TimelineEditor(
           >
             <video
               ref={previewVideoRef}
-              className="h-full w-full object-contain"
+              className="h-full w-full object-contain object-center"
+              style={{ objectFit: "contain", objectPosition: "center" }}
               playsInline
               onError={() => setPreviewError("Video failed to load")}
             />
@@ -939,7 +1292,9 @@ const TimelineEditor = forwardRef(function TimelineEditor(
             </div>
           )}
         </div>
+        {/* Original editor controls: top preview + audio only */}
         <div className="flex items-center justify-center gap-2">
+          <span className="text-[10px] text-gray-500 mr-1">Preview</span>
           <button
             type="button"
             onClick={() => setIsMuted(!isMuted)}
@@ -963,7 +1318,7 @@ const TimelineEditor = forwardRef(function TimelineEditor(
               setCurrentTime(0);
             }}
             className="rounded bg-gray-600 p-1.5 text-white hover:bg-gray-500"
-            title="Stop"
+            title="Stop preview"
           >
             <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
               <rect x="6" y="6" width="12" height="12" rx="1" />
@@ -971,9 +1326,9 @@ const TimelineEditor = forwardRef(function TimelineEditor(
           </button>
           <button
             type="button"
-            onClick={() => setIsPlaying(!isPlaying)}
+            onClick={handlePreviewPlayPause}
             className="rounded bg-blue-600 p-1.5 text-white hover:bg-blue-500"
-            title={isPlaying ? "Pause" : "Play"}
+            title={isPlaying ? "Pause preview" : "Play preview"}
           >
             {isPlaying ? (
               <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
@@ -986,6 +1341,79 @@ const TimelineEditor = forwardRef(function TimelineEditor(
               </svg>
             )}
           </button>
+        </div>
+        {/* Shotstack Studio SDK preview – portrait 9:16, contained and centered */}
+        <div className="mt-4 flex w-full max-w-[360px] justify-center">
+          <div className="rounded-lg border border-gray-700 bg-black/80 p-2">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-medium text-gray-200">
+                Shotstack Studio SDK preview
+              </span>
+              <span className="text-[10px] text-gray-500">beta</span>
+            </div>
+            <div
+              className="flex min-h-0 items-center justify-center rounded-md bg-black overflow-hidden"
+              style={{ aspectRatio: "9/16", width: 320 }}
+            >
+              <div
+                data-shotstack-studio
+                className="h-full w-full min-h-0 min-w-0"
+                style={{ aspectRatio: "9/16" }}
+              />
+            </div>
+            <div
+              data-shotstack-timeline
+              className="mt-3 rounded-md bg-gray-900 overflow-hidden"
+              style={{ width: 320, height: 200 }}
+            />
+            {/* Studio SDK controls – separate from original editor */}
+            <div className="mt-2 flex items-center justify-center gap-2">
+              <span className="text-[10px] text-gray-500 mr-1">Studio</span>
+              <button
+                type="button"
+                onClick={() => {
+                  const edit = studioEditRef.current;
+                  if (edit && typeof edit.stop === "function") edit.stop();
+                  if (edit && typeof edit.pause === "function") edit.pause();
+                  setIsStudioPlaying(false);
+                }}
+                className="rounded bg-gray-600 p-1.5 text-white hover:bg-gray-500"
+                title="Stop Studio"
+              >
+                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                  <rect x="6" y="6" width="12" height="12" rx="1" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const edit = studioEditRef.current;
+                  if (!edit) return;
+                  if (isStudioPlaying) {
+                    if (typeof edit.pause === "function") edit.pause();
+                    setIsStudioPlaying(false);
+                  } else {
+                    if (typeof edit.seek === "function") edit.seek(Math.round(currentTime * 1000));
+                    if (typeof edit.play === "function") edit.play();
+                    setIsStudioPlaying(true);
+                  }
+                }}
+                className="rounded bg-amber-600 p-1.5 text-white hover:bg-amber-500"
+                title={isStudioPlaying ? "Pause Studio" : "Play Studio"}
+              >
+                {isStudioPlaying ? (
+                  <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                    <rect x="6" y="4" width="4" height="16" />
+                    <rect x="14" y="4" width="4" height="16" />
+                  </svg>
+                ) : (
+                  <svg className="ml-0.5 h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
