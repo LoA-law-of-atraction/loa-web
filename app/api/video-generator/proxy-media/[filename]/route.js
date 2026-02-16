@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 
 /**
- * Proxies media (video/audio) from Firebase Storage to avoid CORS when loading
- * in ShotStack Studio canvas. Only allows firebasestorage.googleapis.com URLs.
+ * Proxies media with a filename in the path (e.g. Scene_1.mp4) so that
+ * Shotstack Studio SDK sees a .mp4 path and can load the video. Reads the
+ * real URL from the query param "url". Same logic as ../route.js.
  */
-export async function GET(request) {
+export async function GET(request, { params }) {
   try {
     const { searchParams } = new URL(request.url);
     const url = searchParams.get("url");
@@ -34,9 +35,9 @@ export async function GET(request) {
     }
 
     const contentType = res.headers.get("content-type") || "video/mp4";
-    const contentLength = res.headers.get("content-length");
-    const contentRange = res.headers.get("content-range");
-    const acceptRanges = res.headers.get("accept-ranges") || "bytes";
+    const contentLength = res.headers.get("Content-Length");
+    const contentRange = res.headers.get("Content-Range");
+    const acceptRanges = res.headers.get("Accept-Ranges") || "bytes";
 
     const headers = new Headers();
     headers.set("Content-Type", contentType);

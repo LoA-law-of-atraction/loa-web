@@ -99,7 +99,7 @@ h5 {
   }
 
   .footer {
-    background-image: url("/bg/footerBg.webp");
+    /* Optional: add public/bg/footerBg.webp to enable */
     background-size: 30%;
     background-repeat: no-repeat;
     background-position: center right;
@@ -180,81 +180,6 @@ h5 {
 
 .animate-fade-in {
   animation: fade-in 0.2s ease-out;
-}
-
-/* Timeline preview transitions – match ShotStack transition types */
-.preview-transition-container {
-  transition:
-    opacity ease-out,
-    transform ease-out,
-    clip-path ease-out;
-}
-
-.preview-fade.preview-transition-out {
-  opacity: 0;
-}
-.preview-fade.preview-transition-in {
-  opacity: 1;
-}
-
-.preview-slide-left.preview-transition-out {
-  transform: translateX(-100%);
-}
-.preview-slide-left.preview-transition-in {
-  transform: translateX(0);
-}
-
-.preview-slide-right.preview-transition-out {
-  transform: translateX(100%);
-}
-.preview-slide-right.preview-transition-in {
-  transform: translateX(0);
-}
-
-.preview-slide-up.preview-transition-out {
-  transform: translateY(-100%);
-}
-.preview-slide-up.preview-transition-in {
-  transform: translateY(0);
-}
-
-.preview-slide-down.preview-transition-out {
-  transform: translateY(100%);
-}
-.preview-slide-down.preview-transition-in {
-  transform: translateY(0);
-}
-
-.preview-wipe-left.preview-transition-out {
-  clip-path: inset(0 0 0 100%);
-}
-.preview-wipe-left.preview-transition-in {
-  clip-path: inset(0 0 0 0);
-}
-
-.preview-wipe-right.preview-transition-out {
-  clip-path: inset(0 100% 0 0);
-}
-.preview-wipe-right.preview-transition-in {
-  clip-path: inset(0 0 0 0);
-}
-
-.preview-zoom-in.preview-transition-out {
-  transform: scale(0);
-  opacity: 0;
-}
-.preview-zoom-in.preview-transition-in {
-  transform: scale(1);
-  opacity: 1;
-}
-
-.preview-zoom-out.preview-transition-out {
-  transform: scale(1.5);
-  opacity: 0;
-}
-.preview-zoom-out.preview-transition-in {
-  transform: scale(1);
-  opacity: 1;
 }
 
 @layer components {

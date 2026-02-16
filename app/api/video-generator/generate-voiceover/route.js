@@ -13,6 +13,34 @@ export async function POST(request) {
       );
     }
 
+    const db = getAdminDb();
+
+    // Load character from Firestore characters collection (source of truth for voice_id and name)
+    const characterId = character.character_id || character.id;
+    let resolvedCharacter = character;
+
+    if (characterId) {
+      const charDoc = await db.collection("characters").doc(characterId).get();
+      if (charDoc.exists) {
+        const charData = charDoc.data();
+        resolvedCharacter = {
+          character_id: charDoc.id,
+          id: charDoc.id,
+          name: charData.name || character.name,
+          voice_id: charData.voice_id || character.voice_id,
+          image_urls: charData.image_urls || character.image_urls,
+          ...charData,
+        };
+      }
+    }
+
+    if (!resolvedCharacter.voice_id) {
+      return NextResponse.json(
+        { error: "Character has no voice_id. Set it in the Characters page." },
+        { status: 400 }
+      );
+    }
+
     // Use provided voice settings or defaults
     const settings = voice_settings || {
       stability: 0.65,
@@ -21,7 +49,15 @@ export async function POST(request) {
       use_speaker_boost: true,
     };
 
-    const sessionId = `video_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const projectRef = db.collection("projects").doc(project_id);
+    const projectDoc = await projectRef.get();
+
+    if (!projectDoc.exists) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+
+    const projectData = projectDoc.data() || {};
+    const sessionId = projectData.session_id || `video_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     // Convert pause markers to SSML break tags
     // Supports: [pause:1s], [pause:500ms], [pause]
@@ -33,10 +69,10 @@ export async function POST(request) {
     // Replace simple [pause] with 1 second break
     processedScript = processedScript.replace(/\[pause\]/gi, '<break time="1s"/>');
 
-    // Generate voiceover with ElevenLabs
+    // Generate voiceover with ElevenLabs (use voice_id from characters collection)
     console.log("Generating voiceover...");
     const voiceoverResponse = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${character.voice_id}`,
+      `https://api.elevenlabs.io/v1/text-to-speech/${resolvedCharacter.voice_id}`,
       {
         method: "POST",
         headers: {
@@ -56,9 +92,10 @@ export async function POST(request) {
       throw new Error(`ElevenLabs API error: ${voiceoverResponse.statusText}`);
     }
 
-    // Upload voiceover to Cloud Storage
+    // Upload voiceover to Cloud Storage (unique file per generation)
     const voiceoverBuffer = await voiceoverResponse.arrayBuffer();
-    const voiceoverFileName = `voiceovers/${sessionId}.mp3`;
+    const uniqueId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const voiceoverFileName = `voiceovers/${sessionId}_${uniqueId}.mp3`;
     const bucket = getAdminStorage().bucket();
     const voiceoverFile = bucket.file(voiceoverFileName);
 
@@ -73,30 +110,38 @@ export async function POST(request) {
     const characterCount = script.length;
     const elevenLabsCost = calculateElevenLabsCost(characterCount);
 
-    // Update project with voiceover URL and progress
-    const db = getAdminDb();
-    const projectRef = db.collection("projects").doc(project_id);
+    // Store in voiceovers collection (like music)
+    const voiceoverMetadata = {
+      voiceover_url: voiceoverUrl,
+      storage_path: voiceoverFileName,
+      project_id,
+      session_id: sessionId,
+      character_id: resolvedCharacter.character_id || resolvedCharacter.id || null,
+      character_name: resolvedCharacter.name || null,
+      script_length: characterCount,
+      cost: elevenLabsCost,
+      voice_settings: settings,
+      timestamp: new Date().toISOString(),
+    };
 
-    // Get existing costs
-    const projectDoc = await projectRef.get();
-    const existingCosts = projectDoc.data()?.costs || {};
+    const voiceoverRef = await db.collection("voiceovers").add(voiceoverMetadata);
 
-    // Calculate new costs
+    // Update project costs and auto-select this voiceover
+    const existingCosts = projectData.costs || {};
     const newElevenLabsCost = (existingCosts.elevenlabs || 0) + elevenLabsCost;
     const newStep2ElevenLabsCost = (existingCosts.step2?.elevenlabs || 0) + elevenLabsCost;
     const newStep2Total = (existingCosts.step2?.total || 0) + elevenLabsCost;
     const newTotal = (existingCosts.total || 0) + elevenLabsCost;
 
     await projectRef.update({
+      voiceover_id: voiceoverRef.id,
       voiceover_url: voiceoverUrl,
       session_id: sessionId,
       current_step: 3,
       status: "voiceover_generated",
       costs: {
         ...existingCosts,
-        // Legacy API-level
         elevenlabs: newElevenLabsCost,
-        // Step-level
         step2: {
           ...existingCosts.step2,
           elevenlabs: newStep2ElevenLabsCost,
@@ -109,6 +154,7 @@ export async function POST(request) {
 
     return NextResponse.json({
       success: true,
+      voiceover_id: voiceoverRef.id,
       session_id: sessionId,
       voiceover_url: voiceoverUrl,
     });
