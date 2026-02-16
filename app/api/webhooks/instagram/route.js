@@ -23,7 +23,10 @@ export async function GET(request) {
 
   if (mode === "subscribe" && expectedToken && token === expectedToken && challenge) {
     return new NextResponse(challenge, {
-      headers: { "Content-Type": "text/plain" },
+      headers: {
+        "Content-Type": "text/plain",
+        "Cache-Control": "no-store, no-cache, must-revalidate",
+      },
     });
   }
 
@@ -38,5 +41,11 @@ export async function GET(request) {
           ? "hub.challenge is missing."
           : "Verification failed.";
   console.warn("[Instagram webhook] Verification failed:", { mode, tokenPresent: !!token, expectedSet: !!expectedToken, challengePresent: !!challenge });
-  return new NextResponse(reason, { status: 403, headers: { "Content-Type": "text/plain" } });
+  return new NextResponse(reason, {
+    status: 403,
+    headers: {
+      "Content-Type": "text/plain",
+      "Cache-Control": "no-store, no-cache, must-revalidate",
+    },
+  });
 }

@@ -99,7 +99,7 @@ h5 {
   }
 
   .footer {
-    background-image: url("/bg/footerBg.webp");
+    /* Optional: add public/bg/footerBg.webp to enable */
     background-size: 30%;
     background-repeat: no-repeat;
     background-position: center right;
