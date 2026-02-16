@@ -4,6 +4,11 @@ export function middleware(request) {
   const { pathname } = request.nextUrl;
   const host = request.headers.get("host") || "";
 
+  // Never run middleware for API routes (webhooks, auth callbacks, etc.)
+  if (pathname.startsWith("/api")) {
+    return NextResponse.next();
+  }
+
   // Redirect non-www to www (only in production)
   if (host === "loa-lawofattraction.co") {
     const url = request.nextUrl.clone();

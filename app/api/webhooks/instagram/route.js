@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 
+/** Force server-side run; never cache so Meta always gets a fresh response */
+export const dynamic = "force-dynamic";
+
 /**
  * Meta webhook verification (Instagram/Facebook).
  * Used when Meta app asks for "Callback URL" + "Verify token" (e.g. Webhooks section).
@@ -24,11 +27,16 @@ export async function GET(request) {
     });
   }
 
-  console.warn("[Instagram webhook] Verification failed or missing config:", {
-    mode,
-    tokenPresent: !!token,
-    expectedTokenSet: !!expectedToken,
-    challengePresent: !!challenge,
-  });
-  return new NextResponse("Verification failed or INSTAGRAM_WEBHOOK_VERIFY_TOKEN not set", { status: 403 });
+  // Help debug: when Meta (or you) hit this URL, body explains what’s wrong
+  const reason = !expectedToken
+    ? "INSTAGRAM_WEBHOOK_VERIFY_TOKEN (or FACEBOOK_WEBHOOK_VERIFY_TOKEN) is not set in this environment. Add it in your host's Environment Variables (e.g. Vercel) and redeploy."
+    : mode !== "subscribe"
+      ? "hub.mode is not 'subscribe'."
+      : token !== expectedToken
+        ? "hub.verify_token does not match."
+        : !challenge
+          ? "hub.challenge is missing."
+          : "Verification failed.";
+  console.warn("[Instagram webhook] Verification failed:", { mode, tokenPresent: !!token, expectedSet: !!expectedToken, challengePresent: !!challenge });
+  return new NextResponse(reason, { status: 403, headers: { "Content-Type": "text/plain" } });
 }
