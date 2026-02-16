@@ -15,6 +15,20 @@ import {
  */
 const DEBOUNCE_MS = 600;
 
+/** Return proxy URL for Firebase/Storage URLs to avoid CORS when loading in the timeline (browser). */
+function proxyMediaUrlForTimeline(url, origin = null) {
+  if (!url || typeof url !== "string") return url;
+  const o = origin ?? (typeof window !== "undefined" ? window.location.origin : "");
+  if (!o) return url;
+  if (
+    url.includes("firebasestorage.googleapis.com") ||
+    url.includes("storage.googleapis.com")
+  ) {
+    return `${o}/api/video-generator/proxy-media?url=${encodeURIComponent(url)}`;
+  }
+  return url;
+}
+
 /** Build volume for asset: number or tween array (Shotstack volume animation for configurable fade duration) */
 function buildVolumeWithFade(vol, fadeIn, fadeOut, fadeInDur, fadeOutDur, clipLength) {
   const v = Math.max(0, Math.min(1, Number(vol) ?? 0.5));
@@ -120,7 +134,11 @@ function buildInitialEdit(
     const inTransition = idx > 0 ? (gapTrans[idx - 1] ?? "fade") : "none";
     const outTransition =
       idx < sortedVideos.length - 1 ? (gapTrans[idx] ?? "fade") : "none";
-    const asset = { type: "video", src: video.video_url, volume };
+    const asset = {
+      type: "video",
+      src: proxyMediaUrlForTimeline(video.video_url),
+      volume,
+    };
     if (volumeEffect) asset.volumeEffect = volumeEffect;
     const clip = {
       asset,
@@ -607,8 +625,10 @@ const TimelineEditor = forwardRef(function TimelineEditor(
               if (asset?.src && typeof asset.src === "string") {
                 let src = asset.src;
                 if (src.startsWith("/")) src = origin ? origin + src : "";
-                if (src.startsWith("http://") || src.startsWith("https://"))
+                if (src.startsWith("http://") || src.startsWith("https://")) {
+                  src = proxyMediaUrlForTimeline(src, origin);
                   asset.src = src;
+                }
               }
               if (clip.transition) {
                 if (clip.transition.in === "none") clip.transition.in = "fade";
