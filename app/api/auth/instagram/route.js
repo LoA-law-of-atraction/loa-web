@@ -8,6 +8,7 @@ import { getInstagramRedirectUri } from "@/utils/instagramOAuthConfig";
 
 const INSTAGRAM_STATE_COOKIE = "instagram_oauth_state";
 const INSTAGRAM_STATE_MAX_AGE = 600; // 10 min
+/** State format: randomHex or randomHex:encodeURIComponent(returnToPath) so return path survives redirect without cookies */
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -32,14 +33,29 @@ export async function GET(request) {
     );
   }
 
-  const state = crypto.randomBytes(24).toString("hex");
+  const returnTo = searchParams.get("return_to");
+  const safeReturnTo =
+    returnTo &&
+    typeof returnTo === "string" &&
+    returnTo.startsWith("/") &&
+    !returnTo.startsWith("//")
+      ? returnTo
+      : null;
+  const state =
+    crypto.randomBytes(24).toString("hex") +
+    (safeReturnTo ? ":" + encodeURIComponent(safeReturnTo) : "");
+
   const sdk = new InstagramOAuthSdk({
     clientId,
     clientSecret,
     redirectUri,
     state,
     scopes: [
+      InstagramScope.INSTAGRAM_BUSINESS_BASIC,
+      InstagramScope.INSTAGRAM_BUSINESS_MANAGE_MESSAGES,
+      InstagramScope.INSTAGRAM_BUSINESS_MANAGE_COMMENTS,
       InstagramScope.INSTAGRAM_BUSINESS_CONTENT_PUBLISH,
+      InstagramScope.INSTAGRAM_BUSINESS_MANAGE_INSIGHTS,
     ],
   });
   const authUrl = sdk.getAuthUrl(state);

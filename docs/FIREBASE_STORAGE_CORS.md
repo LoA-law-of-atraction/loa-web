@@ -1,6 +1,6 @@
 # Firebase Storage CORS Setup
 
-The ShotStack timeline editor loads videos and audio directly from Firebase Storage in the browser. Without CORS configuration, you'll see errors like:
+The timeline editor now proxies Firebase Storage URLs via `/api/video-generator/proxy-media` to avoid CORS. If you still see CORS errors (e.g. when loading videos directly elsewhere), or for direct loads:
 
 - `Access to video at 'https://firebasestorage.googleapis.com/...' from origin 'http://localhost:3000' has been blocked by CORS policy`
 
