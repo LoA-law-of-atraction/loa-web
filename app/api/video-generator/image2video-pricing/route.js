@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 
+// Cache FAL pricing to avoid rate limits (429)
+const CACHE_MS = 60 * 60 * 1000; // 1 hour
+let cached = null;
+let cachedAt = 0;
+
 function getImageToVideoModelEndpoint() {
   return process.env.FAL_IMAGE_TO_VIDEO_MODEL || process.env.FAL_VEO_MODEL;
 }
@@ -29,6 +34,11 @@ export async function GET() {
       );
     }
 
+    const now = Date.now();
+    if (cached && now - cachedAt < CACHE_MS) {
+      return NextResponse.json(cached);
+    }
+
     const pricingResponse = await fetch(
       `https://api.fal.ai/v1/models/pricing?endpoint_id=${modelEndpoint}`,
       {
@@ -40,6 +50,9 @@ export async function GET() {
 
     if (!pricingResponse.ok) {
       const errorText = await pricingResponse.text();
+      if (pricingResponse.status === 429 && cached) {
+        return NextResponse.json(cached);
+      }
       return NextResponse.json(
         {
           success: false,
@@ -75,14 +88,17 @@ export async function GET() {
       );
     }
 
-    return NextResponse.json({
+    const result = {
       success: true,
       cost,
       unit: extractUnit(price),
       endpoint_id: modelEndpoint,
       model: "image-to-video",
       source: "fal_api",
-    });
+    };
+    cached = result;
+    cachedAt = Date.now();
+    return NextResponse.json(result);
   } catch (error) {
     return NextResponse.json(
       {

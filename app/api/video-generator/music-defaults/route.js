@@ -10,13 +10,10 @@ export async function GET() {
     });
   } catch (error) {
     console.error("Music defaults error:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to load music defaults",
-        default_description: "",
-      },
-      { status: 500 },
-    );
+    // Return 200 with empty default so the page still loads
+    return NextResponse.json({
+      success: true,
+      default_description: "",
+    });
   }
 }

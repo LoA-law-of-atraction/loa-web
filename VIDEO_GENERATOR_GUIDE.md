@@ -359,7 +359,7 @@ GET /api/video-generator/assemble-video?session_id=video_1738123456789_abc123
 
 ### POST `/api/video-generator/post-social`
 
-Post to social media (currently placeholders).
+Upload the rendered video to Instagram, YouTube, or TikTok. Each platform requires the corresponding env vars; if missing, the API returns `success: false` with a clear message.
 
 **Request:**
 ```json
@@ -375,10 +375,18 @@ Post to social media (currently placeholders).
 ```json
 {
   "success": true,
-  "post_url": "https://instagram.com/p/xxx",
-  "message": "Posted to instagram successfully"
+  "post_url": "https://instagram.com/reel/xxx",
+  "message": "Posted to Instagram."
 }
 ```
+
+**Environment variables (optional; enable each platform when set):**
+
+| Platform   | Env vars | Notes |
+|------------|----------|--------|
+| Instagram  | OAuth: `INSTAGRAM_CLIENT_ID`, `INSTAGRAM_CLIENT_SECRET`, `INSTAGRAM_REDIRECT_URI`; or manual: `INSTAGRAM_USER_ID`, `INSTAGRAM_ACCESS_TOKEN` | **OAuth:** Open `/api/auth/instagram` to connect; token stored in Firestore `integrations/instagram`. **Manual:** Set user id + long-lived token. Graph API: create container (Reels) → poll status → publish. |
+| YouTube    | `YOUTUBE_ACCESS_TOKEN` | OAuth2 access token with `youtube.upload` scope. Video is downloaded from `video_url` and uploaded via Data API v3 multipart. |
+| TikTok     | `TIKTOK_ACCESS_TOKEN` | User access token with `video.upload` scope. Uses PULL_FROM_URL (video URL domain must be [verified](https://developers.tiktok.com/doc/content-posting-api-media-transfer-guide) in TikTok Developer Portal). Video is sent to the user's TikTok inbox to edit and publish in-app. |
 
 ---
 
@@ -453,33 +461,28 @@ Post to social media (currently placeholders).
 
 ---
 
-## Social Media Posting (TODO)
+## Social Media Posting
 
-The social media posting endpoints are currently placeholders. To implement:
+Step 7 posts are implemented in `/api/video-generator/post-social/route.js`. Set the env vars below to enable each platform.
 
 ### Instagram
 
-1. Set up Facebook App + Instagram Business Account
-2. Get access token with permissions: `instagram_basic`, `instagram_content_publish`
-3. Implement in `/api/video-generator/post-social/route.js`
-4. Docs: https://developers.facebook.com/docs/instagram-api/guides/content-publishing
+- **OAuth (recommended):** Set `INSTAGRAM_CLIENT_ID`, `INSTAGRAM_CLIENT_SECRET`, and `INSTAGRAM_REDIRECT_URI` (or rely on `NEXT_PUBLIC_BASE_URL`). Open `/api/auth/instagram` in the browser to connect; credentials are stored in Firestore `integrations/instagram` and refreshed when needed. Uses `@microfox/instagram-oauth`.
+- **Manual:** Set `INSTAGRAM_USER_ID` and `INSTAGRAM_ACCESS_TOKEN` (long-lived token from Meta Developer).
+- Flow: create Reels container with `video_url` → poll container status until `FINISHED` → publish.
+- Docs: https://developers.facebook.com/docs/instagram-api/guides/content-publishing
 
 ### YouTube
 
-1. Set up Google Cloud Project + YouTube Data API
-2. Implement OAuth 2.0 flow
-3. Get access token with scope: `https://www.googleapis.com/auth/youtube.upload`
-4. Implement in `/api/video-generator/post-social/route.js`
-5. Docs: https://developers.google.com/youtube/v3/docs/videos/insert
+- Set `YOUTUBE_ACCESS_TOKEN` (OAuth2 token with scope `https://www.googleapis.com/auth/youtube.upload`).
+- Flow: download video from `video_url`, then multipart upload to YouTube Data API v3.
+- Docs: https://developers.google.com/youtube/v3/docs/videos/insert
 
 ### TikTok
 
-1. Register TikTok Developer account
-2. Create app and get credentials
-3. Implement OAuth flow
-4. Get access token with scopes: `video.upload`, `video.publish`
-5. Implement in `/api/video-generator/post-social/route.js`
-6. Docs: https://developers.tiktok.com/doc/content-posting-api-get-started
+- Set `TIKTOK_ACCESS_TOKEN` (user token with `video.upload` scope).
+- Flow: PULL_FROM_URL to send video to the user’s TikTok inbox; user edits and publishes in the TikTok app. The video URL’s domain must be verified in the TikTok Developer Portal.
+- Docs: https://developers.tiktok.com/doc/content-posting-api-get-started
 
 ---
 
