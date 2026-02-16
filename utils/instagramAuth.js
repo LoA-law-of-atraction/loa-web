@@ -5,17 +5,35 @@ const REFRESH_IF_EXPIRES_IN_DAYS = 7;
 
 const LOG = (obj) => console.log("[Instagram]", JSON.stringify(obj));
 
+/** Mask token for debug display (first 8 + ... + last 4). */
+function tokenPreview(token) {
+  if (typeof token !== "string" || !token) return "";
+  if (token.length <= 12) return token.slice(0, 4) + "…";
+  return token.slice(0, 8) + "…" + token.slice(-4);
+}
+
 /**
- * Build debug info (no secret values) for API responses.
+ * Build debug info for API responses.
+ * Includes access_token_preview (masked). Set INSTAGRAM_DEBUG_SHOW_TOKEN=1 to include full access_token (debug only).
  */
 function buildDebug(source, user_id, access_token) {
-  return {
+  const showFull = process.env.INSTAGRAM_DEBUG_SHOW_TOKEN === "1" || process.env.INSTAGRAM_DEBUG_SHOW_TOKEN === "true";
+  const out = {
     source,
     user_id_type: typeof user_id,
     user_id_length: typeof user_id === "string" ? user_id.length : 0,
     access_token_type: typeof access_token,
     access_token_length: typeof access_token === "string" ? access_token.length : 0,
+    access_token_preview: tokenPreview(access_token),
   };
+  if (showFull && typeof access_token === "string") out.access_token = access_token;
+  return out;
+}
+
+/** Normalize token: trim and remove any whitespace/invisible chars that can cause "Cannot parse access token". */
+function normalizeToken(str) {
+  if (typeof str !== "string") return "";
+  return str.replace(/\s+/g, "").trim();
 }
 
 /**
@@ -49,7 +67,7 @@ export async function getInstagramCredentials() {
   });
 
   if (typeof accessToken !== "string") accessToken = accessToken?.accessToken ?? "";
-  accessToken = (accessToken || "").trim();
+  accessToken = normalizeToken(accessToken || "");
   const userIdStr = typeof userId === "string" ? userId.trim() : "";
   if (!userIdStr) accessToken = "";
   const firestoreDebug = {
@@ -75,7 +93,7 @@ export async function getInstagramCredentials() {
           redirectUri: "",
         });
         const refreshed = await sdk.refreshToken(accessToken);
-        accessToken = typeof refreshed?.accessToken === "string" ? refreshed.accessToken.trim() : "";
+        accessToken = normalizeToken(refreshed?.accessToken ?? "");
         const newExpiresAt = new Date(now + refreshed.expiresIn * 1000).toISOString();
         await ref.update({
           access_token: accessToken,
