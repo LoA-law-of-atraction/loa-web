@@ -215,6 +215,8 @@ function VideoGeneratorContent() {
   const [falVideoUnitCost, setFalVideoUnitCost] = useState(null);
   const [falVideoPricingUnit, setFalVideoPricingUnit] = useState(null);
   const [loadingFalVideoPricing, setLoadingFalVideoPricing] = useState(false);
+  const [instagramConnected, setInstagramConnected] = useState(false);
+  const [instagramStatusLoading, setInstagramStatusLoading] = useState(false);
 
   // Fill missing per-scene negative prompts with a sensible default (do not overwrite explicit empty strings)
   useEffect(() => {
@@ -1248,6 +1250,17 @@ function VideoGeneratorContent() {
       })
       .catch(() => {});
   }, [step, musicDefaultDescription]);
+
+  // Instagram connection status (step 7 or after OAuth redirect)
+  useEffect(() => {
+    if (step !== 7 && searchParams.get("instagram") !== "connected") return;
+    setInstagramStatusLoading(true);
+    fetch("/api/auth/instagram/status")
+      .then((r) => r.json())
+      .then((data) => setInstagramConnected(!!data.connected))
+      .catch(() => setInstagramConnected(false))
+      .finally(() => setInstagramStatusLoading(false));
+  }, [step, searchParams]);
 
   // Load project-generated voiceovers and refresh character from Firestore when entering step 2
   useEffect(() => {
@@ -4627,13 +4640,31 @@ function VideoGeneratorContent() {
           window.open(result.post_url, "_blank", "noopener,noreferrer");
         }
       } else {
-        const errMsg = result.message || result.error || `Failed to post to ${platform}`;
+        let errMsg = result.message || result.error || `Failed to post to ${platform}`;
+        if (result.debug) {
+          errMsg += "\n\nDebug: " + JSON.stringify(result.debug, null, 2);
+        }
         await alert(errMsg, "error");
       }
     } catch (error) {
       await alert("Error: " + error.message, "error");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDisconnectInstagram = async () => {
+    try {
+      const res = await fetch("/api/auth/instagram/disconnect", { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        setInstagramConnected(false);
+        await alert("Instagram disconnected. Click \"Connect Instagram\" to connect again.", "success");
+      } else {
+        await alert(data.error || "Failed to disconnect", "error");
+      }
+    } catch (e) {
+      await alert("Error: " + e.message, "error");
     }
   };
 
@@ -9969,26 +10000,51 @@ function VideoGeneratorContent() {
               {/* Social Media Posting */}
               <div className="mb-8">
                 <h3 className="text-lg font-semibold mb-4">Post to Social Media</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-                  Instagram uses OAuth:{" "}
-                  <a
-                    href="/api/auth/instagram"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-purple-600 dark:text-purple-400 hover:underline"
-                  >
-                    Connect Instagram account
-                  </a>
-                </p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <button
-                    onClick={() => handlePostToSocial("instagram")}
-                    disabled={loading}
-                    className="flex items-center justify-center gap-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-4 rounded-lg font-medium hover:opacity-90 disabled:opacity-50"
-                  >
-                    <SiInstagram className="w-7 h-7 shrink-0" aria-hidden />
-                    Post to Instagram
-                  </button>
+                  {instagramStatusLoading ? (
+                    <div className="flex items-center justify-center gap-3 bg-gray-200 dark:bg-gray-700 text-gray-500 py-4 rounded-lg">
+                      <SiInstagram className="w-7 h-7 shrink-0" aria-hidden />
+                      Checking…
+                    </div>
+                  ) : instagramConnected ? (
+                    <div className="flex flex-col gap-2">
+                      <button
+                        onClick={() => handlePostToSocial("instagram")}
+                        disabled={loading}
+                        className="flex items-center justify-center gap-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-4 rounded-lg font-medium hover:opacity-90 disabled:opacity-50"
+                      >
+                        <SiInstagram className="w-7 h-7 shrink-0" aria-hidden />
+                        Post to Instagram
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDisconnectInstagram}
+                        className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 underline"
+                      >
+                        Disconnect Instagram
+                      </button>
+                    </div>
+                  ) : (
+                    <a
+                      href={
+                        "/api/auth/instagram?return_to=" +
+                        encodeURIComponent(
+                          "/admin/video-generator" +
+                            (currentProjectId || step != null
+                              ? "?" +
+                                new URLSearchParams({
+                                  ...(currentProjectId && { project_id: currentProjectId }),
+                                  ...(step != null && { step: String(step) }),
+                                }).toString()
+                              : "")
+                        )
+                      }
+                      className="flex items-center justify-center gap-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-4 rounded-lg font-medium hover:opacity-90 no-underline"
+                    >
+                      <SiInstagram className="w-7 h-7 shrink-0" aria-hidden />
+                      Connect Instagram
+                    </a>
+                  )}
 
                   <button
                     onClick={() => handlePostToSocial("youtube")}

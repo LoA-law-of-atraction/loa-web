@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdminDb } from "@/utils/firebaseAdmin";
 import { getInstagramCredentials } from "@/utils/instagramAuth";
 
+const LOG = (o) => console.log("[Instagram]", JSON.stringify(o));
 const INSTAGRAM_GRAPH_VERSION = "v21.0";
 const INSTAGRAM_CONTAINER_POLL_MS = 3000;
 const INSTAGRAM_CONTAINER_POLL_MAX = 60; // ~3 min
@@ -21,7 +22,9 @@ export async function POST(request) {
 
     switch (platform) {
       case "instagram":
+        LOG({ step: "post_social", platform: "instagram", session_id: session_id?.slice(0, 12), has_video_url: !!video_url });
         result = await postToInstagram(video_url, caption ?? "");
+        LOG({ step: "post_social", platform: "instagram", result_success: result.success, result_message: result.message?.slice(0, 80) });
         break;
       case "youtube":
         result = await postToYouTube(video_url, caption ?? "");
@@ -57,6 +60,7 @@ export async function POST(request) {
       success: result.success,
       post_url: result.post_url,
       message: result.message ?? (result.success ? `Posted to ${platform} successfully` : `Failed to post to ${platform}`),
+      ...(result.debug != null && { debug: result.debug }),
     });
   } catch (error) {
     console.error("Post social error:", error);
@@ -73,19 +77,55 @@ export async function POST(request) {
  * @see getInstagramCredentials, /api/auth/instagram
  */
 async function postToInstagram(videoUrl, caption) {
+  LOG({ step: "post_instagram", action: "start", video_url_length: videoUrl?.length ?? 0 });
+
   const creds = await getInstagramCredentials();
+  const debug = creds?._debug || null;
 
   if (!creds?.user_id || !creds?.access_token) {
+    LOG({
+      step: "post_instagram",
+      outcome: "no_creds",
+      debug: debug || { source: "none", reason: "no credentials" },
+    });
     return {
       success: false,
       post_url: null,
       message:
         "Instagram is not connected. Connect via OAuth: open /api/auth/instagram in the browser, or set INSTAGRAM_USER_ID and INSTAGRAM_ACCESS_TOKEN in env.",
+      debug: debug || { source: "none", reason: "no credentials" },
     };
   }
 
-  const igUserId = creds.user_id;
-  const accessToken = creds.access_token;
+  const igUserId = String(creds.user_id ?? "").trim();
+  let accessToken = creds.access_token;
+  if (typeof accessToken !== "string") accessToken = "";
+  accessToken = accessToken.trim();
+  if (!igUserId || !accessToken) {
+    LOG({
+      step: "post_instagram",
+      outcome: "invalid_creds",
+      user_id_length: igUserId.length,
+      access_token_type: typeof creds.access_token,
+      debug,
+    });
+    return {
+      success: false,
+      post_url: null,
+      message:
+        "Instagram token is missing or invalid. Disconnect and reconnect Instagram (Connect Instagram account), then try again.",
+      debug: debug || { access_token_type: typeof creds.access_token, user_id_length: igUserId.length },
+    };
+  }
+
+  LOG({
+    step: "post_instagram",
+    action: "graph_create_start",
+    source: debug?.source ?? "unknown",
+    ig_user_id_length: igUserId.length,
+    access_token_length: accessToken.length,
+    graph_url: `${INSTAGRAM_GRAPH_VERSION}/${igUserId}/media`,
+  });
 
   const baseUrl = `https://graph.facebook.com/${INSTAGRAM_GRAPH_VERSION}`;
 
@@ -103,13 +143,40 @@ async function postToInstagram(videoUrl, caption) {
 
   const createData = await createRes.json();
   if (createData.error) {
+    LOG({
+      step: "post_instagram",
+      outcome: "graph_create_error",
+      graph_response: {
+        error_code: createData.error.code,
+        error_type: createData.error.type,
+        error_message: createData.error.message,
+        error_subcode: createData.error.error_subcode,
+        fbtrace_id: createData.error.fbtrace_id,
+      },
+      creds_source: debug?.source,
+      access_token_length: accessToken.length,
+    });
     const msg = createData.error.message || JSON.stringify(createData.error);
-    return { success: false, post_url: null, message: `Instagram: ${msg}` };
+    return {
+      success: false,
+      post_url: null,
+      message: `Instagram: ${msg}`,
+      debug: {
+        ...(debug || {}),
+        graph_api_error: {
+          code: createData.error.code,
+          type: createData.error.type,
+          message: createData.error.message,
+        },
+      },
+    };
   }
   const creationId = createData.id;
   if (!creationId) {
+    LOG({ step: "post_instagram", outcome: "graph_create_no_id", createData_keys: Object.keys(createData || {}) });
     return { success: false, post_url: null, message: "Instagram: No container id returned." };
   }
+  LOG({ step: "post_instagram", action: "graph_create_ok", creation_id: creationId });
 
   // 2) Poll container status until FINISHED or ERROR
   for (let i = 0; i < INSTAGRAM_CONTAINER_POLL_MAX; i++) {
@@ -119,6 +186,13 @@ async function postToInstagram(videoUrl, caption) {
     );
     const statusData = await statusRes.json();
     if (statusData.error) {
+      LOG({
+        step: "post_instagram",
+        outcome: "graph_status_error",
+        creation_id: creationId,
+        error: statusData.error?.message,
+        error_code: statusData.error?.code,
+      });
       return {
         success: false,
         post_url: null,
@@ -128,6 +202,7 @@ async function postToInstagram(videoUrl, caption) {
     const code = statusData.status_code;
     if (code === "FINISHED") break;
     if (code === "ERROR" || code === "EXPIRED") {
+      LOG({ step: "post_instagram", outcome: "container_failed", status_code: code, creation_id: creationId });
       return {
         success: false,
         post_url: null,
@@ -136,6 +211,8 @@ async function postToInstagram(videoUrl, caption) {
     }
     // IN_PROGRESS or other: keep polling
   }
+
+  LOG({ step: "post_instagram", action: "graph_publish_start", creation_id: creationId });
 
   // 3) Publish
   const publishRes = await fetch(`${baseUrl}/${igUserId}/media_publish`, {
@@ -149,6 +226,12 @@ async function postToInstagram(videoUrl, caption) {
 
   const publishData = await publishRes.json();
   if (publishData.error) {
+    LOG({
+      step: "post_instagram",
+      outcome: "graph_publish_error",
+      error_code: publishData.error?.code,
+      error_message: publishData.error?.message,
+    });
     return {
       success: false,
       post_url: null,
@@ -157,6 +240,12 @@ async function postToInstagram(videoUrl, caption) {
   }
   const mediaId = publishData.id;
   const postUrl = mediaId ? `https://www.instagram.com/reel/${mediaId}/` : null;
+  LOG({
+    step: "post_instagram",
+    outcome: "success",
+    media_id: mediaId,
+    post_url: postUrl,
+  });
   return { success: true, post_url: postUrl, message: "Posted to Instagram." };
 }
 

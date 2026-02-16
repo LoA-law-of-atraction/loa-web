@@ -3,56 +3,122 @@ import { getAdminDb } from "@/utils/firebaseAdmin";
 const INTEGRATIONS_DOC = "instagram";
 const REFRESH_IF_EXPIRES_IN_DAYS = 7;
 
+const LOG = (obj) => console.log("[Instagram]", JSON.stringify(obj));
+
 /**
- * Get Instagram credentials for Graph API posting.
- * Prefers env INSTAGRAM_USER_ID + INSTAGRAM_ACCESS_TOKEN; otherwise reads from Firestore (integrations/instagram)
- * and refreshes the token if it expires within REFRESH_IF_EXPIRES_IN_DAYS.
- * @returns {{ user_id: string, access_token: string } | null}
+ * Build debug info (no secret values) for API responses.
+ */
+function buildDebug(source, user_id, access_token) {
+  return {
+    source,
+    user_id_type: typeof user_id,
+    user_id_length: typeof user_id === "string" ? user_id.length : 0,
+    access_token_type: typeof access_token,
+    access_token_length: typeof access_token === "string" ? access_token.length : 0,
+  };
+}
+
+/**
+ * Get Instagram credentials for Graph API posting (to post video to connected account).
+ * Uses only Firestore (OAuth from "Connect Instagram"). Env INSTAGRAM_* is not used for posting.
+ * @returns {{ user_id: string, access_token: string, _debug?: object } | null}
  */
 export async function getInstagramCredentials() {
-  const fromEnv = process.env.INSTAGRAM_USER_ID && process.env.INSTAGRAM_ACCESS_TOKEN;
-  if (fromEnv) {
-    return {
-      user_id: process.env.INSTAGRAM_USER_ID,
-      access_token: process.env.INSTAGRAM_ACCESS_TOKEN,
-    };
-  }
-
+  LOG({ step: "getCredentials", action: "start" });
   const db = getAdminDb();
   const ref = db.collection("integrations").doc(INTEGRATIONS_DOC);
   const snap = await ref.get();
-  if (!snap.exists) return null;
+
+  if (!snap.exists) {
+    LOG({ step: "getCredentials", outcome: "no_doc", reason: "integrations/instagram missing" });
+    return null;
+  }
 
   const data = snap.data();
   let accessToken = data.access_token;
   const userId = data.user_id;
+  LOG({
+    step: "getCredentials",
+    action: "read_firestore",
+    firestore_raw: {
+      access_token_type: typeof data.access_token,
+      access_token_length: typeof data.access_token === "string" ? data.access_token.length : 0,
+      user_id_type: typeof data.user_id,
+      user_id_length: typeof data.user_id === "string" ? data.user_id.length : 0,
+    },
+  });
+
+  if (typeof accessToken !== "string") accessToken = accessToken?.accessToken ?? "";
+  accessToken = (accessToken || "").trim();
+  const userIdStr = typeof userId === "string" ? userId.trim() : "";
+  if (!userIdStr) accessToken = "";
+  const firestoreDebug = {
+    ...buildDebug("firestore", userIdStr, accessToken),
+    firestore_raw_token_type: typeof data.access_token,
+  };
   const expiresAt = data.expires_at ? new Date(data.expires_at).getTime() : 0;
   const now = Date.now();
   const refreshThreshold = REFRESH_IF_EXPIRES_IN_DAYS * 24 * 60 * 60 * 1000;
+  const needsRefresh = expiresAt && expiresAt - now < refreshThreshold;
 
-  if (expiresAt && expiresAt - now < refreshThreshold) {
+  if (needsRefresh) {
+    LOG({ step: "getCredentials", action: "refresh_attempt", expiresAt: !!expiresAt, now });
     try {
-      const { InstagramOAuthSdk } = await import("@microfox/instagram-oauth");
       const clientSecret = process.env.INSTAGRAM_CLIENT_SECRET;
-      if (!clientSecret) return userId && accessToken ? { user_id: userId, access_token: accessToken } : null;
-      const sdk = new InstagramOAuthSdk({
-        clientId: process.env.INSTAGRAM_CLIENT_ID || "",
-        clientSecret,
-        redirectUri: "",
-      });
-      const refreshed = await sdk.refreshToken(accessToken);
-      accessToken = refreshed.accessToken;
-      const newExpiresAt = new Date(now + refreshed.expiresIn * 1000).toISOString();
-      await ref.update({
-        access_token: accessToken,
-        expires_at: newExpiresAt,
-        updated_at: new Date().toISOString(),
-      });
+      if (!clientSecret) {
+        LOG({ step: "getCredentials", action: "refresh_skip", reason: "no INSTAGRAM_CLIENT_SECRET" });
+      } else {
+        const { InstagramOAuthSdk } = await import("@microfox/instagram-oauth");
+        const sdk = new InstagramOAuthSdk({
+          clientId: process.env.INSTAGRAM_CLIENT_ID || "",
+          clientSecret,
+          redirectUri: "",
+        });
+        const refreshed = await sdk.refreshToken(accessToken);
+        accessToken = typeof refreshed?.accessToken === "string" ? refreshed.accessToken.trim() : "";
+        const newExpiresAt = new Date(now + refreshed.expiresIn * 1000).toISOString();
+        await ref.update({
+          access_token: accessToken,
+          expires_at: newExpiresAt,
+          updated_at: new Date().toISOString(),
+        });
+        LOG({
+          step: "getCredentials",
+          action: "refresh_ok",
+          new_token_length: accessToken.length,
+          expiresIn: refreshed.expiresIn,
+        });
+      }
     } catch (e) {
-      console.warn("Instagram token refresh failed:", e.message);
+      LOG({
+        step: "getCredentials",
+        action: "refresh_error",
+        error: e.message,
+        code: e.code,
+      });
+      console.warn("[Instagram] token refresh failed:", e.message);
     }
   }
 
-  if (!userId || !accessToken) return null;
-  return { user_id: userId, access_token: accessToken };
+  if (userIdStr && accessToken) {
+    LOG({
+      step: "getCredentials",
+      outcome: "return_creds",
+      source: "firestore",
+      user_id_length: userIdStr.length,
+      access_token_length: accessToken.length,
+    });
+    return { user_id: userIdStr, access_token: accessToken, _debug: firestoreDebug };
+  }
+
+  LOG({
+    step: "getCredentials",
+    outcome: "return_null",
+    reason: "invalid_doc",
+    hasUserId: !!userIdStr,
+    hasToken: !!accessToken,
+    user_id_length: userIdStr.length,
+    access_token_length: accessToken.length,
+  });
+  return null;
 }
