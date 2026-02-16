@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import crypto from "crypto";
 import {
   InstagramOAuthSdk,
   InstagramScope,
@@ -11,14 +11,25 @@ const LOG = (o) => console.log("[Instagram]", JSON.stringify(o));
 const INSTAGRAM_STATE_COOKIE = "instagram_oauth_state";
 const INTEGRATIONS_DOC = "instagram";
 
-/** Parse return path from state (format: hex or hex:encodeURIComponent(path)). */
-function parseReturnToFromState(stateParam) {
-  if (!stateParam || typeof stateParam !== "string") return null;
-  const idx = stateParam.indexOf(":");
-  if (idx === -1) return null;
+/**
+ * Verify signed state (payload.base64url + "." + signature.base64url) and return return path.
+ * Does not rely on cookies so it works when Meta redirects back and the cookie is not sent.
+ */
+function verifySignedStateAndGetReturnPath(stateParam, secret) {
+  if (!stateParam || typeof stateParam !== "string" || !secret) return null;
+  const dot = stateParam.indexOf(".");
+  if (dot === -1) return null;
+  const payloadB64 = stateParam.slice(0, dot);
+  const sigB64 = stateParam.slice(dot + 1);
   try {
-    const path = decodeURIComponent(stateParam.slice(idx + 1));
-    return path && path.startsWith("/") && !path.startsWith("//") ? path : null;
+    const pad = (n) => "=".repeat((4 - (n % 4)) % 4);
+    const payloadJson = Buffer.from(payloadB64.replace(/-/g, "+").replace(/_/g, "/") + pad(payloadB64.length), "base64").toString("utf8");
+    const sig = Buffer.from(sigB64.replace(/-/g, "+").replace(/_/g, "/") + pad(sigB64.length), "base64");
+    const expectedSig = crypto.createHmac("sha256", secret).update(payloadJson).digest();
+    if (sig.length !== expectedSig.length || !crypto.timingSafeEqual(sig, expectedSig)) return null;
+    const payload = JSON.parse(payloadJson);
+    const path = payload && typeof payload.p === "string" ? payload.p : "";
+    return path.startsWith("//") ? null : path;
   } catch {
     return null;
   }
@@ -53,7 +64,8 @@ export async function GET(request) {
 
   LOG({ step: "callback", action: "start", hasCode: !!code, hasState: !!state, hasError: !!errorParam });
 
-  const returnToPath = parseReturnToFromState(state);
+  const clientSecret = process.env.INSTAGRAM_CLIENT_SECRET;
+  const returnToPath = verifySignedStateAndGetReturnPath(state, clientSecret);
   if (returnToPath) LOG({ step: "callback", return_to: returnToPath });
 
   const redirectBase = getSuccessRedirectBase(returnToPath);
@@ -73,11 +85,9 @@ export async function GET(request) {
     return redirectAndClearCookies(failUrlWithReason("missing_code_or_state"));
   }
 
-  const cookieStore = await cookies();
-  const savedState = cookieStore.get(INSTAGRAM_STATE_COOKIE)?.value;
-  if (!savedState || savedState !== state) {
-    LOG({ step: "callback", outcome: "redirect_fail", reason: "state_mismatch", hasSavedState: !!savedState, stateLength: state?.length, savedStateLength: savedState?.length });
-    return redirectAndClearCookies(failUrlWithReason("state_mismatch"));
+  if (state && returnToPath === null) {
+    LOG({ step: "callback", outcome: "redirect_fail", reason: "state_invalid", stateLength: state?.length });
+    return redirectAndClearCookies(failUrlWithReason("state_invalid"));
   }
 
   const clientId = process.env.INSTAGRAM_CLIENT_ID;
@@ -114,7 +124,8 @@ export async function GET(request) {
     return redirectAndClearCookies(failUrlWithReason("exchange_error"));
   }
 
-  const accessToken = typeof tokens.accessToken === "string" ? tokens.accessToken.trim() : "";
+  let accessToken = typeof tokens.accessToken === "string" ? tokens.accessToken : "";
+  accessToken = accessToken.replace(/\s+/g, "").trim();
   const userId = typeof tokens.userId === "string" ? tokens.userId.trim() : String(tokens.userId ?? "");
   if (!accessToken || !userId) {
     LOG({ step: "callback", outcome: "redirect_fail", reason: "missing_after_exchange", hasToken: !!accessToken, hasUserId: !!userId });

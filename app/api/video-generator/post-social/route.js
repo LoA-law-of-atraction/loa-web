@@ -100,7 +100,7 @@ async function postToInstagram(videoUrl, caption) {
   const igUserId = String(creds.user_id ?? "").trim();
   let accessToken = creds.access_token;
   if (typeof accessToken !== "string") accessToken = "";
-  accessToken = accessToken.trim();
+  accessToken = accessToken.replace(/\s+/g, "").trim();
   if (!igUserId || !accessToken) {
     LOG({
       step: "post_instagram",
@@ -157,10 +157,14 @@ async function postToInstagram(videoUrl, caption) {
       access_token_length: accessToken.length,
     });
     const msg = createData.error.message || JSON.stringify(createData.error);
+    const isTokenError = createData.error.code === 190;
+    const suggestion = isTokenError
+      ? " Disconnect Instagram (Step 7) and connect again to get a new token, then try posting."
+      : "";
     return {
       success: false,
       post_url: null,
-      message: `Instagram: ${msg}`,
+      message: `Instagram: ${msg}${suggestion}`,
       debug: {
         ...(debug || {}),
         graph_api_error: {
