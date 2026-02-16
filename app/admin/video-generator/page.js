@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState, useRef, Fragment } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useToast } from "@/components/admin/Toast";
 import { Trash2, Info } from "lucide-react";
+import { SiInstagram, SiYoutube, SiTiktok } from "react-icons/si";
 import { MUSIC_MODELS, getMusicModelById } from "@/data/music-models";
 import TimelineEditor from "@/components/admin/TimelineEditor";
 
@@ -689,6 +690,9 @@ function VideoGeneratorContent() {
   const [finalVideoUrl, setFinalVideoUrl] = useState(null);
   const [sessionId, setSessionId] = useState(null);
   const [isAssembling, setIsAssembling] = useState(false);
+  const [renderProgress, setRenderProgress] = useState(0);
+  const [lastRenderPayload, setLastRenderPayload] = useState(null);
+  const [showRenderPayloadModal, setShowRenderPayloadModal] = useState(false);
   const timelineEditorRef = useRef(null);
   const [timelineSettings, setTimelineSettings] = useState(null);
 
@@ -1282,7 +1286,7 @@ function VideoGeneratorContent() {
     if (currentProjectId) loadAvailableMusicFromCollection();
   }, [step, currentProjectId]);
 
-  // Poll for final video URL when on step 6/7 and user has started a render (isAssembling)
+  // Poll for final video URL when on step 6/7 (every 3s while waiting)
   useEffect(() => {
     if ((step !== 6 && step !== 7) || !sessionId) return;
     const poll = async () => {
@@ -1291,21 +1295,51 @@ function VideoGeneratorContent() {
           `/api/video-generator/assemble-video?session_id=${sessionId}`,
         );
         const data = await res.json();
-        if (data.success && data.final_video_url) {
+        if (!data.success) return;
+        if (data.final_video_url) {
           setFinalVideoUrl(data.final_video_url);
           setIsAssembling(false);
+          setRenderProgress(100);
+          return;
         }
-        // Do NOT set isAssembling(true) from poll – only when user clicks Render.
-        // This ensures Step 6 always shows timeline editor first for editing.
+        if (data.status === "failed") {
+          setIsAssembling(false);
+          setRenderProgress(0);
+          alert("Video rendering failed. Please try again.", "error");
+        }
       } catch {
         // ignore
       }
     };
     poll();
     if (finalVideoUrl) return;
-    const interval = setInterval(poll, 5000);
+    const interval = setInterval(poll, 3000);
     return () => clearInterval(interval);
   }, [step, finalVideoUrl, sessionId]);
+
+  // Simulate progress bar while rendering (Shotstack doesn't return real progress)
+  useEffect(() => {
+    if (!isAssembling) return;
+    setRenderProgress(5);
+    const start = Date.now();
+    const phase1Ms = 120000; // 0–2 min: 5% → 85%
+    const phase2Ms = 90000;  // 2–3.5 min: 85% → 99% (so it never feels stuck)
+    const tick = () => {
+      const elapsed = Date.now() - start;
+      let p;
+      if (elapsed <= phase1Ms) {
+        p = 5 + (elapsed / phase1Ms) * 80;
+      } else {
+        const phase2Elapsed = elapsed - phase1Ms;
+        p = 85 + Math.min(14, (phase2Elapsed / phase2Ms) * 14);
+      }
+      p = Math.min(99, p);
+      setRenderProgress((prev) => Math.max(prev, Math.round(p)));
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [isAssembling]);
 
   // Update selectedCharacter with full data when characters load
   useEffect(() => {
@@ -4540,19 +4574,18 @@ function VideoGeneratorContent() {
     }
     setLoading(true);
     setIsAssembling(false);
+    const payload = { project_id: currentProjectId, session_id: sessionId, edit };
+    setLastRenderPayload(payload);
     try {
       const response = await fetch("/api/video-generator/assemble-video", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          project_id: currentProjectId,
-          session_id: sessionId,
-          edit,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const result = await response.json();
       if (result.success) {
+        setRenderProgress(0);
         setIsAssembling(true);
         const projectResponse = await fetch(
           `/api/projects/${currentProjectId}`,
@@ -4588,9 +4621,14 @@ function VideoGeneratorContent() {
 
       const result = await response.json();
       if (result.success) {
-        await alert(`Posted to ${platform} successfully!`, "success");
+        const msg = result.message || `Posted to ${platform} successfully!`;
+        await alert(msg, "success");
+        if (result.post_url && typeof window !== "undefined") {
+          window.open(result.post_url, "_blank", "noopener,noreferrer");
+        }
       } else {
-        await alert(`Failed to post to ${platform}: ` + result.error, "error");
+        const errMsg = result.message || result.error || `Failed to post to ${platform}`;
+        await alert(errMsg, "error");
       }
     } catch (error) {
       await alert("Error: " + error.message, "error");
@@ -4826,14 +4864,13 @@ function VideoGeneratorContent() {
               <div key={s.num} className="flex items-center flex-1">
                 <div
                   onClick={() => {
-                    if (s.num <= maxStepReached) {
-                      setStep(s.num);
-                    }
+                    const canGo = s.num <= maxStepReached && (s.num !== 7 || finalVideoUrl);
+                    if (canGo) setStep(s.num);
                   }}
                   className={`flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0 rounded-full text-sm sm:text-base font-semibold transition-all ${
                     s.num === step
                       ? "bg-blue-600 text-white cursor-pointer hover:bg-blue-700 ring-2 ring-blue-300"
-                      : s.num <= maxStepReached
+                      : s.num <= maxStepReached && (s.num !== 7 || finalVideoUrl)
                         ? "bg-blue-500 text-white cursor-pointer hover:bg-blue-700"
                         : "bg-gray-200 text-gray-500 cursor-not-allowed dark:bg-gray-800 dark:text-gray-400"
                   }`}
@@ -9301,50 +9338,8 @@ function VideoGeneratorContent() {
                     const themeOrDescription =
                       (hasPlan ? null : musicPrompt.trim() || selectedTheme?.description) || null;
 
-                    let promptText = themeOrDescription;
-
-                    if (!hasPlan && themeOrDescription) {
-                      try {
-                        const promptRes = await fetch(
-                          "/api/video-generator/generate-music-prompt",
-                          {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                              theme_description: themeOrDescription,
-                              topic: topic?.trim() || "",
-                              script: scriptData?.script?.trim() || "",
-                              scene_locations: (scriptData?.scenes || []).map(
-                                (s) => {
-                                  const locId =
-                                    locationMapping[s.id] ?? s.location_id;
-                                  const loc = selectedLocations.find(
-                                    (l) =>
-                                      l.id === locId || l.id === String(locId),
-                                  );
-                                  return {
-                                    scene_id: s.id,
-                                    location_name: loc?.name ?? null,
-                                  };
-                                },
-                              ),
-                              use_instrument_palette: useInstrumentPalette,
-                              instrument_ids: useInstrumentPalette
-                                ? selectedInstrumentIds.length
-                                  ? selectedInstrumentIds
-                                  : undefined
-                                : undefined,
-                            }),
-                          },
-                        );
-                        const promptResult = await promptRes.json();
-                        if (promptResult.success && promptResult.prompt?.trim()) {
-                          promptText = promptResult.prompt.trim();
-                        }
-                      } catch (promptErr) {
-                        console.warn("Music prompt generation failed, using theme directly:", promptErr);
-                      }
-                    }
+                    // Use Music prompt (or theme description) as-is — no AI rewrite
+                    const promptText = themeOrDescription;
 
                     const body = {
                       project_id: currentProjectId,
@@ -9380,16 +9375,7 @@ function VideoGeneratorContent() {
                       const negativeAppend = musicNegativePrompt.trim()
                         ? "\n\nAvoid: " + musicNegativePrompt.trim()
                         : "";
-                      // Prepend anti-meditation frame — model strongly associates slow pads with meditation
-                      // Avoid trademarked names (Vangelis, Blade Runner) — Fal content checker flags them
-                      const antiMeditationPrefix =
-                        "1980s retro-futuristic synth film score. NOT meditation, NOT spa, NOT relaxation. ";
-                      const prefixedPrompt =
-                        promptText.toLowerCase().includes("retro-futuristic") ||
-                        promptText.toLowerCase().startsWith("film score")
-                          ? promptText
-                          : antiMeditationPrefix + promptText;
-                      body.prompt = prefixedPrompt + negativeAppend;
+                      body.prompt = promptText + negativeAppend;
                     }
 
                     const res = await fetch(
@@ -9738,7 +9724,7 @@ function VideoGeneratorContent() {
 
       {/* Step 6: Timeline Editor (FCP/Premiere-style) & Final Video */}
       {step === 6 && (
-        <div className="admin-card p-8">
+        <div className="admin-card p-8 flex flex-col min-h-[calc(100vh-10rem)]">
           {loadingProject && !scriptData ? (
             <div className="flex flex-col items-center justify-center py-16">
               <div className="inline-block h-8 w-8 animate-spin rounded-full border-2 border-blue-600 border-t-transparent mb-4" />
@@ -9748,28 +9734,15 @@ function VideoGeneratorContent() {
             </div>
           ) : (
           <>
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold mb-3">
+          <div className="mb-4">
+            <h2 className="text-2xl font-bold mb-2">
               Step 6: Assemble & Final Video
             </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              Edit your timeline (Final Cut Pro / Premiere-style) then render
-              via ShotStack. Videos, voiceover, and optional music are combined.
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+              Edit your timeline then render via ShotStack.
             </p>
+            {/* Cost badges only – status moved to action bar to prevent overlap */}
             <div className="flex flex-wrap gap-2">
-              {finalVideoUrl ? (
-                <div className="bg-green-100 text-green-700 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap">
-                  ✓ Video Complete
-                </div>
-              ) : isAssembling ? (
-                <div className="bg-orange-100 text-orange-700 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap">
-                  Rendering...
-                </div>
-              ) : (
-                <div className="bg-teal-100 text-teal-700 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap">
-                  Edit timeline, then click Render
-                </div>
-              )}
               {projectCosts?.step6?.shotstack > 0 && (
                 <div className="bg-pink-50 border border-pink-200 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
                   <span className="text-pink-700">🎞️ Shotstack:</span>
@@ -9788,7 +9761,7 @@ function VideoGeneratorContent() {
               )}
               {projectCosts?.total > 0 && (
                 <div className="bg-blue-50 border border-blue-300 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
-                  <span className="text-blue-700">💎 Total Project Cost:</span>
+                  <span className="text-blue-700">💎 Total:</span>
                   <span className="font-semibold text-blue-900">
                     ${projectCosts.total.toFixed(4)}
                   </span>
@@ -9797,15 +9770,32 @@ function VideoGeneratorContent() {
             </div>
           </div>
 
-          {isAssembling ? (
-            <div className="mb-8 py-12 text-center text-gray-600 dark:text-gray-400">
-              <p>Video is being rendered. This usually takes 1–2 minutes.</p>
-              <p className="mt-2 text-sm">The page will update automatically.</p>
-            </div>
-          ) : (
-            <>
-              {/* Timeline Editor – always shown when not assembling */}
-              <div className="mb-4">
+          <div className="flex flex-1 flex-col min-h-0 gap-4">
+            {/* Rendering progress – shown above editor while rendering */}
+            {isAssembling && (
+              <div className="shrink-0 px-4 py-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
+                  Video is being rendered. This usually takes 1–2 minutes.
+                </p>
+                <div className="w-full h-2.5 bg-blue-200 dark:bg-blue-900/50 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-blue-600 rounded-full transition-all duration-500 ease-out"
+                    style={{ width: `${renderProgress}%` }}
+                  />
+                </div>
+                <p className="text-sm text-blue-600 dark:text-blue-300 mt-2">
+                  {renderProgress < 100 ? `${renderProgress}%` : "Complete! Loading..."}
+                </p>
+                {renderProgress >= 95 && renderProgress < 100 && (
+                  <p className="text-xs text-blue-600/80 dark:text-blue-300/80 mt-1">
+                    Taking longer than usual. The page will update automatically when the video is ready.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Timeline Editor – full screen */}
+            <div className="flex-1 min-h-0 w-full">
                 <TimelineEditor
                   ref={timelineEditorRef}
                   projectId={currentProjectId}
@@ -9829,60 +9819,115 @@ function VideoGeneratorContent() {
                 />
               </div>
 
-              {/* Render button – directly below timeline */}
-              <div className="mb-6">
-                <button
-                  onClick={handleRenderFromEditor}
-                  disabled={loading}
-                  className="w-full bg-blue-600 text-white py-2 sm:py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
-                  title="Render via ShotStack"
-                >
-                  {loading ? "Starting render…" : finalVideoUrl ? "Render Again" : "Render Final Video →"}
-                </button>
-              </div>
-
-              {/* Generated video – show when video exists */}
+              {/* Rendered video preview – shown below editor when video exists (9:16) */}
               {finalVideoUrl && (
-                <div className="mb-6">
-                  <h3 className="mb-3 text-sm font-semibold text-gray-800 dark:text-gray-200">
-                    Generated Video
-                  </h3>
-                  <div className="aspect-[9/16] max-w-md mx-auto bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
-                    <video controls className="w-full h-full">
-                      <source src={finalVideoUrl} type="video/mp4" />
-                    </video>
+                <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-gray-50 dark:bg-gray-900/50">
+                  <div className="px-3 py-2 flex items-center justify-between border-b border-gray-200 dark:border-gray-700">
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Rendered Video
+                    </p>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setShowRenderPayloadModal(true)}
+                        className="p-1.5 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-200 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700 transition"
+                        title="Show render payload JSON"
+                        aria-label="Show render payload"
+                      >
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            const res = await fetch(
+                              `/api/video-generator/assemble-video?session_id=${encodeURIComponent(sessionId || "")}&project_id=${encodeURIComponent(currentProjectId || "")}`,
+                              { method: "DELETE" },
+                            );
+                            const data = await res.json();
+                            if (data.success) {
+                              setFinalVideoUrl(null);
+                              setLastRenderPayload(null);
+                            } else {
+                              await alert(data.error || "Failed to delete rendered video", "error");
+                            }
+                          } catch (e) {
+                            await alert("Failed to delete rendered video", "error");
+                          }
+                        }}
+                        className="p-1.5 rounded-full text-gray-500 hover:text-red-600 hover:bg-red-50 dark:text-gray-400 dark:hover:text-red-400 dark:hover:bg-red-900/30 transition"
+                        title="Delete rendered video"
+                        aria-label="Delete rendered video"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex justify-center p-4">
+                    <div className="w-full max-w-[320px] aspect-[9/16] bg-black rounded overflow-hidden">
+                      <video
+                        src={finalVideoUrl}
+                        controls
+                        className="w-full h-full object-contain"
+                        playsInline
+                      />
+                    </div>
                   </div>
                 </div>
               )}
 
-              {/* Back + Continue to Post */}
-              <div className="flex flex-wrap gap-4">
-                <button
-                  onClick={() => setStep(5)}
-                  className="flex-1 min-w-[120px] bg-gray-200 text-gray-700 py-2 sm:py-3 rounded-lg font-medium hover:bg-gray-300"
-                >
-                  ← Back
-                </button>
-                {finalVideoUrl && (
+              {/* Action bar: status + Render + Back + Continue – no overlap */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-t border-gray-200 dark:border-gray-700 pt-4">
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  {finalVideoUrl ? (
+                    <span className="bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium">
+                      ✓ Video Complete
+                    </span>
+                  ) : (
+                    <span className="bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium">
+                      Edit timeline, then click Render
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
                   <button
-                    onClick={() => {
-                      setStep(7);
-                      setMaxStepReached((prev) => Math.max(prev, 7));
-                    }}
-                    className="flex-1 min-w-[120px] bg-blue-600 text-white py-2 sm:py-3 rounded-lg font-medium hover:bg-blue-700"
+                    onClick={handleRenderFromEditor}
+                    disabled={loading}
+                    className="bg-blue-600 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap"
+                    title="Render via ShotStack"
                   >
-                    Continue to Post →
+                    {loading ? "Starting render…" : finalVideoUrl ? "Render Again" : "Render Final Video"}
                   </button>
-                )}
+                  <button
+                    onClick={() => setStep(5)}
+                    className="bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200 px-6 py-2.5 rounded-lg font-medium hover:bg-gray-300 dark:hover:bg-gray-600 whitespace-nowrap"
+                  >
+                    ← Back
+                  </button>
+                  {finalVideoUrl && (
+                    <button
+                      onClick={() => {
+                        setStep(7);
+                        setMaxStepReached((prev) => Math.max(prev, 7));
+                      }}
+                      className="bg-blue-600 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-blue-700 whitespace-nowrap"
+                    >
+                      Continue to Post →
+                    </button>
+                  )}
+                </div>
               </div>
-            </>
-          )}
+            </div>
           </>
           )}
         </div>
       )}
 
-      {/* Step 7: Post (Download, Social Media, Create Another) */}
+      {/* Step 7: Post (final preview, Download, Social Media) */}
       {step === 7 && (
         <div className="admin-card p-8">
           <div className="mb-6">
@@ -9894,11 +9939,18 @@ function VideoGeneratorContent() {
 
           {finalVideoUrl && (
             <>
-              <div className="mb-8">
-                <div className="aspect-[9/16] max-w-md mx-auto bg-gray-100 rounded-lg overflow-hidden">
-                  <video controls className="w-full h-full">
-                    <source src={finalVideoUrl} type="video/mp4" />
-                  </video>
+              {/* Final rendered video preview (9:16) above post actions */}
+              <div className="mb-8 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-gray-50 dark:bg-gray-900/50">
+                <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-100/80 dark:bg-gray-800/80">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Final video</span>
+                </div>
+                <div className="aspect-[9/16] max-w-[320px] mx-auto bg-black">
+                  <video
+                    src={finalVideoUrl}
+                    controls
+                    className="w-full h-full object-contain"
+                    playsInline
+                  />
                 </div>
               </div>
 
@@ -9917,13 +9969,24 @@ function VideoGeneratorContent() {
               {/* Social Media Posting */}
               <div className="mb-8">
                 <h3 className="text-lg font-semibold mb-4">Post to Social Media</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                  Instagram uses OAuth:{" "}
+                  <a
+                    href="/api/auth/instagram"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-purple-600 dark:text-purple-400 hover:underline"
+                  >
+                    Connect Instagram account
+                  </a>
+                </p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <button
                     onClick={() => handlePostToSocial("instagram")}
                     disabled={loading}
                     className="flex items-center justify-center gap-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-4 rounded-lg font-medium hover:opacity-90 disabled:opacity-50"
                   >
-                    <span className="text-2xl">📷</span>
+                    <SiInstagram className="w-7 h-7 shrink-0" aria-hidden />
                     Post to Instagram
                   </button>
 
@@ -9932,7 +9995,7 @@ function VideoGeneratorContent() {
                     disabled={loading}
                     className="flex items-center justify-center gap-3 bg-red-600 text-white py-4 rounded-lg font-medium hover:bg-red-700 disabled:opacity-50"
                   >
-                    <span className="text-2xl">▶️</span>
+                    <SiYoutube className="w-7 h-7 shrink-0" aria-hidden />
                     Post to YouTube
                   </button>
 
@@ -9941,7 +10004,7 @@ function VideoGeneratorContent() {
                     disabled={loading}
                     className="flex items-center justify-center gap-3 bg-black text-white py-4 rounded-lg font-medium hover:bg-gray-800 disabled:opacity-50"
                   >
-                    <span className="text-2xl">🎵</span>
+                    <SiTiktok className="w-7 h-7 shrink-0" aria-hidden />
                     Post to TikTok
                   </button>
                 </div>
@@ -9956,28 +10019,75 @@ function VideoGeneratorContent() {
             >
               ← Back to Assemble
             </button>
-            <button
-              onClick={() => {
-                setStep(0);
-                setTopic("");
-                setSelectedCharacter(null);
-                setScriptData(null);
-                setImages([]);
-                setVideos([]);
-                setVoiceoverUrl(null);
-                setFinalVideoUrl(null);
-                setTimelineSettings(null);
-                setBackgroundMusicUrl(null);
-                setBackgroundMusicPrompt("");
-                setSessionId(null);
-                setCurrentProjectId(null);
-                setCurrentProjectName("");
-                loadProjects();
-              }}
-              className="flex-1 bg-blue-600 text-white py-2 sm:py-3 rounded-lg font-medium hover:bg-blue-700"
-            >
-              Create Another Video
-            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Render Payload JSON Modal (Step 6) */}
+      {showRenderPayloadModal && (
+        <div
+          className="fixed inset-0 z-[94] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="render-payload-modal-title"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setShowRenderPayloadModal(false);
+          }}
+        >
+          <div className="w-full max-w-4xl max-h-[90vh] bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-800">
+              <h2 id="render-payload-modal-title" className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                Rendered Video Payload (JSON)
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowRenderPayloadModal(false)}
+                className="p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800 transition"
+                aria-label="Close"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto p-4">
+              {(() => {
+                const payload = lastRenderPayload ?? (timelineEditorRef.current?.getEdit?.()
+                  ? { project_id: currentProjectId, session_id: sessionId, edit: timelineEditorRef.current.getEdit() }
+                  : null);
+                return payload ? (
+                  <pre className="text-xs sm:text-sm font-mono text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-900 rounded-lg p-4 overflow-auto whitespace-pre-wrap break-words">
+                    {JSON.stringify(payload, null, 2)}
+                  </pre>
+                ) : (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    No payload available. Load the timeline editor and render to see the payload.
+                  </p>
+                );
+              })()}
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-4 border-t border-gray-200 dark:border-gray-800">
+              {(lastRenderPayload ?? timelineEditorRef.current?.getEdit?.()) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const p = lastRenderPayload ?? { project_id: currentProjectId, session_id: sessionId, edit: timelineEditorRef.current.getEdit() };
+                    navigator.clipboard.writeText(JSON.stringify(p, null, 2));
+                    setShowRenderPayloadModal(false);
+                  }}
+                  className="px-4 py-2 rounded-lg bg-gray-200 text-gray-800 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 text-sm font-medium"
+                >
+                  Copy JSON
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowRenderPayloadModal(false)}
+                className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

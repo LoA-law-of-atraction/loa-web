@@ -361,3 +361,41 @@ export async function GET(request) {
     );
   }
 }
+
+// Clear rendered video (delete from UI and storage)
+export async function DELETE(request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const session_id = searchParams.get("session_id");
+    const project_id = searchParams.get("project_id");
+
+    if (!session_id) {
+      return NextResponse.json(
+        { error: "Missing session_id" },
+        { status: 400 },
+      );
+    }
+
+    const db = getAdminDb();
+
+    await db.collection("video_sessions").doc(session_id).update({
+      final_video_url: null,
+      updated_at: new Date().toISOString(),
+    });
+
+    if (project_id) {
+      await db.collection("projects").doc(project_id).update({
+        final_video_url: null,
+        updated_at: new Date().toISOString(),
+      });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Clear render error:", error);
+    return NextResponse.json(
+      { error: "Failed to clear render", message: error.message },
+      { status: 500 },
+    );
+  }
+}

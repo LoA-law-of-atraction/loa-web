@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import { getAdminDb } from "@/utils/firebaseAdmin";
+import { getInstagramCredentials } from "@/utils/instagramAuth";
+
+const INSTAGRAM_GRAPH_VERSION = "v21.0";
+const INSTAGRAM_CONTAINER_POLL_MS = 3000;
+const INSTAGRAM_CONTAINER_POLL_MAX = 60; // ~3 min
 
 export async function POST(request) {
   try {
@@ -12,28 +17,22 @@ export async function POST(request) {
       );
     }
 
-    console.log(`Posting to ${platform}...`);
-
-    // TODO: Implement actual social media posting
-    // For now, this is a placeholder that logs the action
-
     let result = { success: false, post_url: null };
 
     switch (platform) {
       case "instagram":
-        result = await postToInstagram(video_url, caption);
+        result = await postToInstagram(video_url, caption ?? "");
         break;
       case "youtube":
-        result = await postToYouTube(video_url, caption);
+        result = await postToYouTube(video_url, caption ?? "");
         break;
       case "tiktok":
-        result = await postToTikTok(video_url, caption);
+        result = await postToTikTok(video_url, caption ?? "");
         break;
       default:
         throw new Error(`Unsupported platform: ${platform}`);
     }
 
-    // Update Firestore with posting record
     const db = getAdminDb();
     const docRef = db.collection("video_sessions").doc(session_id);
     const doc = await docRef.get();
@@ -57,9 +56,7 @@ export async function POST(request) {
     return NextResponse.json({
       success: result.success,
       post_url: result.post_url,
-      message: result.success
-        ? `Posted to ${platform} successfully`
-        : `Failed to post to ${platform}`,
+      message: result.message ?? (result.success ? `Posted to ${platform} successfully` : `Failed to post to ${platform}`),
     });
   } catch (error) {
     console.error("Post social error:", error);
@@ -70,179 +67,315 @@ export async function POST(request) {
   }
 }
 
-// Instagram posting (placeholder)
+/**
+ * Instagram Graph API: upload by URL only (no download on our side).
+ * Credentials from env (INSTAGRAM_USER_ID, INSTAGRAM_ACCESS_TOKEN) or from OAuth (Firestore integrations/instagram).
+ * @see getInstagramCredentials, /api/auth/instagram
+ */
 async function postToInstagram(videoUrl, caption) {
-  // TODO: Implement Instagram Graph API posting
-  // Requires: Instagram Business Account, Facebook Page, Access Token
-  // API: https://developers.facebook.com/docs/instagram-api/guides/content-publishing
+  const creds = await getInstagramCredentials();
 
-  console.log("Instagram posting not implemented yet");
-  console.log("Video URL:", videoUrl);
-  console.log("Caption:", caption);
+  if (!creds?.user_id || !creds?.access_token) {
+    return {
+      success: false,
+      post_url: null,
+      message:
+        "Instagram is not connected. Connect via OAuth: open /api/auth/instagram in the browser, or set INSTAGRAM_USER_ID and INSTAGRAM_ACCESS_TOKEN in env.",
+    };
+  }
 
-  // For now, return mock success
-  return {
-    success: true,
-    post_url: "https://instagram.com/p/mock-post-id",
-  };
+  const igUserId = creds.user_id;
+  const accessToken = creds.access_token;
 
-  /* Example implementation:
+  const baseUrl = `https://graph.facebook.com/${INSTAGRAM_GRAPH_VERSION}`;
 
-  const igUserId = process.env.INSTAGRAM_USER_ID;
-  const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN;
+  // 1) Create media container (Reels with video_url)
+  const createRes = await fetch(`${baseUrl}/${igUserId}/media`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      media_type: "REELS",
+      video_url: videoUrl,
+      caption: caption.slice(0, 2200),
+      access_token: accessToken,
+    }),
+  });
 
-  // Step 1: Create media container
-  const containerResponse = await fetch(
-    `https://graph.facebook.com/v18.0/${igUserId}/media`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        video_url: videoUrl,
-        caption: caption,
-        access_token: accessToken,
-      }),
+  const createData = await createRes.json();
+  if (createData.error) {
+    const msg = createData.error.message || JSON.stringify(createData.error);
+    return { success: false, post_url: null, message: `Instagram: ${msg}` };
+  }
+  const creationId = createData.id;
+  if (!creationId) {
+    return { success: false, post_url: null, message: "Instagram: No container id returned." };
+  }
+
+  // 2) Poll container status until FINISHED or ERROR
+  for (let i = 0; i < INSTAGRAM_CONTAINER_POLL_MAX; i++) {
+    await new Promise((r) => setTimeout(r, INSTAGRAM_CONTAINER_POLL_MS));
+    const statusRes = await fetch(
+      `${baseUrl}/${creationId}?fields=status_code&access_token=${encodeURIComponent(accessToken)}`
+    );
+    const statusData = await statusRes.json();
+    if (statusData.error) {
+      return {
+        success: false,
+        post_url: null,
+        message: `Instagram status check: ${statusData.error.message || "Unknown error"}`,
+      };
     }
-  );
-
-  const containerData = await containerResponse.json();
-  const creationId = containerData.id;
-
-  // Step 2: Wait for processing (check status)
-  // Step 3: Publish
-  const publishResponse = await fetch(
-    `https://graph.facebook.com/v18.0/${igUserId}/media_publish`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        creation_id: creationId,
-        access_token: accessToken,
-      }),
+    const code = statusData.status_code;
+    if (code === "FINISHED") break;
+    if (code === "ERROR" || code === "EXPIRED") {
+      return {
+        success: false,
+        post_url: null,
+        message: `Instagram container ${code}. Check video format and URL accessibility.`,
+      };
     }
-  );
+    // IN_PROGRESS or other: keep polling
+  }
 
-  const publishData = await publishResponse.json();
-  return {
-    success: true,
-    post_url: `https://instagram.com/p/${publishData.id}`,
-  };
-  */
+  // 3) Publish
+  const publishRes = await fetch(`${baseUrl}/${igUserId}/media_publish`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      creation_id: creationId,
+      access_token: accessToken,
+    }),
+  });
+
+  const publishData = await publishRes.json();
+  if (publishData.error) {
+    return {
+      success: false,
+      post_url: null,
+      message: `Instagram publish: ${publishData.error.message || "Unknown error"}`,
+    };
+  }
+  const mediaId = publishData.id;
+  const postUrl = mediaId ? `https://www.instagram.com/reel/${mediaId}/` : null;
+  return { success: true, post_url: postUrl, message: "Posted to Instagram." };
 }
 
-// YouTube posting (placeholder)
+/**
+ * YouTube Data API v3: upload via API only (no manual user download/upload).
+ * YouTube does not support "upload from URL"; we must send bytes. We use resumable upload
+ * and stream from the source URL in chunks so we never buffer the full file in memory.
+ * Env: YOUTUBE_ACCESS_TOKEN (OAuth2 access token with youtube.upload scope).
+ */
 async function postToYouTube(videoUrl, caption) {
-  // TODO: Implement YouTube Data API posting
-  // Requires: OAuth 2.0, YouTube API credentials
-  // API: https://developers.google.com/youtube/v3/docs/videos/insert
-
-  console.log("YouTube posting not implemented yet");
-  console.log("Video URL:", videoUrl);
-  console.log("Caption:", caption);
-
-  // For now, return mock success
-  return {
-    success: true,
-    post_url: "https://youtube.com/watch?v=mock-video-id",
-  };
-
-  /* Example implementation:
-
   const accessToken = process.env.YOUTUBE_ACCESS_TOKEN;
+  if (!accessToken) {
+    return {
+      success: false,
+      post_url: null,
+      message:
+        "YouTube posting is not configured. Set YOUTUBE_ACCESS_TOKEN (OAuth2 with youtube.upload scope).",
+    };
+  }
 
-  // Step 1: Download video
-  const videoResponse = await fetch(videoUrl);
-  const videoBuffer = await videoResponse.arrayBuffer();
-
-  // Step 2: Upload to YouTube
-  const uploadResponse = await fetch(
-    "https://www.googleapis.com/upload/youtube/v3/videos?uploadType=multipart&part=snippet,status",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "multipart/related; boundary=boundary",
-      },
-      body: createMultipartBody(videoBuffer, {
-        snippet: {
-          title: caption.substring(0, 100),
-          description: caption,
-          categoryId: "22", // People & Blogs
-        },
-        status: {
-          privacyStatus: "public",
-          selfDeclaredMadeForKids: false,
-        },
-      }),
-    }
-  );
-
-  const uploadData = await uploadResponse.json();
-  return {
-    success: true,
-    post_url: `https://youtube.com/watch?v=${uploadData.id}`,
+  const title = (caption || "Video").slice(0, 100);
+  const metadata = {
+    snippet: {
+      title,
+      description: (caption || "").slice(0, 5000),
+      categoryId: "22",
+    },
+    status: {
+      privacyStatus: "public",
+      selfDeclaredMadeForKids: false,
+    },
   };
-  */
+
+  // Get total size (required for resumable init). Stream in 256KB chunks if size known.
+  let totalSize = null;
+  const headRes = await fetch(videoUrl, { method: "HEAD" });
+  if (headRes.ok) {
+    const cl = headRes.headers.get("Content-Length");
+    if (cl) totalSize = parseInt(cl, 10);
+  }
+  if (totalSize == null || !Number.isFinite(totalSize) || totalSize <= 0) {
+    const fallback = await uploadYouTubeFallbackBuffer(videoUrl, accessToken, metadata);
+    if (!fallback.success) return { success: false, post_url: null, message: fallback.message };
+    const postUrl = fallback.videoId ? `https://www.youtube.com/watch?v=${fallback.videoId}` : null;
+    return { success: true, post_url: postUrl, message: "Uploaded to YouTube." };
+  }
+
+  const uploadUrl = await initYouTubeResumableUpload(accessToken, metadata, totalSize);
+  if (!uploadUrl) {
+    return { success: false, post_url: null, message: "YouTube: Failed to init resumable upload." };
+  }
+
+  const result = await streamUploadToYouTube(videoUrl, uploadUrl, accessToken, totalSize, metadata);
+  if (!result.success) {
+    return { success: false, post_url: null, message: result.message ?? "YouTube upload failed." };
+  }
+  const videoId = result.videoId;
+  const postUrl = videoId ? `https://www.youtube.com/watch?v=${videoId}` : null;
+  return { success: true, post_url: postUrl, message: "Uploaded to YouTube." };
 }
 
-// TikTok posting (placeholder)
-async function postToTikTok(videoUrl, caption) {
-  // TODO: Implement TikTok API posting
-  // Requires: TikTok Developer account, OAuth tokens
-  // API: https://developers.tiktok.com/doc/content-posting-api-get-started
+const YOUTUBE_CHUNK_SIZE = 256 * 1024; // 256 KB (required multiple for resumable chunks)
 
-  console.log("TikTok posting not implemented yet");
-  console.log("Video URL:", videoUrl);
-  console.log("Caption:", caption);
-
-  // For now, return mock success
-  return {
-    success: true,
-    post_url: "https://tiktok.com/@username/video/mock-video-id",
-  };
-
-  /* Example implementation:
-
-  const accessToken = process.env.TIKTOK_ACCESS_TOKEN;
-
-  // Step 1: Download video
-  const videoResponse = await fetch(videoUrl);
-  const videoBuffer = await videoResponse.arrayBuffer();
-
-  // Step 2: Upload to TikTok
-  const uploadResponse = await fetch(
-    "https://open.tiktokapis.com/v2/post/publish/video/init/",
+async function initYouTubeResumableUpload(accessToken, metadata, totalSize) {
+  const res = await fetch(
+    "https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status",
     {
       method: "POST",
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
+        "Content-Type": "application/json; charset=UTF-8",
+        "X-Upload-Content-Type": "video/mp4",
+        "X-Upload-Content-Length": String(totalSize),
       },
-      body: JSON.stringify({
-        post_info: {
-          title: caption,
-          privacy_level: "PUBLIC_TO_EVERYONE",
-          disable_duet: false,
-          disable_comment: false,
-          disable_stitch: false,
-          video_cover_timestamp_ms: 1000,
-        },
-        source_info: {
-          source: "FILE_UPLOAD",
-          video_size: videoBuffer.byteLength,
-          chunk_size: 10485760, // 10MB chunks
-          total_chunk_count: Math.ceil(videoBuffer.byteLength / 10485760),
-        },
-      }),
+      body: JSON.stringify(metadata),
     }
   );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    console.error("YouTube resumable init error:", err);
+    return null;
+  }
+  return res.headers.get("Location");
+}
 
-  const uploadData = await uploadResponse.json();
-  // ... continue with chunk upload and publishing
+async function streamUploadToYouTube(videoUrl, uploadUrl, accessToken, totalSize, metadata) {
+  const getRes = await fetch(videoUrl);
+  if (!getRes.ok) {
+    return { success: false, videoId: null, message: `Failed to fetch video: ${getRes.status}` };
+  }
+  const reader = getRes.body?.getReader?.();
+  if (!reader) {
+    return await uploadYouTubeFallbackBuffer(videoUrl, accessToken, metadata);
+  }
 
+  let offset = 0;
+  let buffer = [];
+  let buffered = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (value?.length) {
+      buffer.push(value);
+      buffered += value.length;
+    }
+    const shouldSend = done ? buffered > 0 : buffered >= YOUTUBE_CHUNK_SIZE;
+    if (!shouldSend && !done) continue;
+
+    if (buffered > 0) {
+      const toSend = Math.min(buffered, done ? buffered : YOUTUBE_CHUNK_SIZE);
+      const chunk = new Uint8Array(toSend);
+      let filled = 0;
+      while (filled < toSend && buffer.length) {
+        const b = buffer[0];
+        const take = Math.min(b.length, toSend - filled);
+        chunk.set(b.subarray(0, take), filled);
+        filled += take;
+        if (take >= b.length) buffer.shift();
+        else buffer[0] = b.subarray(take);
+      }
+      buffered -= toSend;
+      const end = offset + toSend - 1;
+      const put = await putYouTubeChunk(uploadUrl, accessToken, chunk, offset, end, totalSize);
+      if (put?.id) return { success: true, videoId: put.id, message: null };
+      if (put?.error) return { success: false, videoId: null, message: put.error.message || "Upload failed" };
+      offset = end + 1;
+    }
+    if (done) break;
+  }
+  return { success: false, videoId: null, message: "YouTube upload did not return video id." };
+}
+
+async function putYouTubeChunk(uploadUrl, accessToken, body, start, end, total) {
+  const res = await fetch(uploadUrl, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "video/mp4",
+      "Content-Length": String(body.length),
+      "Content-Range": `bytes ${start}-${end}/${total}`,
+    },
+    body,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 200 || res.status === 201) return data;
+  if (res.status === 308) return null; // more chunks to send
+  return { error: data.error || { message: `HTTP ${res.status}` } };
+}
+
+async function uploadYouTubeFallbackBuffer(videoUrl, accessToken, metadata) {
+  const videoRes = await fetch(videoUrl);
+  if (!videoRes.ok) {
+    return { success: false, videoId: null, message: `Failed to fetch video: ${videoRes.status}` };
+  }
+  const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
+  const total = videoBuffer.length;
+  const title = (metadata?.snippet?.title || "Video").slice(0, 100);
+  const fallbackMetadata = metadata || {
+    snippet: { title, description: "", categoryId: "22" },
+    status: { privacyStatus: "public", selfDeclaredMadeForKids: false },
+  };
+  const uploadUrl = await initYouTubeResumableUpload(accessToken, fallbackMetadata, total);
+  if (!uploadUrl) {
+    return { success: false, videoId: null, message: "YouTube: Failed to init upload." };
+  }
+  const put = await putYouTubeChunk(uploadUrl, accessToken, videoBuffer, 0, total - 1, total);
+  if (put?.id) return { success: true, videoId: put.id, message: null };
+  return { success: false, videoId: null, message: put?.error?.message || "YouTube upload failed" };
+}
+
+/**
+ * TikTok Content Posting API: PULL_FROM_URL sends video to user's inbox (draft).
+ * Video URL domain must be verified in TikTok Developer Portal.
+ * Env: TIKTOK_ACCESS_TOKEN (user access token with video.upload scope).
+ */
+async function postToTikTok(videoUrl, caption) {
+  const accessToken = process.env.TIKTOK_ACCESS_TOKEN;
+  if (!accessToken) {
+    return {
+      success: false,
+      post_url: null,
+      message:
+        "TikTok posting is not configured. Set TIKTOK_ACCESS_TOKEN (with video.upload scope).",
+    };
+  }
+
+  const initRes = await fetch("https://open.tiktokapis.com/v2/post/publish/inbox/video/init/", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json; charset=UTF-8",
+    },
+    body: JSON.stringify({
+      source_info: {
+        source: "PULL_FROM_URL",
+        video_url: videoUrl,
+      },
+    }),
+  });
+
+  const initData = await initRes.json();
+  const err = initData.error;
+  if (err && err.code !== "ok") {
+    const msg = err.message || err.code || JSON.stringify(err);
+    return {
+      success: false,
+      post_url: null,
+      message: `TikTok: ${msg}. (For PULL_FROM_URL, verify the video URL domain in TikTok Developer Portal.)`,
+    };
+  }
+
+  const publishId = initData.data?.publish_id;
+  // Inbox uploads go to the user's TikTok inbox; there is no direct post URL until they publish in-app.
+  const postUrl = "https://www.tiktok.com/notifications/inbox";
   return {
     success: true,
-    post_url: uploadData.share_url,
+    post_url: postUrl,
+    message: publishId
+      ? "Video sent to your TikTok inbox. Open TikTok app to edit and publish."
+      : "Video sent to TikTok inbox.",
   };
-  */
 }
