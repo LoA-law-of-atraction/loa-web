@@ -217,6 +217,7 @@ function VideoGeneratorContent() {
   const [loadingFalVideoPricing, setLoadingFalVideoPricing] = useState(false);
   const [instagramConnected, setInstagramConnected] = useState(false);
   const [instagramStatusLoading, setInstagramStatusLoading] = useState(false);
+  const [instagramTokenDebug, setInstagramTokenDebug] = useState(null);
 
   // Fill missing per-scene negative prompts with a sensible default (do not overwrite explicit empty strings)
   useEffect(() => {
@@ -1251,14 +1252,20 @@ function VideoGeneratorContent() {
       .catch(() => {});
   }, [step, musicDefaultDescription]);
 
-  // Instagram connection status (step 7 or after OAuth redirect)
+  // Instagram connection status (step 7 or after OAuth redirect); fetch token debug for display after connect
   useEffect(() => {
     if (step !== 7 && searchParams.get("instagram") !== "connected") return;
     setInstagramStatusLoading(true);
-    fetch("/api/auth/instagram/status")
+    fetch("/api/auth/instagram/status?debug=1")
       .then((r) => r.json())
-      .then((data) => setInstagramConnected(!!data.connected))
-      .catch(() => setInstagramConnected(false))
+      .then((data) => {
+        setInstagramConnected(!!data.connected);
+        setInstagramTokenDebug(data.debug || null);
+      })
+      .catch(() => {
+        setInstagramConnected(false);
+        setInstagramTokenDebug(null);
+      })
       .finally(() => setInstagramStatusLoading(false));
   }, [step, searchParams]);
 
@@ -4659,6 +4666,7 @@ function VideoGeneratorContent() {
       const data = await res.json();
       if (data.success) {
         setInstagramConnected(false);
+        setInstagramTokenDebug(null);
         await alert("Instagram disconnected. Click \"Connect Instagram\" to connect again.", "success");
       } else {
         await alert(data.error || "Failed to disconnect", "error");
@@ -10023,6 +10031,16 @@ function VideoGeneratorContent() {
                       >
                         Disconnect Instagram
                       </button>
+                      {instagramTokenDebug && (
+                        <div className="mt-2 p-3 rounded-lg bg-gray-100 dark:bg-gray-800 text-left text-xs font-mono break-all">
+                          <div className="font-semibold text-gray-600 dark:text-gray-400 mb-1">Token (debug, stored after connect)</div>
+                          <div>Preview: {instagramTokenDebug.access_token_preview ?? "—"}</div>
+                          {instagramTokenDebug.access_token != null && (
+                            <div className="mt-1">Token: {instagramTokenDebug.access_token}</div>
+                          )}
+                          <div className="mt-1 text-gray-500">Length: {instagramTokenDebug.access_token_length ?? "—"}</div>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <a

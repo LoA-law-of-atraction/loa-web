@@ -8,7 +8,21 @@ import { getInstagramRedirectUri } from "@/utils/instagramOAuthConfig";
 
 const INSTAGRAM_STATE_COOKIE = "instagram_oauth_state";
 const INSTAGRAM_STATE_MAX_AGE = 600; // 10 min
-/** State format: randomHex or randomHex:encodeURIComponent(returnToPath) so return path survives redirect without cookies */
+
+function base64UrlEncode(buf) {
+  const b = Buffer.isBuffer(buf) ? buf : Buffer.from(buf);
+  return b.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+/** Build signed state so callback can verify without relying on cookies (which may not be sent on cross-site redirect). */
+function buildSignedState(returnToPath, secret) {
+  const payload = { r: crypto.randomBytes(24).toString("hex"), p: returnToPath || "" };
+  const payloadJson = JSON.stringify(payload);
+  const payloadB64 = base64UrlEncode(Buffer.from(payloadJson, "utf8"));
+  const sig = crypto.createHmac("sha256", secret).update(payloadJson).digest();
+  const sigB64 = base64UrlEncode(sig);
+  return `${payloadB64}.${sigB64}`;
+}
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -41,9 +55,8 @@ export async function GET(request) {
     !returnTo.startsWith("//")
       ? returnTo
       : null;
-  const state =
-    crypto.randomBytes(24).toString("hex") +
-    (safeReturnTo ? ":" + encodeURIComponent(safeReturnTo) : "");
+
+  const state = buildSignedState(safeReturnTo, clientSecret);
 
   const sdk = new InstagramOAuthSdk({
     clientId,
