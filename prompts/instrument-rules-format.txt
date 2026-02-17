@@ -1,12 +1,11 @@
-# Instrument rules format for music prompt generation
-# LOA music concept: existential, sentimental, retro-futuristic noir.
-# Heavy and emotionally weighty, not wellness.
+# Instrument rules format (fallback when no instruments loaded)
+# Piano = emotional lead. Pads = world. LOA music concept: existential, sentimental, retro-futuristic noir.
 
-primary_label=PRIMARY (sustained analog synth pad — main harmonic voice)
-secondary_label=SECONDARY (low harmonic pad / drone — subtle support for weight and depth)
-conditional_label=CONDITIONAL (soft felt piano — distant, sparse sustained chords only; no melody)
+primary_label=PRIMARY (soft felt piano — emotional lead, carries chord progression)
+secondary_label=SECONDARY (analog synth pad — creates world/atmosphere behind piano)
+conditional_label=CONDITIONAL (low harmonic pad/drone — optional, 10–20% max)
 forbidden_label=DO NOT USE
 
-fallback_empty=Film score aesthetic, not meditation or wellness. Sustained analog synth pads in minor key, emotionally heavy and restrained, subtle harmonic tension, nocturnal cold urban undertone, metallic restraint. No rhythm, no drums, no vocals, no melody.
+fallback_empty=Piano-led: soft felt piano carries chord progression and harmonic movement, expressive but restrained. Analog synth pads create depth and atmosphere behind the piano, sustain and move slowly. Minor key, emotionally heavy and restrained, subtle harmonic tension, nocturnal cold urban undertone. No rhythm, no drums, no vocals, no melodic lead. Harmonic storytelling, not melodic performance.
 
-closing=If more than two instruments are noticeable, it is wrong. Sustained, static, emotionally weighty — unresolved and inevitable. Solitary, not soothing. No cinematic builds, no tension arcs, no relaxation intent.
+closing=Piano leads harmonically and emotionally; pads create the world behind it. Sustained, intimate, nocturnal. No cinematic builds, no tension arcs, no relaxation intent.

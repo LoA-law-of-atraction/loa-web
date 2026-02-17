@@ -673,18 +673,12 @@ function VideoGeneratorContent() {
   });
   const [generatingMusicPlan, setGeneratingMusicPlan] = useState(false);
   const [generatingMusicPrompt, setGeneratingMusicPrompt] = useState(false);
-  const [availableMusicThemes, setAvailableMusicThemes] = useState([]);
-  const [defaultMusicThemeId, setDefaultMusicThemeId] = useState(null);
-  const [selectedMusicThemeId, setSelectedMusicThemeId] = useState(null);
-  const [showMusicThemePicker, setShowMusicThemePicker] = useState(false);
+  const [musicPromptReview, setMusicPromptReview] = useState(null);
   const [availableMusicFromCollection, setAvailableMusicFromCollection] =
     useState([]);
   const [loadingMusicCollection, setLoadingMusicCollection] = useState(false);
   const [showMusicCollectionPicker, setShowMusicCollectionPicker] =
     useState(false);
-  const [availableInstruments, setAvailableInstruments] = useState([]);
-  const [selectedInstrumentIds, setSelectedInstrumentIds] = useState([]);
-  const [useInstrumentPalette, setUseInstrumentPalette] = useState(true);
   const [selectedMusicModelId, setSelectedMusicModelId] = useState("stable-audio-25");
   const [isPlayingWithVoiceover, setIsPlayingWithVoiceover] = useState(false);
   const playWithVoiceoverRef = useRef({ voiceover: null, music: null });
@@ -1008,7 +1002,6 @@ function VideoGeneratorContent() {
     loadMultipleAnglesPricing();
     loadFalVideoPricing();
     loadMusicPricing("stable-audio-25");
-    loadAvailableMusicThemes();
   }, []);
 
   useEffect(() => {
@@ -1161,19 +1154,6 @@ function VideoGeneratorContent() {
     }
   }, [scriptData?.script, currentProjectId, step]);
 
-  // Auto-save selected music theme when it changes (Step 5)
-  useEffect(() => {
-    if (currentProjectId && step === 5) {
-      fetch(`/api/projects/${currentProjectId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          selected_music_theme_id: selectedMusicThemeId ?? null,
-        }),
-      }).catch(() => {});
-    }
-  }, [currentProjectId, step, selectedMusicThemeId]);
-
   // Auto-save music prompt when it changes (Step 5, debounced)
   useEffect(() => {
     if (currentProjectId && step === 5) {
@@ -1298,11 +1278,9 @@ function VideoGeneratorContent() {
     }
   }, [step, currentProjectId, selectedCharacter?.character_id]);
 
-  // Load project-generated music, themes, and instruments when entering step 5
+  // Load project-generated music when entering step 5
   useEffect(() => {
     if (step !== 5) return;
-    loadAvailableMusicThemes();
-    loadAvailableInstruments();
     if (currentProjectId) loadAvailableMusicFromCollection();
   }, [step, currentProjectId]);
 
@@ -1657,31 +1635,6 @@ function VideoGeneratorContent() {
     }
   };
 
-  const loadAvailableMusicThemes = async () => {
-    try {
-      const response = await fetch("/api/music-themes/list");
-      const result = await response.json();
-      if (result.success) {
-        if (result.music_themes) setAvailableMusicThemes(result.music_themes);
-        setDefaultMusicThemeId(result.default_theme_id || null);
-      }
-    } catch (error) {
-      console.error("Failed to load music themes:", error);
-    }
-  };
-
-  const loadAvailableInstruments = async () => {
-    try {
-      const response = await fetch("/api/instruments/list");
-      const result = await response.json();
-      if (result.success) {
-        if (result.instruments) setAvailableInstruments(result.instruments);
-      }
-    } catch (error) {
-      console.error("Failed to load instruments:", error);
-    }
-  };
-
   const loadAvailableMusicFromCollection = async () => {
     setLoadingMusicCollection(true);
     try {
@@ -2003,9 +1956,6 @@ function VideoGeneratorContent() {
         setMusicNegativePrompt(
           result.project.music_negative_prompt?.trim() ||
             DEFAULT_MUSIC_NEGATIVE_PROMPT,
-        );
-        setSelectedMusicThemeId(
-          result.project.selected_music_theme_id ?? null,
         );
         console.log(
           "Loaded project costs on project select:",
@@ -8809,127 +8759,21 @@ function VideoGeneratorContent() {
             </div>
           )}
 
-          {/* Theme – selected or default */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between gap-3 mb-2">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
-                Music theme
-              </label>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    loadAvailableMusicThemes();
-                    setShowMusicThemePicker(true);
-                  }}
-                  className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 dark:bg-gray-950 dark:text-gray-200 dark:border-gray-800 dark:hover:bg-gray-900"
-                  title="Select a music theme from the library"
-                >
-                  {selectedMusicThemeId
-                    ? availableMusicThemes.find(
-                        (t) => t.id === selectedMusicThemeId,
-                      )?.name || "Theme"
-                    : defaultMusicThemeId
-                      ? (availableMusicThemes.find(
-                          (t) => t.id === defaultMusicThemeId,
-                        )?.name || "Theme") + " (default)"
-                      : "🎵 Select theme"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    loadAvailableMusicFromCollection();
-                    setShowMusicCollectionPicker(true);
-                  }}
-                  className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 dark:bg-gray-950 dark:text-gray-200 dark:border-gray-800 dark:hover:bg-gray-900"
-                  title="Select previously generated music from the collection"
-                >
-                  📀 Select from collection
-                </button>
-                {selectedMusicThemeId && (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedMusicThemeId(null)}
-                    className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                    title="Clear theme selection"
-                  >
-                    Clear
-                  </button>
-                )}
-                <a
-                  href="/admin/music-themes"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-xs px-2 py-1 rounded border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 dark:bg-gray-950 dark:text-gray-300 dark:border-gray-800"
-                  title="Manage music theme library"
-                >
-                  Manage
-                </a>
-              </div>
-            </div>
-
-            {/* Instrument palette – brand rules for prompt generation */}
-            <div className="mb-6">
-              <div className="flex items-center justify-between gap-3 mb-2">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
-                  Instrument palette
-                </label>
-                <div className="flex items-center gap-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={useInstrumentPalette}
-                      onChange={(e) =>
-                        setUseInstrumentPalette(e.target.checked)
-                      }
-                      className="rounded border-gray-300"
-                    />
-                    <span className="text-xs text-gray-600 dark:text-gray-300">
-                      Apply instrument rules to prompts
-                    </span>
-                  </label>
-                  <a
-                    href="/admin/instruments"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-xs px-2 py-1 rounded border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 dark:bg-gray-950 dark:text-gray-300 dark:border-gray-800"
-                    title="Manage instrument palette"
-                  >
-                    Manage
-                  </a>
-                </div>
-              </div>
-              {useInstrumentPalette && availableInstruments.length > 0 && (
-                <details className="px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/30">
-                  <summary className="text-xs font-medium text-gray-500 dark:text-gray-400 cursor-pointer list-none">
-                    {availableInstruments.map((i) => i.name).join(", ")}
-                    {availableInstruments.length > 8 && "…"}
-                  </summary>
-                  <div className="mt-2 text-xs text-gray-600 dark:text-gray-300">
-                    {availableInstruments.map((i) => i.name).join(", ")}
-                  </div>
-                </details>
-              )}
-            </div>
-
-            {(selectedMusicThemeId || defaultMusicThemeId) && (
-              <div className="mb-3 px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/30">
-                <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-                  Theme description (read-only)
-                </div>
-                <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                  {(
-                    availableMusicThemes.find(
-                      (t) =>
-                        t.id === (selectedMusicThemeId || defaultMusicThemeId),
-                    )?.description || ""
-                  ).trim() || "—"}
-                </div>
-              </div>
-            )}
+          <div className="mb-6 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                loadAvailableMusicFromCollection();
+                setShowMusicCollectionPicker(true);
+              }}
+              className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 dark:bg-gray-950 dark:text-gray-200 dark:border-gray-800 dark:hover:bg-gray-900"
+              title="Select previously generated music from the collection"
+            >
+              📀 Select from collection
+            </button>
           </div>
 
-          {/* Music prompt – generated from theme + topic + script, or custom */}
+          {/* Music prompt – generated from topic + script, or custom */}
           <div className="mb-6">
             <div className="flex items-center justify-between gap-3 mb-2">
               <label
@@ -8941,24 +8785,6 @@ function VideoGeneratorContent() {
               <button
                 type="button"
                 onClick={async () => {
-                  const theme =
-                    selectedMusicThemeId
-                      ? availableMusicThemes.find(
-                          (t) => t.id === selectedMusicThemeId,
-                        )
-                      : defaultMusicThemeId
-                        ? availableMusicThemes.find(
-                            (t) => t.id === defaultMusicThemeId,
-                          )
-                        : null;
-                  const themeDesc = theme?.description?.trim();
-                  if (!themeDesc) {
-                    await alert(
-                      "Select a theme or set a default theme first",
-                      "warning",
-                    );
-                    return;
-                  }
                   setGeneratingMusicPrompt(true);
                   try {
                     const res = await fetch(
@@ -8967,7 +8793,6 @@ function VideoGeneratorContent() {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
-                          theme_description: themeDesc,
                           topic: topic?.trim() || "",
                           script: scriptData?.script?.trim() || "",
                           scene_locations: (scriptData?.scenes || []).map(
@@ -8983,18 +8808,15 @@ function VideoGeneratorContent() {
                               };
                             },
                           ),
-                          use_instrument_palette: useInstrumentPalette,
-                          instrument_ids: useInstrumentPalette
-                            ? selectedInstrumentIds.length
-                              ? selectedInstrumentIds
-                              : undefined
-                            : undefined,
                         }),
                       },
                     );
                     const result = await res.json();
                     if (result.success && result.prompt?.trim()) {
-                      setMusicPrompt(result.prompt.trim());
+                      setMusicPromptReview({
+                        previousPrompt: musicPrompt,
+                        newPrompt: result.prompt.trim(),
+                      });
                     } else {
                       await alert(
                         "Failed to generate prompt: " +
@@ -9008,14 +8830,11 @@ function VideoGeneratorContent() {
                     setGeneratingMusicPrompt(false);
                   }
                 }}
-                disabled={
-                  generatingMusicPrompt ||
-                  !(selectedMusicThemeId || defaultMusicThemeId)
-                }
+                disabled={generatingMusicPrompt}
                 className="text-xs px-3 py-1.5 rounded-lg bg-violet-100 text-violet-800 hover:bg-violet-200 dark:bg-violet-900/40 dark:text-violet-200 dark:hover:bg-violet-900/60 disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Generate music prompt from theme + topic + voiceover script"
+                title="Generate music prompt from topic + voiceover script"
               >
-                {generatingMusicPrompt ? "Generating…" : "Generate from theme"}
+                {generatingMusicPrompt ? "Generating…" : "Generate prompt"}
               </button>
             </div>
             <textarea
@@ -9023,7 +8842,7 @@ function VideoGeneratorContent() {
               value={musicPrompt}
               onChange={(e) => setMusicPrompt(e.target.value)}
               rows={4}
-              placeholder="Generated from theme + topic + script, or enter custom prompt…"
+              placeholder="Generate prompt from topic + script, or enter custom prompt…"
               className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-900 dark:text-gray-100 dark:border-gray-800"
             />
           </div>
@@ -9326,7 +9145,7 @@ function VideoGeneratorContent() {
                   Generate new music
                 </div>
                 <p className="text-xs text-gray-600 dark:text-gray-400">
-                  Uses ElevenLabs Music (via Fal). Select a theme or enter a
+                  Uses the selected model (via Fal). Generate a prompt or enter a
                   description above.
                 </p>
               </div>
@@ -9336,20 +9155,10 @@ function VideoGeneratorContent() {
                     useCompositionPlan &&
                     Array.isArray(musicCompositionPlan?.sections) &&
                     musicCompositionPlan.sections.length > 0;
-                  const selectedTheme = selectedMusicThemeId
-                    ? availableMusicThemes.find(
-                        (t) => t.id === selectedMusicThemeId,
-                      )
-                    : defaultMusicThemeId
-                      ? availableMusicThemes.find(
-                          (t) => t.id === defaultMusicThemeId,
-                        )
-                      : null;
-                  const hasPrompt =
-                    musicPrompt.trim() || Boolean(selectedTheme?.description);
+                  const hasPrompt = Boolean(musicPrompt.trim());
 
                   if (!hasPlan && !hasPrompt) {
-                    await alert("Select a music theme or enter a description (or configure a composition plan)", "warning");
+                    await alert("Enter a music prompt or configure a composition plan", "warning");
                     return;
                   }
                   if (hasPlan && musicCompositionPlan.sections.some((s) => !s.section_name || !s.duration_ms)) {
@@ -9375,7 +9184,7 @@ function VideoGeneratorContent() {
                     );
 
                     const themeOrDescription =
-                      (hasPlan ? null : musicPrompt.trim() || selectedTheme?.description) || null;
+                      (hasPlan ? null : musicPrompt.trim()) || null;
 
                     // Use Music prompt (or theme description) as-is — no AI rewrite
                     const promptText = themeOrDescription;
@@ -9481,7 +9290,7 @@ function VideoGeneratorContent() {
                 <div className="flex items-center gap-3 mb-2">
                   <div className="animate-spin h-4 w-4 border-2 border-violet-600 border-t-transparent rounded-full"></div>
                   <span className="text-sm font-medium text-violet-900 dark:text-violet-100">
-                    Generating background music with ElevenLabs Music…
+                    Generating background music with {getMusicModelById(selectedMusicModelId).name}…
                   </span>
                 </div>
                 <div className="w-full bg-violet-200 dark:bg-violet-900/40 rounded-full h-2 overflow-hidden">
@@ -10161,145 +9970,6 @@ function VideoGeneratorContent() {
               >
                 Close
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Music Theme Picker Modal */}
-      {showMusicThemePicker && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-950 rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-800">
-            <div className="p-6 border-b border-gray-200 dark:border-gray-800">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
-                    🎵 Select Music Theme
-                  </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
-                    Pick a music theme for background music generation.
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <a
-                    href="/admin/music-themes"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-xs px-3 py-2 rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 dark:bg-gray-950 dark:text-gray-200 dark:border-gray-800 dark:hover:bg-gray-900"
-                    title="Manage music theme library"
-                  >
-                    Manage
-                  </a>
-                  <button
-                    onClick={() => setShowMusicThemePicker(false)}
-                    className="text-gray-400 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-200 text-2xl"
-                    aria-label="Close"
-                  >
-                    ×
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div
-              className="p-6 overflow-y-auto"
-              style={{ maxHeight: "calc(90vh - 180px)" }}
-            >
-              <div className="grid grid-cols-1 gap-4">
-                {availableMusicThemes.map((theme) => {
-                  const isCurrent = selectedMusicThemeId === theme.id;
-
-                  return (
-                    <button
-                      key={theme.id}
-                      onClick={() => {
-                        setSelectedMusicThemeId(theme.id);
-                        setMusicPrompt(theme.description || "");
-                        setShowMusicThemePicker(false);
-                      }}
-                      className={
-                        "text-left p-4 rounded-xl border-2 transition " +
-                        (isCurrent
-                          ? "border-violet-500 bg-violet-50 dark:bg-violet-950/20"
-                          : "border-gray-200 hover:border-violet-400 hover:bg-violet-50 dark:border-gray-800 dark:hover:bg-violet-950/20")
-                      }
-                    >
-                      <div className="flex items-start gap-2">
-                        <span className="text-xl">🎵</span>
-                        <div className="flex-1">
-                          <div className="font-semibold text-gray-900 dark:text-gray-100 text-base">
-                            {theme.name}
-                            {isCurrent && (
-                              <span className="ml-2 text-xs text-green-600 dark:text-green-300 font-normal">
-                                (Current)
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-sm text-gray-700 dark:text-gray-200 mt-1">
-                            {theme.description}
-                          </p>
-                          {theme.tags && theme.tags.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-3">
-                              {theme.tags.map((tag, idx) => (
-                                <span
-                                  key={idx}
-                                  className="px-2 py-0.5 bg-violet-100 text-violet-700 text-xs rounded-full dark:bg-violet-950/20 dark:text-violet-200"
-                                >
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-
-                {availableMusicThemes.length === 0 && (
-                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                    <p className="mb-2">No music themes available yet.</p>
-                    <p className="text-sm">
-                      Click &quot;Seed defaults&quot; in the{" "}
-                      <a
-                        href="/admin/music-themes"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-violet-600 hover:underline"
-                      >
-                        Music Themes
-                      </a>{" "}
-                      page.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="p-6 border-t border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-950/40">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {selectedMusicThemeId && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedMusicThemeId(null);
-                      setMusicPrompt("");
-                      setShowMusicThemePicker(false);
-                    }}
-                    className="w-full bg-red-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-red-700"
-                    title="Clear theme selection"
-                  >
-                    ✕ Clear selection
-                  </button>
-                )}
-                <button
-                  onClick={() => setShowMusicThemePicker(false)}
-                  className="w-full bg-gray-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-gray-700"
-                >
-                  Close
-                </button>
-              </div>
             </div>
           </div>
         </div>
@@ -12041,6 +11711,66 @@ function VideoGeneratorContent() {
                   </div>
                 </details>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Music Prompt Review Modal (Step 5) */}
+      {musicPromptReview && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[90] p-4 isolate">
+          <div className="bg-white dark:bg-gray-950 rounded-lg shadow-xl max-w-2xl w-full max-h-[85vh] overflow-hidden dark:border dark:border-gray-800">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-800">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                Review music prompt
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                Compare the current prompt with the generated one. Accept to apply, or Cancel to keep the current.
+              </p>
+            </div>
+            <div className="p-6 overflow-y-auto space-y-4" style={{ maxHeight: "calc(85vh - 180px)" }}>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
+                  Previous prompt
+                </label>
+                <div className="px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                  {(musicPromptReview.previousPrompt || "(empty)").trim() || "(empty)"}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
+                  New prompt
+                </label>
+                <textarea
+                  value={musicPromptReview.newPrompt}
+                  onChange={(e) =>
+                    setMusicPromptReview((prev) =>
+                      prev ? { ...prev, newPrompt: e.target.value } : prev,
+                    )
+                  }
+                  rows={6}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y"
+                />
+              </div>
+            </div>
+            <div className="p-6 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950/40 flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setMusicPromptReview(null)}
+                className="bg-gray-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMusicPrompt(musicPromptReview.newPrompt);
+                  setMusicPromptReview(null);
+                }}
+                className="bg-blue-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-blue-700"
+              >
+                Accept
+              </button>
             </div>
           </div>
         </div>
