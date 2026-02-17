@@ -91,7 +91,6 @@ export async function GET(request) {
   }
 
   const clientId = process.env.INSTAGRAM_CLIENT_ID;
-  const clientSecret = process.env.INSTAGRAM_CLIENT_SECRET;
   const redirectUri = getInstagramRedirectUri();
   LOG({ step: "callback", action: "exchange_prep", redirect_uri: redirectUri, hasClientId: !!clientId, hasClientSecret: !!clientSecret });
 
