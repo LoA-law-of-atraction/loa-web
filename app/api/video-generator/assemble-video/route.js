@@ -29,7 +29,7 @@ export async function POST(request) {
       // Convert proxy URLs back to original – ShotStack cloud fetches directly, needs real URLs
       const resolveProxyUrl = (src) => {
         if (!src || typeof src !== "string") return src;
-        if (src.includes("/api/video-generator/proxy-media?url=")) {
+        if (src.includes("/api/video-generator/proxy-media") && src.includes("url=")) {
           try {
             return decodeURIComponent(
               src.split("url=")[1]?.split("&")[0] || src,
