@@ -129,15 +129,15 @@ async function postToInstagram(videoUrl, caption) {
 
   const baseUrl = `https://graph.facebook.com/${INSTAGRAM_GRAPH_VERSION}`;
 
-  // 1) Create media container (Reels with video_url)
-  const createRes = await fetch(`${baseUrl}/${igUserId}/media`, {
+  // 1) Create media container (Reels with video_url). access_token as query param (Graph API expects it there).
+  const createUrl = `${baseUrl}/${igUserId}/media?access_token=${encodeURIComponent(accessToken)}`;
+  const createRes = await fetch(createUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       media_type: "REELS",
       video_url: videoUrl,
       caption: caption.slice(0, 2200),
-      access_token: accessToken,
     }),
   });
 
@@ -218,14 +218,12 @@ async function postToInstagram(videoUrl, caption) {
 
   LOG({ step: "post_instagram", action: "graph_publish_start", creation_id: creationId });
 
-  // 3) Publish
-  const publishRes = await fetch(`${baseUrl}/${igUserId}/media_publish`, {
+  // 3) Publish. creation_id and access_token as query params per Meta docs.
+  const publishUrl = `${baseUrl}/${igUserId}/media_publish?creation_id=${encodeURIComponent(creationId)}&access_token=${encodeURIComponent(accessToken)}`;
+  const publishRes = await fetch(publishUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      creation_id: creationId,
-      access_token: accessToken,
-    }),
+    body: JSON.stringify({}),
   });
 
   const publishData = await publishRes.json();
