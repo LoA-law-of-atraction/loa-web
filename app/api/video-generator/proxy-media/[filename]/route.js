@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
 /**
  * Proxies media with a filename in the path (e.g. Scene_1.mp4) so that
  * Shotstack Studio SDK sees a .mp4 path and can load the video. Reads the
