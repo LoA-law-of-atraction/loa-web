@@ -23,11 +23,11 @@ export async function GET(request) {
       return NextResponse.json({ error: "URL not allowed" }, { status: 403 });
     }
 
-    const res = await fetch(url, {
-      headers: {
-        Range: request.headers.get("range") || "",
-      },
-    });
+    const fetchHeaders = {};
+    const rangeHeader = request.headers.get("range");
+    if (rangeHeader) fetchHeaders["Range"] = rangeHeader;
+
+    const res = await fetch(url, { headers: fetchHeaders });
 
     if (!res.ok) {
       return NextResponse.json(
