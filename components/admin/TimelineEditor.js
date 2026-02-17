@@ -16,22 +16,33 @@ import {
 const DEBOUNCE_MS = 600;
 
 /** Return URL for timeline assets (video/audio).
- * Localhost: direct Firebase URL (dev bucket has CORS). Prod: proxy (prod bucket has no CORS). */
+ * Localhost: direct Firebase URL (dev bucket has CORS). Prod: proxy (prod bucket has no CORS).
+ * Unwrap nested proxy URLs – saved edits may contain proxy URLs; extract inner Firebase URL before re-proxying. */
 function proxyMediaUrlForTimeline(url, origin = null) {
   if (!url || typeof url !== "string") return url;
   const o = origin ?? (typeof window !== "undefined" ? window.location.origin : "");
   if (!o) return url;
+  let inner = url;
+  if (url.includes("/api/video-generator/proxy-media") && url.includes("url=")) {
+    try {
+      for (;;) {
+        const m = inner.match(/proxy-media(?:\/[^?]+)?\?url=([^&]+)/);
+        if (!m) break;
+        inner = decodeURIComponent(m[1]);
+      }
+    } catch {}
+  }
   if (
-    !url.includes("firebasestorage.googleapis.com") &&
-    !url.includes("storage.googleapis.com")
+    !inner.includes("firebasestorage.googleapis.com") &&
+    !inner.includes("storage.googleapis.com")
   ) {
     return url;
   }
   if (/^https?:\/\/localhost(:\d+)?$/.test(o)) {
-    return url;
+    return inner;
   }
-  const ext = /\.(mp3|m4a|wav|ogg|webm)(\?|$)/i.test(url) ? "audio.mp3" : "video.mp4";
-  return `${o}/api/video-generator/proxy-media/${ext}?url=${encodeURIComponent(url)}`;
+  const ext = /\.(mp3|m4a|wav|ogg|webm)(\?|$)/i.test(inner) ? "audio.mp3" : "video.mp4";
+  return `${o}/api/video-generator/proxy-media/${ext}?url=${encodeURIComponent(inner)}`;
 }
 
 /** Build volume for asset: number or tween array (Shotstack volume animation for configurable fade duration) */
