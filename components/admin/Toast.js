@@ -26,9 +26,12 @@ export function ToastProvider({ children }) {
   const showModal = (message, options = {}) => {
     return new Promise((resolve) => {
       const type = options.type || "info";
+      const firstLine = typeof message === "string" ? message.split("\n")[0]?.trim() : "";
       const defaultTitle =
-        type === "error"
-          ? "Something went wrong"
+        options.title != null
+          ? options.title
+          : type === "error"
+          ? (firstLine && firstLine.length <= 120 ? firstLine : "Something went wrong")
           : type === "warning"
             ? "Please confirm"
             : type === "success"
@@ -55,8 +58,8 @@ export function ToastProvider({ children }) {
     });
   };
 
-  const alert = (message, type = "info") => {
-    return showModal(message, { type });
+  const alert = (message, type = "info", options = {}) => {
+    return showModal(message, { type, ...options });
   };
 
   const confirm = (message, typeOrOptions = "warning", maybeOptions = {}) => {
@@ -231,7 +234,7 @@ export function ToastProvider({ children }) {
                   </h3>
                   <p
                     id={`toast-modal-desc-${modal.id}`}
-                    className="mt-1 text-sm text-gray-600 break-words overflow-wrap-anywhere dark:text-gray-300"
+                    className="mt-1 text-sm text-gray-600 break-words overflow-wrap-anywhere dark:text-gray-300 max-h-64 overflow-y-auto"
                   >
                     {modal.message}
                   </p>
