@@ -14,7 +14,7 @@ const fs = require("fs");
 require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 
 const COLLECTIONS = [
-  "integrations",     // Instagram token etc.
+  // DO NOT copy "integrations" – Instagram tokens are app-specific. Prod must connect via OAuth.
   "video_sessions",
   "projects",
   "characters",
