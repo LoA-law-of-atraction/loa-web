@@ -15,17 +15,19 @@ import {
  */
 const DEBOUNCE_MS = 600;
 
-/** Return proxy URL for Firebase/Storage URLs to avoid CORS when loading in the timeline (browser). */
+/** Return URL for timeline assets (video/audio).
+ * Use direct Firebase Storage URLs when CORS is configured on the bucket (see FIREBASE_CORS_SETUP.md).
+ * Direct URLs have .mp4/.mp3 in path so PixiJS/Shotstack parsers match. Proxy not needed with CORS. */
 function proxyMediaUrlForTimeline(url, origin = null) {
   if (!url || typeof url !== "string") return url;
-  const o = origin ?? (typeof window !== "undefined" ? window.location.origin : "");
-  if (!o) return url;
   if (
     url.includes("firebasestorage.googleapis.com") ||
     url.includes("storage.googleapis.com")
   ) {
-    return `${o}/api/video-generator/proxy-media?url=${encodeURIComponent(url)}`;
+    return url;
   }
+  const o = origin ?? (typeof window !== "undefined" ? window.location.origin : "");
+  if (!o) return url;
   return url;
 }
 
