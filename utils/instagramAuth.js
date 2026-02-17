@@ -30,10 +30,14 @@ function buildDebug(source, user_id, access_token) {
   return out;
 }
 
-/** Normalize token: trim and remove any whitespace/invisible chars that can cause "Cannot parse access token". */
+/** Normalize token: trim, remove whitespace and any non-printable chars that can cause "Cannot parse access token". */
 function normalizeToken(str) {
   if (typeof str !== "string") return "";
-  return str.replace(/\s+/g, "").trim();
+  // Strip whitespace, zero-width chars, and other invisible Unicode; keep only valid token chars
+  return str
+    .replace(/[\s\u200B-\u200D\uFEFF\u00AD]/g, "")
+    .replace(/[^\x20-\x7E]/g, "")
+    .trim();
 }
 
 /**
