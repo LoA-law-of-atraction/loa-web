@@ -38,12 +38,10 @@ function proxyMediaUrlForTimeline(url, origin = null) {
   ) {
     return url;
   }
-  const useDirect =
-    /^https?:\/\/localhost(:\d+)?$/.test(o) ||
-    /\.loa-lawofattraction\.co$/.test(o);
-  if (useDirect) {
-    return inner; // Direct URL – requires CORS on bucket (see FIREBASE_STORAGE_CORS.md)
+  if (/^https?:\/\/localhost(:\d+)?$/.test(o)) {
+    return inner; // Direct URL – dev bucket has CORS for localhost
   }
+  // Prod: always use proxy. Project may reference loa-dev URLs; dev bucket has no CORS for prod origin.
   const ext = /\.(mp3|m4a|wav|ogg|webm)(\?|$)/i.test(inner) ? "audio.mp3" : "video.mp4";
   return `${o}/api/video-generator/proxy-media/${ext}?url=${encodeURIComponent(inner)}`;
 }
