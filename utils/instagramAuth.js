@@ -38,11 +38,24 @@ function normalizeToken(str) {
 
 /**
  * Get Instagram credentials for Graph API posting (to post video to connected account).
- * Uses only Firestore (OAuth from "Connect Instagram"). Env INSTAGRAM_* is not used for posting.
+ * Priority: (1) Env INSTAGRAM_USER_ID + INSTAGRAM_ACCESS_TOKEN if both set; (2) Firestore OAuth.
  * @returns {{ user_id: string, access_token: string, _debug?: object } | null}
  */
 export async function getInstagramCredentials() {
   LOG({ step: "getCredentials", action: "start" });
+
+  // Manual env override – use when Firestore OAuth tokens fail (e.g. "Cannot parse access token")
+  const envUserId = typeof process.env.INSTAGRAM_USER_ID === "string" ? process.env.INSTAGRAM_USER_ID.trim() : "";
+  const envToken = normalizeToken(process.env.INSTAGRAM_ACCESS_TOKEN || "");
+  if (envUserId && envToken) {
+    LOG({ step: "getCredentials", outcome: "return_creds", source: "env", user_id_length: envUserId.length, access_token_length: envToken.length });
+    return {
+      user_id: envUserId,
+      access_token: envToken,
+      _debug: buildDebug("env", envUserId, envToken),
+    };
+  }
+
   const db = getAdminDb();
   const ref = db.collection("integrations").doc(INTEGRATIONS_DOC);
   const snap = await ref.get();
