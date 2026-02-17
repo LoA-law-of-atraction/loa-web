@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
 /**
  * Proxies media (video/audio) from Firebase Storage to avoid CORS when loading
  * in ShotStack Studio canvas. Only allows firebasestorage.googleapis.com URLs.

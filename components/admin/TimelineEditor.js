@@ -41,7 +41,11 @@ function proxyMediaUrlForTimeline(url, origin = null) {
   if (/^https?:\/\/localhost(:\d+)?$/.test(o)) {
     return inner; // Direct URL – dev bucket has CORS for localhost
   }
-  // Prod: always use proxy. Project may reference loa-dev URLs; dev bucket has no CORS for prod origin.
+  // Prod origin + prod bucket: use direct URL (CORS allows www.loa-lawofattraction.co)
+  if (/^https:\/\/(www\.)?loa-lawofattraction\.co$/.test(o) && inner.includes("loa-prod-a4834")) {
+    return inner;
+  }
+  // Prod viewing dev bucket, or other: use proxy (dev bucket has no CORS for prod)
   const ext = /\.(mp3|m4a|wav|ogg|webm)(\?|$)/i.test(inner) ? "audio.mp3" : "video.mp4";
   return `${o}/api/video-generator/proxy-media/${ext}?url=${encodeURIComponent(inner)}`;
 }
