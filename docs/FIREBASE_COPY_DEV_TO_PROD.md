@@ -6,7 +6,7 @@ Two ways to copy Firestore data from **loa-dev** to **loa-prod**.
 
 ## Option 1: Copy only what you need (e.g. Instagram) – Node script
 
-Use this when you only need specific collections (e.g. `integrations` for Instagram token, or a few collections).
+Use this when you only need specific collections (e.g. `projects`, `topics`). Note: do **not** copy `integrations` — Instagram tokens are app-specific; prod must connect via OAuth.
 
 1. Install dotenv: `npm install dotenv`
 2. Create a key file for **loa-prod** (or use `.env.prod` with prod vars).
@@ -17,7 +17,7 @@ Use this when you only need specific collections (e.g. `integrations` for Instag
 node scripts/copy-firestore-dev-to-prod.js
 ```
 
-The script copies the listed top-level collections from dev to prod. Edit the `COLLECTIONS` array in the script to choose which ones to copy. **Subcollections** (e.g. `projects/{id}/scenes`) are not copied by this script; use Option 2 for a full clone.
+The script copies the listed top-level collections from dev to prod. Edit the `COLLECTIONS` array in the script to choose which ones to copy. **Subcollections** (e.g. `projects/{id}/scenes`) are not copied by this script; use Option 2 for a full clone. `integrations` is excluded by default (prod must connect Instagram separately).
 
 ---
 
