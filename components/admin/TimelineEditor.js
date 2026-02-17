@@ -16,19 +16,22 @@ import {
 const DEBOUNCE_MS = 600;
 
 /** Return URL for timeline assets (video/audio).
- * Use direct Firebase Storage URLs when CORS is configured on the bucket (see FIREBASE_CORS_SETUP.md).
- * Direct URLs have .mp4/.mp3 in path so PixiJS/Shotstack parsers match. Proxy not needed with CORS. */
+ * Localhost: direct Firebase URL (dev bucket has CORS). Prod: proxy (prod bucket has no CORS). */
 function proxyMediaUrlForTimeline(url, origin = null) {
   if (!url || typeof url !== "string") return url;
+  const o = origin ?? (typeof window !== "undefined" ? window.location.origin : "");
+  if (!o) return url;
   if (
-    url.includes("firebasestorage.googleapis.com") ||
-    url.includes("storage.googleapis.com")
+    !url.includes("firebasestorage.googleapis.com") &&
+    !url.includes("storage.googleapis.com")
   ) {
     return url;
   }
-  const o = origin ?? (typeof window !== "undefined" ? window.location.origin : "");
-  if (!o) return url;
-  return url;
+  if (/^https?:\/\/localhost(:\d+)?$/.test(o)) {
+    return url;
+  }
+  const ext = /\.(mp3|m4a|wav|ogg|webm)(\?|$)/i.test(url) ? "audio.mp3" : "video.mp4";
+  return `${o}/api/video-generator/proxy-media/${ext}?url=${encodeURIComponent(url)}`;
 }
 
 /** Build volume for asset: number or tween array (Shotstack volume animation for configurable fade duration) */
