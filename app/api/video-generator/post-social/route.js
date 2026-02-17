@@ -127,7 +127,8 @@ async function postToInstagram(videoUrl, caption) {
     graph_url: `${INSTAGRAM_GRAPH_VERSION}/${igUserId}/media`,
   });
 
-  const baseUrl = `https://graph.facebook.com/${INSTAGRAM_GRAPH_VERSION}`;
+  // Use graph.instagram.com – tokens from Instagram Login fail on graph.facebook.com with "Cannot parse access token"
+  const baseUrl = `https://graph.instagram.com/${INSTAGRAM_GRAPH_VERSION}`;
 
   // 1) Create media container (Reels with video_url). access_token as query param (Graph API expects it there).
   const createUrl = `${baseUrl}/${igUserId}/media?access_token=${encodeURIComponent(accessToken)}`;
