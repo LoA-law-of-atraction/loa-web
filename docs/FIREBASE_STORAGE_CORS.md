@@ -1,29 +1,25 @@
 # Firebase Storage CORS Setup
 
-The timeline editor now proxies Firebase Storage URLs via `/api/video-generator/proxy-media` to avoid CORS. If you still see CORS errors (e.g. when loading videos directly elsewhere), or for direct loads:
+The timeline editor loads videos/audio directly from Firebase Storage when CORS is configured. Apply CORS to **both** dev and prod buckets.
 
-- `Access to video at 'https://firebasestorage.googleapis.com/...' from origin 'http://localhost:3000' has been blocked by CORS policy`
+## Apply CORS
 
-## Fix
-
-Apply the CORS config to your Firebase Storage bucket:
-
+**Dev bucket:**
 ```bash
 gsutil cors set cors.json gs://loa-dev-7447a.firebasestorage.app
 ```
 
-Or if using the default bucket:
-
+**Prod bucket (required for timeline editor on prod):**
 ```bash
-gsutil cors set cors.json gs://loa-dev-7447a.appspot.com
+gsutil cors set cors.json gs://loa-prod-a4834.firebasestorage.app
 ```
 
-To find your bucket name: Firebase Console → Storage → bucket URL (e.g. `loa-dev-7447a.firebasestorage.app`).
+`cors.json` allows: localhost, loa-dev-7447a.web.app, www.loa-lawofattraction.co, loa-lawofattraction.co.
 
 ## Verify
 
 ```bash
-gsutil cors get gs://loa-dev-7447a.firebasestorage.app
+gsutil cors get gs://loa-prod-a4834.firebasestorage.app
 ```
 
-You should see the `cors.json` contents. The timeline editor will then load Firebase videos/audio without CORS errors.
+You should see the `cors.json` contents. Timeline editor will then load videos/audio on prod without proxy/CORS errors.
