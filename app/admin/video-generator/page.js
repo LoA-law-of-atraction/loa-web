@@ -218,6 +218,13 @@ function VideoGeneratorContent() {
   const [instagramConnected, setInstagramConnected] = useState(false);
   const [instagramStatusLoading, setInstagramStatusLoading] = useState(false);
   const [instagramTokenDebug, setInstagramTokenDebug] = useState(null);
+  const [instagramCaption, setInstagramCaption] = useState("");
+  const [instagramCoverUrl, setInstagramCoverUrl] = useState(null);
+  const [socialTab, setSocialTab] = useState("instagram"); // instagram | youtube | tiktok
+  const [youtubeCaption, setYoutubeCaption] = useState("");
+  const [tiktokCaption, setTiktokCaption] = useState("");
+  const [generatingCaptionFor, setGeneratingCaptionFor] = useState(null); // "instagram" | "youtube" | "tiktok"
+  const [postProgress, setPostProgress] = useState(null); // { platform, status }
 
   // Fill missing per-scene negative prompts with a sensible default (do not overwrite explicit empty strings)
   useEffect(() => {
@@ -1182,6 +1189,35 @@ function VideoGeneratorContent() {
     }
   }, [musicNegativePrompt, currentProjectId, step]);
 
+  // Auto-save social captions and Instagram cover when on Step 7 (debounced)
+  useEffect(() => {
+    if (currentProjectId && step === 7) {
+      const debounce = setTimeout(() => {
+        const payload = {
+          social_captions: {
+            instagram: instagramCaption || "",
+            youtube: youtubeCaption || "",
+            tiktok: tiktokCaption || "",
+          },
+          instagram_cover_url: instagramCoverUrl || null,
+        };
+        fetch(`/api/projects/${currentProjectId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }).catch(() => {});
+      }, 800);
+      return () => clearTimeout(debounce);
+    }
+  }, [
+    instagramCaption,
+    youtubeCaption,
+    tiktokCaption,
+    instagramCoverUrl,
+    currentProjectId,
+    step,
+  ]);
+
   // Load ElevenLabs info when on Step 2
   useEffect(() => {
     if (step === 2) {
@@ -1962,6 +1998,19 @@ function VideoGeneratorContent() {
           result.project.costs,
         );
         setProjectCosts(result.project.costs || null);
+
+        // Load social captions and Instagram cover (Step 7)
+        const sc = result.project.social_captions;
+        if (sc && typeof sc === "object") {
+          setInstagramCaption(sc.instagram ?? "");
+          setYoutubeCaption(sc.youtube ?? "");
+          setTiktokCaption(sc.tiktok ?? "");
+        } else {
+          setInstagramCaption("");
+          setYoutubeCaption("");
+          setTiktokCaption("");
+        }
+        setInstagramCoverUrl(result.project.instagram_cover_url || null);
 
         // Load selected locations from scene docs.
         // Backward-compatible: migrate legacy project.location_mapping -> scenes[].location_id.
@@ -4577,6 +4626,15 @@ function VideoGeneratorContent() {
   // Step 5: Post to Social Media
   const handlePostToSocial = async (platform) => {
     setLoading(true);
+    setPostProgress({ platform, status: "Creating media container…" });
+    const statusInterval = setInterval(() => {
+      setPostProgress((p) => {
+        if (!p) return null;
+        if (p.status === "Creating media container…") return { ...p, status: "Uploading video…" };
+        if (p.status === "Uploading video…") return { ...p, status: "Publishing…" };
+        return p;
+      });
+    }, 12000);
     try {
       const response = await fetch("/api/video-generator/post-social", {
         method: "POST",
@@ -4585,11 +4643,15 @@ function VideoGeneratorContent() {
           session_id: sessionId,
           platform,
           video_url: finalVideoUrl,
-          caption: scriptData.script,
+          caption: (platform === "instagram" ? instagramCaption : platform === "youtube" ? youtubeCaption : tiktokCaption) || scriptData?.script || "",
+          ...(platform === "instagram" && instagramCoverUrl && { cover_url: instagramCoverUrl }),
         }),
       });
+      clearInterval(statusInterval);
+      setPostProgress((p) => (p ? { ...p, status: "Finishing…" } : null));
 
       const result = await response.json();
+      setPostProgress(null);
       if (result.success) {
         const msg = result.message || `Posted to ${platform} successfully!`;
         await alert(msg, "success");
@@ -4604,9 +4666,39 @@ function VideoGeneratorContent() {
         await alert(errMsg, "error");
       }
     } catch (error) {
+      clearInterval(statusInterval);
+      setPostProgress(null);
       await alert("Error: " + error.message, "error");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGenerateCaption = async (platform) => {
+    if (!scriptData?.script?.trim()) {
+      await alert("Generate a script first (Step 2)", "warning");
+      return;
+    }
+    setGeneratingCaptionFor(platform);
+    try {
+      const res = await fetch("/api/video-generator/generate-caption", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic: topic || "", script: scriptData.script, platform }),
+      });
+      const data = await res.json();
+      if (data.success && data.caption) {
+        if (platform === "instagram") setInstagramCaption(data.caption);
+        else if (platform === "youtube") setYoutubeCaption(data.caption);
+        else setTiktokCaption(data.caption);
+        await alert(`${platform.charAt(0).toUpperCase() + platform.slice(1)} caption generated`, "success");
+      } else {
+        await alert(data.error || "Failed to generate caption", "error");
+      }
+    } catch (e) {
+      await alert("Error: " + e.message, "error");
+    } finally {
+      setGeneratingCaptionFor(null);
     }
   };
 
@@ -9817,79 +9909,151 @@ function VideoGeneratorContent() {
               {/* Social Media Posting */}
               <div className="mb-8">
                 <h3 className="text-lg font-semibold mb-4">Post to Social Media</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {instagramStatusLoading ? (
-                    <div className="flex items-center justify-center gap-3 bg-gray-200 dark:bg-gray-700 text-gray-500 py-4 rounded-lg">
-                      <SiInstagram className="w-7 h-7 shrink-0" aria-hidden />
-                      Checking…
-                    </div>
-                  ) : instagramConnected ? (
-                    <div className="flex flex-col gap-2">
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Voiceover text
+                  </label>
+                  <div className="px-4 py-3 border rounded-lg bg-gray-50 dark:bg-gray-900 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-300 max-h-32 overflow-y-auto">
+                    {scriptData?.script || "—"}
+                  </div>
+                </div>
+
+                {/* Platform tabs */}
+                <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                  <div className="flex border-b border-gray-200 dark:border-gray-700">
+                    {["instagram", "youtube", "tiktok"].map((p) => (
                       <button
-                        onClick={() => handlePostToSocial("instagram")}
-                        disabled={loading}
-                        className="flex items-center justify-center gap-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-4 rounded-lg font-medium hover:opacity-90 disabled:opacity-50"
-                      >
-                        <SiInstagram className="w-7 h-7 shrink-0" aria-hidden />
-                        Post to Instagram
-                      </button>
-                      <button
+                        key={p}
                         type="button"
-                        onClick={handleDisconnectInstagram}
-                        className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 underline"
+                        onClick={() => setSocialTab(p)}
+                        className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 text-sm font-medium transition ${
+                          socialTab === p
+                            ? p === "instagram"
+                              ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white"
+                              : p === "youtube"
+                              ? "bg-red-600 text-white"
+                              : "bg-black text-white"
+                            : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+                        }`}
                       >
-                        Disconnect Instagram
+                        {p === "instagram" && <SiInstagram className="w-5 h-5" />}
+                        {p === "youtube" && <SiYoutube className="w-5 h-5" />}
+                        {p === "tiktok" && <SiTiktok className="w-5 h-5" />}
+                        {p.charAt(0).toUpperCase() + p.slice(1)}
                       </button>
-                      {instagramTokenDebug && (
-                        <div className="mt-2 p-3 rounded-lg bg-gray-100 dark:bg-gray-800 text-left text-xs font-mono break-all">
-                          <div className="font-semibold text-gray-600 dark:text-gray-400 mb-1">Token (debug, stored after connect)</div>
-                          <div>Preview: {instagramTokenDebug.access_token_preview ?? "—"}</div>
-                          {instagramTokenDebug.access_token != null && (
-                            <div className="mt-1">Token: {instagramTokenDebug.access_token}</div>
-                          )}
-                          <div className="mt-1 text-gray-500">Length: {instagramTokenDebug.access_token_length ?? "—"}</div>
+                    ))}
+                  </div>
+                  <div className="p-4 bg-white dark:bg-gray-950">
+                    {socialTab === "instagram" && (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Caption</label>
+                          <div className="flex gap-2 mb-1">
+                            <textarea
+                              value={instagramCaption}
+                              onChange={(e) => setInstagramCaption(e.target.value)}
+                              placeholder="Enter caption for Instagram"
+                              className="flex-1 min-h-[100px] px-4 py-3 border rounded-lg text-sm bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100 dark:border-gray-700 resize-y"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleGenerateCaption("instagram")}
+                              disabled={!!generatingCaptionFor || !scriptData?.script?.trim()}
+                              className="self-start px-4 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 text-white font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                            >
+                              {generatingCaptionFor === "instagram" ? "Generating…" : "Generate"}
+                            </button>
+                          </div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{instagramCaption.length} / 2200</p>
                         </div>
-                      )}
-                    </div>
-                  ) : (
-                    <a
-                      href={
-                        "/api/auth/instagram?return_to=" +
-                        encodeURIComponent(
-                          "/admin/video-generator" +
-                            (currentProjectId || step != null
-                              ? "?" +
-                                new URLSearchParams({
-                                  ...(currentProjectId && { project_id: currentProjectId }),
-                                  ...(step != null && { step: String(step) }),
-                                }).toString()
-                              : "")
-                        )
-                      }
-                      className="flex items-center justify-center gap-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-4 rounded-lg font-medium hover:opacity-90 no-underline"
-                    >
-                      <SiInstagram className="w-7 h-7 shrink-0" aria-hidden />
-                      Connect Instagram
-                    </a>
-                  )}
-
-                  <button
-                    onClick={() => handlePostToSocial("youtube")}
-                    disabled={loading}
-                    className="flex items-center justify-center gap-3 bg-red-600 text-white py-4 rounded-lg font-medium hover:bg-red-700 disabled:opacity-50"
-                  >
-                    <SiYoutube className="w-7 h-7 shrink-0" aria-hidden />
-                    Post to YouTube
-                  </button>
-
-                  <button
-                    onClick={() => handlePostToSocial("tiktok")}
-                    disabled={loading}
-                    className="flex items-center justify-center gap-3 bg-black text-white py-4 rounded-lg font-medium hover:bg-gray-800 disabled:opacity-50"
-                  >
-                    <SiTiktok className="w-7 h-7 shrink-0" aria-hidden />
-                    Post to TikTok
-                  </button>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Reel cover image</label>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setInstagramCoverUrl(null)}
+                              className={`w-16 h-16 rounded-lg border-2 flex items-center justify-center text-xs font-medium transition ${
+                                !instagramCoverUrl ? "border-blue-500 bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300" : "border-gray-300 dark:border-gray-600 hover:border-gray-400"
+                              }`}
+                            >
+                              Default
+                            </button>
+                            {(scriptData?.scenes || []).map((s) => getSelectedImageUrlForScene(s)).filter(Boolean).map((url, idx) => (
+                              <button key={idx} type="button" onClick={() => setInstagramCoverUrl(url)} className={`w-16 h-16 rounded-lg border-2 overflow-hidden shrink-0 transition ${instagramCoverUrl === url ? "border-blue-500 ring-2 ring-blue-500/50" : "border-gray-300 dark:border-gray-600 hover:border-gray-400"}`}>
+                                <img src={url} alt={`Scene ${idx + 1}`} className="w-full h-full object-cover" />
+                              </button>
+                            ))}
+                          </div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Optional. Recommended: 420×654px.</p>
+                        </div>
+                        <div className="pt-2">
+                          {instagramStatusLoading ? (
+                            <div className="flex items-center justify-center gap-3 bg-gray-200 dark:bg-gray-700 text-gray-500 py-4 rounded-lg">
+                              <SiInstagram className="w-7 h-7" /> Checking…
+                            </div>
+                          ) : instagramConnected ? (
+                            <div className="flex flex-col gap-2">
+                              <button onClick={() => handlePostToSocial("instagram")} disabled={loading} className="flex items-center justify-center gap-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-4 rounded-lg font-medium hover:opacity-90 disabled:opacity-50">
+                                <SiInstagram className="w-7 h-7" /> Post to Instagram
+                              </button>
+                              <button type="button" onClick={handleDisconnectInstagram} className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 underline">
+                                Disconnect Instagram
+                              </button>
+                              {instagramTokenDebug && (
+                                <div className="mt-2 p-3 rounded-lg bg-gray-100 dark:bg-gray-800 text-left text-xs font-mono break-all">
+                                  <div className="font-semibold text-gray-600 dark:text-gray-400 mb-1">Token (debug)</div>
+                                  <div>Preview: {instagramTokenDebug.access_token_preview ?? "—"}</div>
+                                  {instagramTokenDebug.access_token != null && <div className="mt-1">Token: {instagramTokenDebug.access_token}</div>}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <a href={"/api/auth/instagram?return_to=" + encodeURIComponent("/admin/video-generator" + (currentProjectId || step != null ? "?" + new URLSearchParams({ ...(currentProjectId && { project_id: currentProjectId }), ...(step != null && { step: String(step) }) }).toString() : ""))} className="flex items-center justify-center gap-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-4 rounded-lg font-medium hover:opacity-90 no-underline">
+                              <SiInstagram className="w-7 h-7" /> Connect Instagram
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {socialTab === "youtube" && (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Caption (title + description)</label>
+                          <div className="flex gap-2 mb-1">
+                            <textarea value={youtubeCaption} onChange={(e) => setYoutubeCaption(e.target.value)} placeholder="Enter caption for YouTube" className="flex-1 min-h-[100px] px-4 py-3 border rounded-lg text-sm bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100 dark:border-gray-700 resize-y" />
+                            <button type="button" onClick={() => handleGenerateCaption("youtube")} disabled={!!generatingCaptionFor || !scriptData?.script?.trim()} className="self-start px-4 py-2 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">
+                              {generatingCaptionFor === "youtube" ? "Generating…" : "Generate"}
+                            </button>
+                          </div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{youtubeCaption.length} / 5000</p>
+                        </div>
+                        <div className="pt-2">
+                          <button onClick={() => handlePostToSocial("youtube")} disabled={loading} className="w-full flex items-center justify-center gap-3 bg-red-600 text-white py-4 rounded-lg font-medium hover:bg-red-700 disabled:opacity-50">
+                            <SiYoutube className="w-7 h-7" /> Post to YouTube
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {socialTab === "tiktok" && (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Caption</label>
+                          <div className="flex gap-2 mb-1">
+                            <textarea value={tiktokCaption} onChange={(e) => setTiktokCaption(e.target.value)} placeholder="Enter caption for TikTok" className="flex-1 min-h-[100px] px-4 py-3 border rounded-lg text-sm bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100 dark:border-gray-700 resize-y" />
+                            <button type="button" onClick={() => handleGenerateCaption("tiktok")} disabled={!!generatingCaptionFor || !scriptData?.script?.trim()} className="self-start px-4 py-2 rounded-lg bg-black text-white font-medium hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">
+                              {generatingCaptionFor === "tiktok" ? "Generating…" : "Generate"}
+                            </button>
+                          </div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{tiktokCaption.length} chars</p>
+                        </div>
+                        <div className="pt-2">
+                          <button onClick={() => handlePostToSocial("tiktok")} disabled={loading} className="w-full flex items-center justify-center gap-3 bg-black text-white py-4 rounded-lg font-medium hover:bg-gray-800 disabled:opacity-50">
+                            <SiTiktok className="w-7 h-7" /> Post to TikTok
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </>
@@ -9902,6 +10066,26 @@ function VideoGeneratorContent() {
             >
               ← Back to Assemble
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Post to Social Progress Modal */}
+      {postProgress && (
+        <div
+          className="fixed inset-0 z-[95] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-busy="true"
+        >
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+            <div className="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+              Posting to {postProgress.platform}…
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              {postProgress.status} This may take 1–2 minutes.
+            </p>
           </div>
         </div>
       )}

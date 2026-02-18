@@ -9,7 +9,7 @@ const INSTAGRAM_CONTAINER_POLL_MAX = 60; // ~3 min
 
 export async function POST(request) {
   try {
-    const { session_id, platform, video_url, caption } = await request.json();
+    const { session_id, platform, video_url, caption, cover_url } = await request.json();
 
     if (!session_id || !platform || !video_url) {
       return NextResponse.json(
@@ -23,7 +23,7 @@ export async function POST(request) {
     switch (platform) {
       case "instagram":
         LOG({ step: "post_social", platform: "instagram", session_id: session_id?.slice(0, 12), has_video_url: !!video_url });
-        result = await postToInstagram(video_url, caption ?? "");
+        result = await postToInstagram(video_url, caption ?? "", cover_url || null);
         LOG({ step: "post_social", platform: "instagram", result_success: result.success, result_message: result.message?.slice(0, 80) });
         break;
       case "youtube":
@@ -76,8 +76,8 @@ export async function POST(request) {
  * Credentials from env (INSTAGRAM_USER_ID, INSTAGRAM_ACCESS_TOKEN) or from OAuth (Firestore integrations/instagram).
  * @see getInstagramCredentials, /api/auth/instagram
  */
-async function postToInstagram(videoUrl, caption) {
-  LOG({ step: "post_instagram", action: "start", video_url_length: videoUrl?.length ?? 0 });
+async function postToInstagram(videoUrl, caption, coverUrl = null) {
+  LOG({ step: "post_instagram", action: "start", video_url_length: videoUrl?.length ?? 0, has_cover: !!coverUrl });
 
   const creds = await getInstagramCredentials();
   const debug = creds?._debug || null;
@@ -139,6 +139,7 @@ async function postToInstagram(videoUrl, caption) {
       media_type: "REELS",
       video_url: videoUrl,
       caption: caption.slice(0, 2200),
+      ...(coverUrl && { cover_url: coverUrl }),
     }),
   });
 
