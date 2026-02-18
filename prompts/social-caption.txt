@@ -1,0 +1,16 @@
+Generate an SEO-optimized social media caption for {{platform}}.
+
+Topic: {{topic}}
+
+Script (video voiceover):
+{{script}}
+
+---
+PLATFORM-SPECIFIC SEO RULES (follow exactly):
+
+{{platform_instructions}}
+
+---
+OUTPUT FORMAT:
+- Plain text only. No markdown, quotes, or extra formatting.
+- Tone: Law of Attraction / self-improvement – positive, motivational, inspiring.

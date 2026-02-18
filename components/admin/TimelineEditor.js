@@ -75,6 +75,92 @@ function buildVolumeWithFade(vol, fadeIn, fadeOut, fadeInDur, fadeOutDur, clipLe
   return tweens.length > 0 ? tweens : v;
 }
 
+/** Build Shotstack text track from subtitle cues for burned-in subtitles.
+ * Output size assumed 1080×1920 (portrait). Uses subtitleTimingOverrides when present. */
+function buildSubtitleTextTrack(
+  edit,
+  scriptData,
+  subtitleTextOverrides,
+  subtitleTimingOverrides,
+  subtitlePosition,
+  subtitleFont,
+  subtitleFontSize,
+  subtitleTextColor,
+  subtitleFade,
+  subtitleStroke,
+) {
+  const clips = edit?.timeline?.tracks?.[0]?.clips ?? [];
+  const scenes = [...(scriptData?.scenes ?? [])].sort(
+    (a, b) => Number(a?.id ?? 0) - Number(b?.id ?? 0),
+  );
+  const overrides = subtitleTextOverrides ?? {};
+  const timingOverrides = subtitleTimingOverrides ?? {};
+  const fontFamily =
+    subtitleFont === "serif"
+      ? "Arapey Regular"
+      : subtitleFont === "mono"
+        ? "Roboto"
+        : "Clear Sans";
+  const fontPx = Math.max(24, Math.min(96, Math.round((Number(subtitleFontSize) || 14) * 4)));
+  const color = /^#[0-9A-Fa-f]{6}$/.test(String(subtitleTextColor))
+    ? String(subtitleTextColor)
+    : "#FFFFFF";
+
+  const textClips = [];
+  for (let i = 0; i < clips.length; i++) {
+    const clip = clips[i];
+    const clipStart = Number(clip?.start) ?? 0;
+    const clipLength = Number(clip?.length) ?? 0;
+    const timing = timingOverrides[String(i)];
+    const startSec = timing?.startSec != null
+      ? Math.max(0, Number(timing.startSec))
+      : clipStart;
+    const lengthSec = timing?.lengthSec != null
+      ? Math.max(0.5, Math.min(60, Number(timing.lengthSec)))
+      : clipLength;
+    const baseText = (scenes[i]?.voiceover ?? "").trim() || "";
+    const text = Object.prototype.hasOwnProperty.call(overrides, String(i))
+      ? String(overrides[i]).trim()
+      : baseText;
+    if (!text || lengthSec < 0.1) continue;
+
+    const pos =
+      subtitlePosition === "top"
+        ? "top"
+        : subtitlePosition === "bottom"
+          ? "bottom"
+          : "center";
+    const offsetY =
+      subtitlePosition === "top"
+        ? -0.06
+        : subtitlePosition === "bottom"
+          ? 0.06
+          : 0;
+
+    const textClip = {
+      asset: {
+        type: "text",
+        text: text.length > 500 ? `${text.slice(0, 497)}...` : text,
+        font: { family: fontFamily, size: fontPx, color },
+        width: 1000,
+        height: 280,
+      },
+      start: startSec,
+      length: lengthSec,
+      position: pos,
+      offset: { y: offsetY },
+    };
+    if (subtitleStroke) {
+      textClip.asset.stroke = { color: "#000000", width: 2 };
+    }
+    if (subtitleFade) {
+      textClip.transition = { in: "fade", out: "fade" };
+    }
+    textClips.push(textClip);
+  }
+  return textClips;
+}
+
 /** Build initial edit JSON from videos + voiceover + music (used when no saved edit) */
 function buildInitialEdit(
   videos,
@@ -286,6 +372,49 @@ const TimelineEditor = forwardRef(function TimelineEditor(
   const [selectedClip, setSelectedClip] = useState(null); // { trackIndex, clipIndex }
   const [, setVolumeChangeTick] = useState(0); // force re-render when clip volume changes
   const [studioReadyTick, setStudioReadyTick] = useState(0); // increment when init completes – persistence listens
+  const [currentSubtitle, setCurrentSubtitle] = useState("");
+  const [subtitleOpacity, setSubtitleOpacity] = useState(1);
+  const [subtitlePosition, setSubtitlePosition] = useState(
+    () => initialTimelineSettings?.subtitlePosition ?? "bottom",
+  );
+  const [subtitleFont, setSubtitleFont] = useState(
+    () => initialTimelineSettings?.subtitleFont ?? "sans",
+  );
+  const [subtitleFontSize, setSubtitleFontSize] = useState(
+    () => {
+      const v = initialTimelineSettings?.subtitleFontSize;
+      const n = Number(v);
+      return Number.isFinite(n) && n >= 8 && n <= 48 ? n : 14;
+    },
+  );
+  const [subtitlePadding, setSubtitlePadding] = useState(
+    () => {
+      const v = initialTimelineSettings?.subtitlePadding;
+      const n = Number(v);
+      return Number.isFinite(n) && n >= 0 && n <= 48 ? n : 12;
+    },
+  );
+  const [subtitleTextColor, setSubtitleTextColor] = useState(
+    () => {
+      const v = initialTimelineSettings?.subtitleTextColor;
+      return v && /^#[0-9A-Fa-f]{6}$/.test(String(v)) ? String(v) : "#FFFFFF";
+    },
+  );
+  const [subtitleTextOverrides, setSubtitleTextOverrides] = useState(() => {
+    const o = initialTimelineSettings?.subtitleTextOverrides;
+    return o && typeof o === "object" ? { ...o } : {};
+  });
+  const [subtitleTimingOverrides, setSubtitleTimingOverrides] = useState(() => {
+    const o = initialTimelineSettings?.subtitleTimingOverrides;
+    return o && typeof o === "object" ? { ...o } : {};
+  });
+  const [subtitleFade, setSubtitleFade] = useState(
+    () => initialTimelineSettings?.subtitleFade !== false,
+  );
+  const [subtitleStroke, setSubtitleStroke] = useState(
+    () => initialTimelineSettings?.subtitleStroke === true,
+  );
+  const [showSubtitleTextEdit, setShowSubtitleTextEdit] = useState(false);
   const timelineContainerRef = useRef(null);
   const studioEditRef = useRef(null);
   const studioSdkInstancesRef = useRef(null); // { canvas, timeline, controls } for cleanup dispose
@@ -294,6 +423,8 @@ const TimelineEditor = forwardRef(function TimelineEditor(
   const initialEditRef = useRef(null);
   const usedVideoOnlyFallbackRef = useRef(false);
   const fadeOverrideRef = useRef(Object.create(null)); // { "track-clip": { fadeIn, fadeOut, fadeInDuration?, fadeOutDuration? } } – SDK rejects volumeEffect in loadEdit, so we keep UI state here
+  const subtitleSettingsRef = useRef({}); // Kept in sync so timeline auto-save never overwrites subtitle settings
+  const mountTimeRef = useRef(Date.now());
 
   // Edit to load: saved edit or build from source data (supports migration from old format)
   const editToLoad = useMemo(() => {
@@ -844,6 +975,7 @@ const TimelineEditor = forwardRef(function TimelineEditor(
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = setTimeout(() => {
         saveTimeoutRef.current = null;
+        if (Date.now() - mountTimeRef.current < 2000 && !initialTimelineSettings) return; // Wait for project load on refresh
         const edit = getEffectiveEdit?.() ?? initialEditRef.current;
         if (!edit?.timeline || !edit?.output) return;
         // Extract gapTransitions and transitionGapByIndex from edit so buildInitialEdit can restore them on rebuild
@@ -903,12 +1035,14 @@ const TimelineEditor = forwardRef(function TimelineEditor(
         const prev = initialTimelineSettings && typeof initialTimelineSettings === "object"
           ? initialTimelineSettings
           : {};
+        const subtitleFromRef = subtitleSettingsRef.current || {};
         fetch(`/api/projects/${projectId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             timeline_settings: {
               ...prev,
+              ...subtitleFromRef,
               edit,
               gapTransitions: Object.keys(gapTransitions).length > 0 ? gapTransitions : prev.gapTransitions,
               transitionGapByIndex: Object.keys(transitionGapByIndex).length > 0 ? transitionGapByIndex : prev.transitionGapByIndex,
@@ -994,11 +1128,201 @@ const TimelineEditor = forwardRef(function TimelineEditor(
             }
           });
         });
+
+        // Add subtitle text track for burned-in captions (Shotstack renders; Studio UI does not show it)
+        const subtitleClips = buildSubtitleTextTrack(
+          edit,
+          scriptData,
+          subtitleTextOverrides,
+          subtitleTimingOverrides,
+          subtitlePosition,
+          subtitleFont,
+          subtitleFontSize,
+          subtitleTextColor,
+          subtitleFade,
+          subtitleStroke,
+        );
+        if (subtitleClips.length > 0) {
+          // Shotstack: first track = top layer. Put subtitles first so they overlay the video.
+          edit.timeline.tracks = [{ clips: subtitleClips }, ...(edit.timeline.tracks || [])];
+        }
+
         return edit;
       },
     }),
-    [initialTimelineSettings],
+    [
+      initialTimelineSettings,
+      scriptData,
+      subtitleTextOverrides,
+      subtitleTimingOverrides,
+      subtitlePosition,
+      subtitleFont,
+      subtitleFontSize,
+      subtitleTextColor,
+      subtitleFade,
+      subtitleStroke,
+    ],
   );
+
+  // Use editToLoad for structure – must run before early return for hooks rules
+  const structureEdit = editToLoad;
+  const liveEdit = studioEditRef.current?.getEdit?.();
+
+  // Subtitle cues: clip start/end (ms) + text from overrides or scene voiceover
+  // Uses subtitleTimingOverrides when present; otherwise clip timing
+  const subtitleCues = useMemo(() => {
+    const edit = liveEdit ?? structureEdit;
+    const clips = edit?.timeline?.tracks?.[0]?.clips ?? [];
+    const scenes = [...(scriptData?.scenes ?? [])].sort(
+      (a, b) => Number(a?.id ?? 0) - Number(b?.id ?? 0),
+    );
+    const overrides = subtitleTextOverrides;
+    const timingOverrides = subtitleTimingOverrides ?? {};
+    const cues = [];
+    for (let i = 0; i < clips.length; i++) {
+      const clip = clips[i];
+      const clipStart = Number(clip?.start) || 0;
+      const clipLength = Number(clip?.length) || 0;
+      const timing = timingOverrides[String(i)];
+      const startSec = timing?.startSec != null
+        ? Math.max(0, Number(timing.startSec))
+        : clipStart;
+      const lengthSec = timing?.lengthSec != null
+        ? Math.max(0.5, Math.min(60, Number(timing.lengthSec)))
+        : clipLength;
+      const startMs = startSec * 1000;
+      const endMs = startMs + lengthSec * 1000;
+      const baseText = (scenes[i]?.voiceover ?? "").trim() || "";
+      const text = Object.prototype.hasOwnProperty.call(overrides, String(i))
+        ? String(overrides[i]).trim()
+        : baseText;
+      cues.push({ startMs, endMs, text, clipStart, clipLength });
+    }
+    return cues;
+  }, [liveEdit, structureEdit, scriptData?.scenes, subtitleTextOverrides, subtitleTimingOverrides]);
+
+  const lastSubtitleRef = useRef("");
+  const subtitleContainerRef = useRef(null);
+  const subtitleTextRef = useRef(null);
+
+  // Debug: log subtitle and container dimensions
+  useEffect(() => {
+    if (!currentSubtitle) return;
+    const t = setTimeout(() => {
+      const container = subtitleContainerRef.current;
+      const text = subtitleTextRef.current;
+      if (container) {
+        const cr = container.getBoundingClientRect();
+        console.log("[TimelineEditor] Subtitle container rect:", { w: cr.width, h: cr.height, left: cr.left, top: cr.top });
+      }
+      if (text) {
+        const tr = text.getBoundingClientRect();
+        const scrollHeight = text.scrollHeight;
+        const clientHeight = text.clientHeight;
+        console.log("[TimelineEditor] Subtitle text rect:", { w: tr.width, h: tr.height, scrollHeight, clientHeight, overflow: scrollHeight > clientHeight, len: currentSubtitle.length });
+      }
+    }, 100);
+    return () => clearTimeout(t);
+  }, [currentSubtitle]);
+
+  // Keep subtitleSettingsRef in sync so timeline auto-save never overwrites subtitle settings on refresh
+  useEffect(() => {
+    subtitleSettingsRef.current = {
+      subtitlePosition,
+      subtitleFont,
+      subtitleFontSize,
+      subtitlePadding,
+      subtitleTextColor,
+      subtitleTextOverrides,
+      subtitleTimingOverrides,
+      subtitleFade,
+      subtitleStroke,
+    };
+  }, [
+    subtitlePosition,
+    subtitleFont,
+    subtitleFontSize,
+    subtitlePadding,
+    subtitleTextColor,
+    subtitleTextOverrides,
+    subtitleTimingOverrides,
+    subtitleFade,
+    subtitleStroke,
+  ]);
+
+  // Sync subtitle settings when loading a different project
+  useEffect(() => {
+    const pos = initialTimelineSettings?.subtitlePosition ?? "bottom";
+    const font = initialTimelineSettings?.subtitleFont ?? "sans";
+    const v = initialTimelineSettings?.subtitleFontSize;
+    const size = Number.isFinite(Number(v)) && Number(v) >= 8 && Number(v) <= 48 ? Number(v) : 14;
+    const pad = initialTimelineSettings?.subtitlePadding;
+    const padNum = Number.isFinite(Number(pad)) && Number(pad) >= 0 && Number(pad) <= 48 ? Number(pad) : 12;
+    const col = initialTimelineSettings?.subtitleTextColor;
+    const colVal = col && /^#[0-9A-Fa-f]{6}$/.test(String(col)) ? String(col) : "#FFFFFF";
+    const overrides = initialTimelineSettings?.subtitleTextOverrides;
+    const timingOverrides = initialTimelineSettings?.subtitleTimingOverrides;
+    const fade = initialTimelineSettings?.subtitleFade;
+    const stroke = initialTimelineSettings?.subtitleStroke;
+    setSubtitlePosition(pos);
+    setSubtitleFont(font);
+    setSubtitleFontSize(size);
+    setSubtitlePadding(padNum);
+    setSubtitleTextColor(colVal);
+    setSubtitleTextOverrides(
+      overrides && typeof overrides === "object" ? { ...overrides } : {},
+    );
+    setSubtitleTimingOverrides(
+      timingOverrides && typeof timingOverrides === "object" ? { ...timingOverrides } : {},
+    );
+    setSubtitleFade(fade !== false);
+    setSubtitleStroke(stroke === true);
+  }, [
+    projectId,
+    initialTimelineSettings?.subtitlePosition,
+    initialTimelineSettings?.subtitleFont,
+    initialTimelineSettings?.subtitleFontSize,
+    initialTimelineSettings?.subtitlePadding,
+    initialTimelineSettings?.subtitleTextColor,
+    initialTimelineSettings?.subtitleTextOverrides,
+    initialTimelineSettings?.subtitleTimingOverrides,
+    initialTimelineSettings?.subtitleFade,
+    initialTimelineSettings?.subtitleStroke,
+  ]);
+
+  const FADE_DUR_MS = 300;
+
+  // Sync subtitle overlay with playback position
+  useEffect(() => {
+    if (!subtitleCues.length) return;
+    let rafId = null;
+    const tick = () => {
+      const edit = studioEditRef.current;
+      const t = edit?.playbackTime ?? 0;
+      const cue = subtitleCues.find((c) => t >= c.startMs && t < c.endMs);
+      const next = cue?.text ?? "";
+      if (next !== lastSubtitleRef.current) {
+        lastSubtitleRef.current = next;
+        setCurrentSubtitle(next);
+      }
+      let opacity = 1;
+      if (subtitleFade && cue) {
+        const dur = cue.endMs - cue.startMs;
+        const fadeMs = Math.min(FADE_DUR_MS, dur / 3);
+        if (t < cue.startMs + fadeMs) {
+          opacity = (t - cue.startMs) / fadeMs;
+        } else if (t > cue.endMs - fadeMs) {
+          opacity = (cue.endMs - t) / fadeMs;
+        }
+      }
+      setSubtitleOpacity(opacity);
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => {
+      if (rafId != null) cancelAnimationFrame(rafId);
+    };
+  }, [subtitleCues, subtitleFade]);
 
   if (!effectiveVideos.length || !voiceoverUrl) {
     return (
@@ -1070,11 +1394,6 @@ const TimelineEditor = forwardRef(function TimelineEditor(
     }
     return { type: "fade", duration: 1 };
   };
-
-  // Use editToLoad for structure (row count) so panels don't disappear when SDK reloads.
-  // Use live getEdit() only for current values when available.
-  const structureEdit = editToLoad;
-  const liveEdit = studioEditRef.current?.getEdit?.();
 
   const transitionGaps = (() => {
     const structureClips = structureEdit?.timeline?.tracks?.[0]?.clips ?? [];
@@ -1215,8 +1534,8 @@ const TimelineEditor = forwardRef(function TimelineEditor(
   };
 
   return (
-    <div className="flex h-full min-h-[calc(100vh-10rem)] w-full flex-col rounded-xl border-2 border-gray-300 bg-white shadow-lg dark:border-gray-600 dark:bg-gray-900">
-      <div className="flex flex-1 flex-col gap-3 border-b border-gray-200 bg-black p-4 dark:border-gray-700 overflow-hidden min-h-0">
+    <div className="flex h-full min-h-[calc(100vh-10rem)] w-full flex-col rounded-xl border-2 border-gray-300 bg-white shadow-lg dark:border-gray-600 dark:bg-gray-900 overflow-hidden">
+      <div className="flex flex-1 flex-col gap-3 border-b border-gray-200 bg-black p-4 dark:border-gray-700 overflow-hidden min-h-0 min-w-0">
         <div className="flex w-full shrink-0 items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <span className="text-sm font-medium text-gray-300">
@@ -1246,15 +1565,458 @@ const TimelineEditor = forwardRef(function TimelineEditor(
             {formatTime(totalSeconds)} total
           </span>
         </div>
-        <div className="flex flex-1 flex-col gap-3 min-h-0 overflow-hidden">
-          {/* Preview – above timeline */}
-          <div className="shrink-0 flex items-center justify-center bg-black">
+          <div className="flex flex-1 flex-col gap-3 min-h-0 overflow-hidden">
+          {/* Preview – above timeline, with subtitle overlay. Strict clip to 260×462. */}
+          <div className="shrink-0 min-w-0 flex justify-center bg-black overflow-hidden">
             <div
-              data-shotstack-studio
-              className="flex items-center justify-center overflow-hidden rounded-md bg-black"
-              style={{ aspectRatio: "9/16", width: 260, maxWidth: "100%" }}
-            />
+              ref={subtitleContainerRef}
+              style={{
+                position: "relative",
+                width: "260px",
+                height: "462px",
+                overflow: "clip",
+                borderRadius: "6px",
+                backgroundColor: "#000",
+              }}
+            >
+              <div
+                data-shotstack-studio
+                className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-md bg-black"
+              />
+              {currentSubtitle && (
+                <div
+                  style={{
+                    position: "absolute",
+                    left: 0,
+                    right: 0,
+                    width: "260px",
+                    padding: `${subtitlePadding}px`,
+                    pointerEvents: "none",
+                    boxSizing: "border-box",
+                    opacity: subtitleOpacity,
+                    transition: subtitleFade ? "opacity 0.05s linear" : "none",
+                    ...(subtitlePosition === "bottom"
+                      ? { bottom: 0, display: "flex", justifyContent: "center", alignItems: "flex-end", minHeight: "28%", maxHeight: "35%", background: "linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.7), transparent)" }
+                      : subtitlePosition === "top"
+                        ? { top: 0, display: "flex", justifyContent: "center", alignItems: "flex-start", minHeight: "28%", maxHeight: "35%", background: "linear-gradient(to bottom, rgba(0,0,0,0.9), rgba(0,0,0,0.7), transparent)" }
+                        : { inset: 0, display: "flex", justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.6)" }),
+                  }}
+                >
+                  <div
+                    ref={subtitleTextRef}
+                    style={{
+                      width: `${260 - subtitlePadding * 2}px`,
+                      maxWidth: `${260 - subtitlePadding * 2}px`,
+                      overflow: subtitleStroke ? "visible" : "hidden",
+                      fontSize: `${Number(subtitleFontSize) || 14}px`,
+                      color: subtitleTextColor,
+                      textAlign: "center",
+                      fontWeight: 500,
+                      lineHeight: 1.5,
+                      maxHeight: `${((Number(subtitleFontSize) || 14) * 1.5 * 3)}px`,
+                      display: "-webkit-box",
+                      WebkitLineClamp: 3,
+                      WebkitBoxOrient: "vertical",
+                      wordBreak: "break-word",
+                      overflowWrap: "anywhere",
+                      ...(subtitleStroke
+                        ? {
+                            WebkitTextStroke: "2px #000000",
+                            WebkitTextFillColor: subtitleTextColor,
+                            paintOrder: "stroke fill",
+                            filter: "drop-shadow(-1px -1px 0 #000) drop-shadow(1px -1px 0 #000) drop-shadow(-1px 1px 0 #000) drop-shadow(1px 1px 0 #000)",
+                          }
+                        : { textShadow: "0 1px 2px rgba(0,0,0,0.9)" }),
+                    }}
+                    className={subtitleFont === "serif" ? "font-serif" : subtitleFont === "mono" ? "font-mono" : "font-sans"}
+                  >
+                    {currentSubtitle.length > 120 ? `${currentSubtitle.slice(0, 117)}...` : currentSubtitle}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
+          {/* Subtitle style controls */}
+          <div className="shrink-0 flex flex-wrap items-center gap-3 text-xs">
+            <span className="text-gray-500 dark:text-gray-400">Subtitle:</span>
+            <div className="flex items-center gap-1">
+              {["bottom", "center", "top"].map((pos) => (
+                <button
+                  key={pos}
+                  type="button"
+                  onClick={() => {
+                    setSubtitlePosition(pos);
+                    if (projectId) {
+                      fetch(`/api/projects/${projectId}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          timeline_settings: {
+                            ...(initialTimelineSettings && typeof initialTimelineSettings === "object" ? initialTimelineSettings : {}),
+                            subtitlePosition: pos,
+                            subtitleFont,
+                            subtitleFontSize,
+                            subtitlePadding,
+                            subtitleTextColor,
+                            subtitleTimingOverrides,
+                            subtitleFade,
+                            subtitleStroke,
+                          },
+                        }),
+                      }).catch(() => {});
+                    }
+                  }}
+                  className={`px-2 py-1 rounded capitalize ${
+                    subtitlePosition === pos
+                      ? "bg-amber-600 text-white"
+                      : "bg-gray-600/60 text-gray-300 hover:bg-gray-600"
+                  }`}
+                >
+                  {pos}
+                </button>
+              ))}
+            </div>
+            <select
+              value={subtitleFont}
+              onChange={(e) => {
+                const font = e.target.value;
+                setSubtitleFont(font);
+                if (projectId) {
+                  fetch(`/api/projects/${projectId}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      timeline_settings: {
+                        ...(initialTimelineSettings && typeof initialTimelineSettings === "object" ? initialTimelineSettings : {}),
+                        subtitlePosition,
+                        subtitleFont: font,
+                        subtitleFontSize,
+                        subtitlePadding,
+                        subtitleTextColor,
+                        subtitleTimingOverrides,
+                        subtitleFade,
+                        subtitleStroke,
+                      },
+                    }),
+                  }).catch(() => {});
+                }
+              }}
+              className="rounded bg-gray-700 text-gray-200 px-2 py-1 border-0 text-xs"
+            >
+              <option value="sans">Sans</option>
+              <option value="serif">Serif</option>
+              <option value="mono">Mono</option>
+            </select>
+            <select
+              value={subtitleFontSize}
+              onChange={(e) => {
+                const size = Math.max(8, Math.min(48, Number(e.target.value) || 14));
+                setSubtitleFontSize(size);
+                if (projectId) {
+                  fetch(`/api/projects/${projectId}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      timeline_settings: {
+                        ...(initialTimelineSettings && typeof initialTimelineSettings === "object" ? initialTimelineSettings : {}),
+                        subtitlePosition,
+                        subtitleFont,
+                        subtitleFontSize: size,
+                        subtitlePadding,
+                        subtitleTextColor,
+                        subtitleTimingOverrides,
+                        subtitleFade,
+                        subtitleStroke,
+                      },
+                    }),
+                  }).catch(() => {});
+                }
+              }}
+              className="rounded bg-gray-700 text-gray-200 px-2 py-1 border-0 text-xs"
+            >
+              {[10, 12, 14, 16, 18, 20, 24, 28, 32].map((px) => (
+                <option key={px} value={px}>{px}px</option>
+              ))}
+            </select>
+            <select
+              value={subtitlePadding}
+              onChange={(e) => {
+                const pad = Math.max(0, Math.min(48, Number(e.target.value) || 12));
+                setSubtitlePadding(pad);
+                if (projectId) {
+                  fetch(`/api/projects/${projectId}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      timeline_settings: {
+                        ...(initialTimelineSettings && typeof initialTimelineSettings === "object" ? initialTimelineSettings : {}),
+                        subtitlePosition,
+                        subtitleFont,
+                        subtitleFontSize,
+                        subtitlePadding: pad,
+                        subtitleTextColor,
+                        subtitleTimingOverrides,
+                        subtitleFade,
+                        subtitleStroke,
+                      },
+                    }),
+                  }).catch(() => {});
+                }
+              }}
+              className="rounded bg-gray-700 text-gray-200 px-2 py-1 border-0 text-xs"
+            >
+              {[0, 4, 8, 12, 16, 20, 24].map((px) => (
+                <option key={px} value={px}>Pad {px}px</option>
+              ))}
+            </select>
+            <div className="flex items-center gap-1">
+              <label htmlFor="subtitle-color" className="text-gray-400 text-xs shrink-0">Color</label>
+              <input
+                id="subtitle-color"
+                type="color"
+                value={subtitleTextColor}
+                onChange={(e) => {
+                  const hex = e.target.value;
+                  if (/^#[0-9A-Fa-f]{6}$/.test(hex)) {
+                    setSubtitleTextColor(hex);
+                    if (projectId) {
+                      fetch(`/api/projects/${projectId}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          timeline_settings: {
+                            ...(initialTimelineSettings && typeof initialTimelineSettings === "object" ? initialTimelineSettings : {}),
+                            subtitlePosition,
+                            subtitleFont,
+                            subtitleFontSize,
+                            subtitlePadding,
+                            subtitleTextColor: hex,
+                            subtitleTimingOverrides,
+                            subtitleFade,
+                            subtitleStroke,
+                          },
+                        }),
+                      }).catch(() => {});
+                    }
+                  }
+                }}
+                className="w-7 h-6 rounded border-0 cursor-pointer bg-transparent p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded"
+              />
+            </div>
+            <label className="flex items-center gap-1.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={subtitleFade}
+                onChange={(e) => {
+                  const v = e.target.checked;
+                  setSubtitleFade(v);
+                  if (projectId) {
+                    const prev = initialTimelineSettings && typeof initialTimelineSettings === "object" ? initialTimelineSettings : {};
+                    fetch(`/api/projects/${projectId}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        timeline_settings: {
+                          ...prev,
+                          subtitleFade: v,
+                          subtitlePosition,
+                          subtitleFont,
+                          subtitleFontSize,
+                          subtitlePadding,
+                          subtitleTextColor,
+                          subtitleTimingOverrides,
+                          subtitleStroke,
+                        },
+                      }),
+                    }).catch(() => {});
+                  }
+                }}
+                className="rounded border-gray-500 bg-gray-700 text-amber-600"
+              />
+              <span className="text-xs text-gray-400">Fade</span>
+            </label>
+            <label className="flex items-center gap-1.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={subtitleStroke}
+                onChange={(e) => {
+                  const v = e.target.checked;
+                  setSubtitleStroke(v);
+                  if (projectId) {
+                    const prev = initialTimelineSettings && typeof initialTimelineSettings === "object" ? initialTimelineSettings : {};
+                    fetch(`/api/projects/${projectId}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        timeline_settings: {
+                          ...prev,
+                          subtitleStroke: v,
+                          subtitlePosition,
+                          subtitleFont,
+                          subtitleFontSize,
+                          subtitlePadding,
+                          subtitleTextColor,
+                          subtitleTimingOverrides,
+                          subtitleFade,
+                        },
+                      }),
+                    }).catch(() => {});
+                  }
+                }}
+                className="rounded border-gray-500 bg-gray-700 text-amber-600"
+              />
+              <span className="text-xs text-gray-400">Stroke</span>
+            </label>
+            <button
+              type="button"
+              onClick={() => setShowSubtitleTextEdit((v) => !v)}
+              className={`px-2 py-1 rounded text-xs ${
+                showSubtitleTextEdit ? "bg-amber-600 text-white" : "bg-gray-600/60 text-gray-300 hover:bg-gray-600"
+              }`}
+            >
+              Edit text
+            </button>
+          </div>
+          {showSubtitleTextEdit && subtitleCues.length > 0 && (
+            <div className="shrink-0 flex flex-col gap-2 rounded-md border border-gray-600 bg-gray-800/40 px-3 py-2 max-h-64 overflow-y-auto">
+              <span className="text-[10px] font-medium text-gray-500 uppercase">Subtitle text per clip</span>
+              {subtitleCues.map((cue, i) => {
+                const scenes = [...(scriptData?.scenes ?? [])].sort(
+                  (a, b) => Number(a?.id ?? 0) - Number(b?.id ?? 0),
+                );
+                const defaultText = (scenes[i]?.voiceover ?? "").trim() || "";
+                const value = Object.prototype.hasOwnProperty.call(subtitleTextOverrides, String(i))
+                  ? subtitleTextOverrides[i]
+                  : defaultText;
+                const startSec = cue.startMs / 1000;
+                const lengthSec = (cue.endMs - cue.startMs) / 1000;
+                const hasTimingOverride = Object.prototype.hasOwnProperty.call(subtitleTimingOverrides, String(i));
+                const persistTiming = (next) => {
+                  if (projectId) {
+                    const prev = initialTimelineSettings && typeof initialTimelineSettings === "object" ? initialTimelineSettings : {};
+                    fetch(`/api/projects/${projectId}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        timeline_settings: { ...prev, subtitleTimingOverrides: next },
+                      }),
+                    }).catch(() => {});
+                  }
+                };
+                return (
+                  <div key={i} className="flex flex-col gap-1">
+                    <div className="flex gap-2 items-center">
+                      <label className="shrink-0 text-xs text-gray-400 w-8">V{i + 1}</label>
+                      <span className="text-[10px] text-gray-500">Start</span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={999}
+                        step={0.5}
+                        value={startSec}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          if (!Number.isFinite(v) || v < 0) return;
+                          setSubtitleTimingOverrides((prev) => {
+                            const curr = prev[String(i)] ?? { startSec: cue.clipStart, lengthSec: cue.clipLength };
+                            const next = { ...prev, [String(i)]: { ...curr, startSec: v } };
+                            persistTiming(next);
+                            return next;
+                          });
+                        }}
+                        onBlur={(e) => {
+                          const v = Math.max(0, Number(e.target.value) || 0);
+                          setSubtitleTimingOverrides((prev) => {
+                            const curr = prev[String(i)] ?? { startSec: cue.clipStart, lengthSec: cue.clipLength };
+                            const next = { ...prev, [String(i)]: { ...curr, startSec: v } };
+                            persistTiming(next);
+                            return next;
+                          });
+                        }}
+                        className="w-14 px-1 py-0.5 text-xs rounded bg-gray-700 text-gray-200 border-0"
+                      />
+                      <span className="text-[10px] text-gray-500">s</span>
+                      <span className="text-[10px] text-gray-500">Duration</span>
+                      <input
+                        type="number"
+                        min={0.5}
+                        max={60}
+                        step={0.5}
+                        value={lengthSec}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          if (!Number.isFinite(v) || v < 0.5) return;
+                          setSubtitleTimingOverrides((prev) => {
+                            const curr = prev[String(i)] ?? { startSec: cue.clipStart, lengthSec: cue.clipLength };
+                            const next = { ...prev, [String(i)]: { ...curr, lengthSec: Math.min(60, v) } };
+                            persistTiming(next);
+                            return next;
+                          });
+                        }}
+                        onBlur={(e) => {
+                          const v = Math.max(0.5, Math.min(60, Number(e.target.value) || 1));
+                          setSubtitleTimingOverrides((prev) => {
+                            const curr = prev[String(i)] ?? { startSec: cue.clipStart, lengthSec: cue.clipLength };
+                            const next = { ...prev, [String(i)]: { ...curr, lengthSec: v } };
+                            persistTiming(next);
+                            return next;
+                          });
+                        }}
+                        className="w-14 px-1 py-0.5 text-xs rounded bg-gray-700 text-gray-200 border-0"
+                      />
+                      <span className="text-[10px] text-gray-500">s</span>
+                      {hasTimingOverride && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSubtitleTimingOverrides((prev) => {
+                              const next = { ...prev };
+                              delete next[String(i)];
+                              persistTiming(next);
+                              return next;
+                            });
+                          }}
+                          className="text-[10px] text-amber-400 hover:text-amber-300"
+                        >
+                          Reset
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex gap-2 items-start">
+                      <span className="w-8 shrink-0" />
+                    <textarea
+                      value={value}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setSubtitleTextOverrides((prev) => ({
+                          ...prev,
+                          [String(i)]: v,
+                        }));
+                      }}
+                      onBlur={(e) => {
+                        const v = e.target.value;
+                        const next = { ...subtitleTextOverrides, [String(i)]: v };
+                        if (projectId) {
+                          const prev = initialTimelineSettings && typeof initialTimelineSettings === "object" ? initialTimelineSettings : {};
+                          fetch(`/api/projects/${projectId}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              timeline_settings: { ...prev, subtitleTextOverrides: next, subtitleTimingOverrides, subtitleFade, subtitleStroke },
+                            }),
+                          }).catch(() => {});
+                        }
+                      }}
+                      placeholder={defaultText || "Enter subtitle…"}
+                      className="flex-1 min-h-[2rem] px-2 py-1 text-xs rounded bg-gray-700 text-gray-200 border-0 resize-y placeholder-gray-500"
+                      rows={2}
+                    />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
           <div className="flex flex-1 min-h-0 min-w-0 overflow-auto">
             {/* Timeline – 1080×400 scaled; overflow-auto enables vertical scroll when content exceeds container */}
             <div
