@@ -71,3 +71,19 @@ If you only want to test “Post to Instagram” on prod and don’t need dev da
 2. Open the video generator on prod → Step 7 → **Connect Instagram** and complete OAuth.
 
 The token is stored in **loa-prod** Firestore (`integrations/instagram`). No copy from dev needed.
+
+---
+
+## Upload grain assets to Storage (dev or prod)
+
+Grain overlay files live in Firebase Storage under `grains/`. To upload from local `public/grains`:
+
+```bash
+# Dev (uses .env)
+node scripts/upload-grains-to-storage.js
+
+# Prod (uses .env.prod)
+node scripts/upload-grains-to-storage.js --prod
+```
+
+Requires `.env` or `.env.prod` with Firebase Admin credentials and `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`. Run from project root.

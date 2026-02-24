@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminDb } from "@/utils/firebaseAdmin";
 import { getInstagramCredentials } from "@/utils/instagramAuth";
+import { getYouTubeCredentials } from "@/utils/youtubeAuth";
 
 const LOG = (o) => console.log("[Instagram]", JSON.stringify(o));
 const INSTAGRAM_GRAPH_VERSION = "v21.0";
@@ -9,7 +10,7 @@ const INSTAGRAM_CONTAINER_POLL_MAX = 60; // ~3 min
 
 export async function POST(request) {
   try {
-    const { session_id, platform, video_url, caption, cover_url } = await request.json();
+    const { session_id, platform, video_url, caption, cover_url, thumbnail_url } = await request.json();
 
     if (!session_id || !platform || !video_url) {
       return NextResponse.json(
@@ -27,7 +28,7 @@ export async function POST(request) {
         LOG({ step: "post_social", platform: "instagram", result_success: result.success, result_message: result.message?.slice(0, 80) });
         break;
       case "youtube":
-        result = await postToYouTube(video_url, caption ?? "");
+        result = await postToYouTube(video_url, caption ?? "", thumbnail_url || null);
         break;
       case "tiktok":
         result = await postToTikTok(video_url, caption ?? "");
@@ -257,16 +258,19 @@ async function postToInstagram(videoUrl, caption, coverUrl = null) {
  * YouTube Data API v3: upload via API only (no manual user download/upload).
  * YouTube does not support "upload from URL"; we must send bytes. We use resumable upload
  * and stream from the source URL in chunks so we never buffer the full file in memory.
- * Env: YOUTUBE_ACCESS_TOKEN (OAuth2 access token with youtube.upload scope).
+ * Optional thumbnailUrl: after upload, set custom thumbnail via thumbnails.set (JPEG/PNG, max 2MB).
+ * Credentials: env YOUTUBE_ACCESS_TOKEN or OAuth (Firestore integrations/youtube via /api/auth/youtube).
  */
-async function postToYouTube(videoUrl, caption) {
-  const accessToken = process.env.YOUTUBE_ACCESS_TOKEN;
+async function postToYouTube(videoUrl, caption, thumbnailUrl = null) {
+  const creds = await getYouTubeCredentials();
+  const accessToken = creds?.access_token;
   if (!accessToken) {
     return {
       success: false,
       post_url: null,
       message:
-        "YouTube posting is not configured. Set YOUTUBE_ACCESS_TOKEN (OAuth2 with youtube.upload scope).",
+        "YouTube is not connected. Connect via OAuth: open /api/auth/youtube in the browser, or set YOUTUBE_ACCESS_TOKEN in env.",
+      debug: creds?._debug ?? null,
     };
   }
 
@@ -290,11 +294,18 @@ async function postToYouTube(videoUrl, caption) {
     const cl = headRes.headers.get("Content-Length");
     if (cl) totalSize = parseInt(cl, 10);
   }
+  let videoId = null;
   if (totalSize == null || !Number.isFinite(totalSize) || totalSize <= 0) {
     const fallback = await uploadYouTubeFallbackBuffer(videoUrl, accessToken, metadata);
     if (!fallback.success) return { success: false, post_url: null, message: fallback.message };
-    const postUrl = fallback.videoId ? `https://www.youtube.com/watch?v=${fallback.videoId}` : null;
-    return { success: true, post_url: postUrl, message: "Uploaded to YouTube." };
+    videoId = fallback.videoId;
+    const postUrl = videoId ? `https://www.youtube.com/watch?v=${videoId}` : null;
+    const thumbResult = videoId && thumbnailUrl ? await setYouTubeThumbnail(accessToken, videoId, thumbnailUrl) : null;
+    return {
+      success: true,
+      post_url: postUrl,
+      message: thumbResult === false ? "Uploaded to YouTube; thumbnail update failed." : "Uploaded to YouTube.",
+    };
   }
 
   const uploadUrl = await initYouTubeResumableUpload(accessToken, metadata, totalSize);
@@ -306,9 +317,48 @@ async function postToYouTube(videoUrl, caption) {
   if (!result.success) {
     return { success: false, post_url: null, message: result.message ?? "YouTube upload failed." };
   }
-  const videoId = result.videoId;
+  videoId = result.videoId;
   const postUrl = videoId ? `https://www.youtube.com/watch?v=${videoId}` : null;
-  return { success: true, post_url: postUrl, message: "Uploaded to YouTube." };
+  const thumbResult = videoId && thumbnailUrl ? await setYouTubeThumbnail(accessToken, videoId, thumbnailUrl) : null;
+  return {
+    success: true,
+    post_url: postUrl,
+    message: thumbResult === false ? "Uploaded to YouTube; thumbnail update failed." : "Uploaded to YouTube.",
+  };
+}
+
+/** YouTube thumbnails.set: upload custom thumbnail (JPEG/PNG, max 2MB). */
+async function setYouTubeThumbnail(accessToken, videoId, imageUrl) {
+  const imgRes = await fetch(imageUrl);
+  if (!imgRes.ok) {
+    console.error("YouTube thumbnail fetch failed:", imgRes.status, imageUrl);
+    return false;
+  }
+  const contentType = imgRes.headers.get("Content-Type") || "";
+  const isPng = contentType.includes("png");
+  const buffer = Buffer.from(await imgRes.arrayBuffer());
+  if (buffer.length > 2 * 1024 * 1024) {
+    console.error("YouTube thumbnail too large:", buffer.length, "max 2MB");
+    return false;
+  }
+  const thumbRes = await fetch(
+    `https://www.googleapis.com/upload/youtube/v3/thumbnails/set?videoId=${encodeURIComponent(videoId)}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": isPng ? "image/png" : "image/jpeg",
+        "Content-Length": String(buffer.length),
+      },
+      body: buffer,
+    }
+  );
+  if (!thumbRes.ok) {
+    const err = await thumbRes.text();
+    console.error("YouTube thumbnails.set error:", thumbRes.status, err?.slice(0, 200));
+    return false;
+  }
+  return true;
 }
 
 const YOUTUBE_CHUNK_SIZE = 256 * 1024; // 256 KB (required multiple for resumable chunks)

@@ -1,0 +1,7 @@
+Static camera, lock-off shot, no camera movement. Character and subject have natural movement: subtle motion, breathing, gentle animation. No text.
+
+Audio rules:
+- SFX only (environmental sounds like rain, distant traffic, footsteps).
+- Do NOT include background music, soundtrack, songs, singing, or BGM.
+
+Avoid: lip-sync/speaking, breathing/chest rise-fall, text overlays, logos/watermarks, flicker/jitter, warping/morphing, camera shake

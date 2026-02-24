@@ -41,6 +41,7 @@
     "rehype-sanitize": "^6.0.0",
     "remark-gfm": "^4.0.1",
     "uuid": "^11.1.0",
+    "youtube-transcript-plus": "^1.2.0",
     "yup": "^1.6.1"
   },
   "devDependencies": {

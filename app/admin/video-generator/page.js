@@ -220,8 +220,12 @@ function VideoGeneratorContent() {
   const [instagramTokenDebug, setInstagramTokenDebug] = useState(null);
   const [instagramCaption, setInstagramCaption] = useState("");
   const [instagramCoverUrl, setInstagramCoverUrl] = useState(null);
+  const [youtubeConnected, setYoutubeConnected] = useState(false);
+  const [youtubeStatusLoading, setYoutubeStatusLoading] = useState(false);
+  const [youtubeTokenDebug, setYoutubeTokenDebug] = useState(null);
   const [socialTab, setSocialTab] = useState("instagram"); // instagram | youtube | tiktok
   const [youtubeCaption, setYoutubeCaption] = useState("");
+  const [youtubeThumbnailUrl, setYoutubeThumbnailUrl] = useState(null);
   const [tiktokCaption, setTiktokCaption] = useState("");
   const [generatingCaptionFor, setGeneratingCaptionFor] = useState(null); // "instagram" | "youtube" | "tiktok"
   const [postProgress, setPostProgress] = useState(null); // { platform, status }
@@ -1200,6 +1204,7 @@ function VideoGeneratorContent() {
             tiktok: tiktokCaption || "",
           },
           instagram_cover_url: instagramCoverUrl || null,
+          youtube_thumbnail_url: youtubeThumbnailUrl || null,
         };
         fetch(`/api/projects/${currentProjectId}`, {
           method: "PATCH",
@@ -1214,6 +1219,7 @@ function VideoGeneratorContent() {
     youtubeCaption,
     tiktokCaption,
     instagramCoverUrl,
+    youtubeThumbnailUrl,
     currentProjectId,
     step,
   ]);
@@ -1283,6 +1289,23 @@ function VideoGeneratorContent() {
         setInstagramTokenDebug(null);
       })
       .finally(() => setInstagramStatusLoading(false));
+  }, [step, searchParams]);
+
+  // YouTube connection status (step 7 or after OAuth redirect)
+  useEffect(() => {
+    if (step !== 7 && searchParams.get("youtube") !== "connected") return;
+    setYoutubeStatusLoading(true);
+    fetch("/api/auth/youtube/status?debug=1")
+      .then((r) => r.json())
+      .then((data) => {
+        setYoutubeConnected(!!data.connected);
+        setYoutubeTokenDebug(data.debug || null);
+      })
+      .catch(() => {
+        setYoutubeConnected(false);
+        setYoutubeTokenDebug(null);
+      })
+      .finally(() => setYoutubeStatusLoading(false));
   }, [step, searchParams]);
 
   // Load project-generated voiceovers and refresh character from Firestore when entering step 2
@@ -2011,6 +2034,7 @@ function VideoGeneratorContent() {
           setTiktokCaption("");
         }
         setInstagramCoverUrl(result.project.instagram_cover_url || null);
+        setYoutubeThumbnailUrl(result.project.youtube_thumbnail_url || null);
 
         // Load selected locations from scene docs.
         // Backward-compatible: migrate legacy project.location_mapping -> scenes[].location_id.
@@ -4645,6 +4669,7 @@ function VideoGeneratorContent() {
           video_url: finalVideoUrl,
           caption: (platform === "instagram" ? instagramCaption : platform === "youtube" ? youtubeCaption : tiktokCaption) || scriptData?.script || "",
           ...(platform === "instagram" && instagramCoverUrl && { cover_url: instagramCoverUrl }),
+          ...(platform === "youtube" && youtubeThumbnailUrl && { thumbnail_url: youtubeThumbnailUrl }),
         }),
       });
       clearInterval(statusInterval);
@@ -4710,6 +4735,22 @@ function VideoGeneratorContent() {
         setInstagramConnected(false);
         setInstagramTokenDebug(null);
         await alert("Instagram disconnected. Click \"Connect Instagram\" to connect again.", "success");
+      } else {
+        await alert(data.error || "Failed to disconnect", "error");
+      }
+    } catch (e) {
+      await alert("Error: " + e.message, "error");
+    }
+  };
+
+  const handleDisconnectYouTube = async () => {
+    try {
+      const res = await fetch("/api/auth/youtube/disconnect", { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        setYoutubeConnected(false);
+        setYoutubeTokenDebug(null);
+        await alert("YouTube disconnected. Click \"Connect YouTube\" to connect again.", "success");
       } else {
         await alert(data.error || "Failed to disconnect", "error");
       }
@@ -10027,10 +10068,52 @@ function VideoGeneratorContent() {
                           </div>
                           <p className="text-xs text-gray-500 dark:text-gray-400">{youtubeCaption.length} / 5000</p>
                         </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Thumbnail image</label>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setYoutubeThumbnailUrl(null)}
+                              className={`w-16 h-16 rounded-lg border-2 flex items-center justify-center text-xs font-medium transition ${
+                                !youtubeThumbnailUrl ? "border-blue-500 bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300" : "border-gray-300 dark:border-gray-600 hover:border-gray-400"
+                              }`}
+                            >
+                              Default
+                            </button>
+                            {(scriptData?.scenes || []).map((s) => getSelectedImageUrlForScene(s)).filter(Boolean).map((url, idx) => (
+                              <button key={idx} type="button" onClick={() => setYoutubeThumbnailUrl(url)} className={`w-16 h-16 rounded-lg border-2 overflow-hidden shrink-0 transition ${youtubeThumbnailUrl === url ? "border-blue-500 ring-2 ring-blue-500/50" : "border-gray-300 dark:border-gray-600 hover:border-gray-400"}`}>
+                                <img src={url} alt={`Scene ${idx + 1}`} className="w-full h-full object-cover" />
+                              </button>
+                            ))}
+                          </div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Optional. Recommended: 1280×720px (16:9). Max 2MB. JPEG or PNG.</p>
+                        </div>
                         <div className="pt-2">
-                          <button onClick={() => handlePostToSocial("youtube")} disabled={loading} className="w-full flex items-center justify-center gap-3 bg-red-600 text-white py-4 rounded-lg font-medium hover:bg-red-700 disabled:opacity-50">
-                            <SiYoutube className="w-7 h-7" /> Post to YouTube
-                          </button>
+                          {youtubeStatusLoading ? (
+                            <div className="flex items-center justify-center gap-2 py-4 text-gray-500 dark:text-gray-400">
+                              Checking YouTube connection…
+                            </div>
+                          ) : youtubeConnected ? (
+                            <div className="flex flex-col gap-2">
+                              <button onClick={() => handlePostToSocial("youtube")} disabled={loading} className="flex items-center justify-center gap-3 bg-red-600 text-white py-4 rounded-lg font-medium hover:bg-red-700 disabled:opacity-50">
+                                <SiYoutube className="w-7 h-7" /> Post to YouTube
+                              </button>
+                              <button type="button" onClick={handleDisconnectYouTube} className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 underline">
+                                Disconnect YouTube
+                              </button>
+                              {youtubeTokenDebug && (
+                                <div className="mt-2 p-3 rounded-lg bg-gray-100 dark:bg-gray-800 text-left text-xs font-mono break-all">
+                                  <div className="font-semibold text-gray-600 dark:text-gray-400 mb-1">Token (debug)</div>
+                                  <div>Preview: {youtubeTokenDebug.access_token_preview ?? "—"}</div>
+                                  {youtubeTokenDebug.access_token != null && <div className="mt-1">Token: {youtubeTokenDebug.access_token}</div>}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <a href={"/api/auth/youtube?return_to=" + encodeURIComponent("/admin/video-generator" + (currentProjectId || step != null ? "?" + new URLSearchParams({ ...(currentProjectId && { project_id: currentProjectId }), ...(step != null && { step: String(step) }) }).toString() : ""))} className="flex items-center justify-center gap-3 bg-red-600 text-white py-4 rounded-lg font-medium hover:bg-red-700 no-underline">
+                              <SiYoutube className="w-7 h-7" /> Connect YouTube
+                            </a>
+                          )}
                         </div>
                       </div>
                     )}

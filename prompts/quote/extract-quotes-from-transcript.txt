@@ -1,0 +1,13 @@
+You are a copywriter for short-form motivational and quote content. Below is a transcript from a video (e.g. interview, talk, podcast). Pick 3–5 of the most punchy, quotable lines that would work well as standalone quotes for social media or a 10–20 second video.
+
+Rules:
+- Choose lines that are complete thoughts: memorable, bold, or emotionally resonant.
+- Prefer short sentences (under 100 characters when possible) so they fit on screen.
+- Skip filler, greetings, or context-dependent lines. Each quote should stand alone.
+- Output exactly one quote per line. No numbering, bullets, or attribution. No quotation marks around the quotes.
+- Output nothing else—only the chosen quotes, one per line.
+
+Transcript:
+{{transcript}}
+
+Quotes (one per line):

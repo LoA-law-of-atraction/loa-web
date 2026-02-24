@@ -385,7 +385,7 @@ Upload the rendered video to Instagram, YouTube, or TikTok. Each platform requir
 | Platform   | Env vars | Notes |
 |------------|----------|--------|
 | Instagram  | OAuth: `INSTAGRAM_CLIENT_ID`, `INSTAGRAM_CLIENT_SECRET`, `INSTAGRAM_REDIRECT_URI`; or manual: `INSTAGRAM_USER_ID`, `INSTAGRAM_ACCESS_TOKEN` | **OAuth:** Open `/api/auth/instagram` to connect; token stored in Firestore `integrations/instagram`. **Manual:** Set user id + long-lived token. Graph API: create container (Reels) → poll status → publish. |
-| YouTube    | `YOUTUBE_ACCESS_TOKEN` | OAuth2 access token with `youtube.upload` scope. Video is downloaded from `video_url` and uploaded via Data API v3 multipart. |
+| YouTube    | OAuth: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, redirect `…/api/auth/youtube/callback`; or manual: `YOUTUBE_ACCESS_TOKEN` | **OAuth:** "Connect YouTube" in Step 7; token stored in Firestore `integrations/youtube`, auto-refresh. **Manual:** OAuth2 token with `youtube.upload` scope. Video uploaded via Data API v3 resumable upload. |
 | TikTok     | `TIKTOK_ACCESS_TOKEN` | User access token with `video.upload` scope. Uses PULL_FROM_URL (video URL domain must be [verified](https://developers.tiktok.com/doc/content-posting-api-media-transfer-guide) in TikTok Developer Portal). Video is sent to the user's TikTok inbox to edit and publish in-app. |
 
 ---
@@ -474,9 +474,12 @@ Step 7 posts are implemented in `/api/video-generator/post-social/route.js`. Set
 
 ### YouTube
 
-- Set `YOUTUBE_ACCESS_TOKEN` (OAuth2 token with scope `https://www.googleapis.com/auth/youtube.upload`).
-- Flow: download video from `video_url`, then multipart upload to YouTube Data API v3.
+- **OAuth (recommended):** Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` (or `YOUTUBE_CLIENT_ID` / `YOUTUBE_CLIENT_SECRET`). Add redirect URI `https://your-domain.com/api/auth/youtube/callback` in Google Cloud Console. Open `/api/auth/youtube` or click "Connect YouTube" in Step 7; tokens are stored in Firestore `integrations/youtube` and refreshed automatically.
+- **Manual:** Set `YOUTUBE_ACCESS_TOKEN` (OAuth2 token with scope `https://www.googleapis.com/auth/youtube.upload`).
+- Flow: download video from `video_url`, then resumable upload to YouTube Data API v3.
 - Docs: https://developers.google.com/youtube/v3/docs/videos/insert
+
+**Where to get Google OAuth credentials:** [Google Cloud Console](https://console.cloud.google.com/) → select or create a project → **APIs & Services** → **Library** → enable **YouTube Data API v3** → **Credentials** → **Create Credentials** → **OAuth client ID** → Application type **Web application** → add **Authorized redirect URI** `https://<your-domain>/api/auth/youtube/callback` (and `http://localhost:3000/api/auth/youtube/callback` for local). Copy the Client ID and Client secret into `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. If the OAuth consent screen is not set up, configure it under **OAuth consent screen** first (External app, add test users while in Testing).
 
 ### TikTok
 
@@ -487,6 +490,15 @@ Step 7 posts are implemented in `/api/video-generator/post-social/route.js`. Set
 ---
 
 ## Troubleshooting
+
+### Issue: YouTube OAuth "Error 400: redirect_uri_mismatch"
+
+**Cause:** The redirect URI your app sends to Google does not exactly match any URI in your OAuth client.
+
+**Fix:**
+1. Open `/api/auth/youtube?show_uri=1` in the same browser and origin you use for "Connect YouTube" (e.g. `http://localhost:3000/api/auth/youtube?show_uri=1`). The JSON response includes `redirect_uri` — copy it exactly (no trailing slash).
+2. In [Google Cloud Console](https://console.cloud.google.com/) → **APIs & Services** → **Credentials** → your **OAuth 2.0 Client ID** → under **Authorized redirect URIs** add that exact URI (e.g. `http://localhost:3000/api/auth/youtube/callback`) → **Save**.
+3. Optional: set `YOUTUBE_REDIRECT_URI` in `.env` to that exact value so the app always uses the same URI (avoids mismatches from `NEXT_PUBLIC_BASE_URL` or `localhost` vs `127.0.0.1`).
 
 ### Issue: Characters not loading
 

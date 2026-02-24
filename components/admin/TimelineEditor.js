@@ -75,6 +75,30 @@ function buildVolumeWithFade(vol, fadeIn, fadeOut, fadeInDur, fadeOutDur, clipLe
   return tweens.length > 0 ? tweens : v;
 }
 
+/** Font options for subtitle/quote overlay. Shotstack built-in families. */
+const SUBTITLE_FONT_OPTIONS = [
+  { value: "sans", label: "Sans", shotstack: "Clear Sans", css: "ui-sans-serif, system-ui, sans-serif" },
+  { value: "serif", label: "Serif", shotstack: "Arapey Regular", css: "ui-serif, Georgia, serif" },
+  { value: "mono", label: "Mono", shotstack: "Roboto", css: "ui-monospace, monospace" },
+  { value: "montserrat", label: "Montserrat", shotstack: "Montserrat", css: "'Montserrat', sans-serif" },
+  { value: "openSans", label: "Open Sans", shotstack: "Open Sans", css: "'Open Sans', sans-serif" },
+  { value: "workSans", label: "Work Sans", shotstack: "Work Sans", css: "'Work Sans', sans-serif" },
+  { value: "didact", label: "Didact Gothic", shotstack: "Didact Gothic", css: "'Didact Gothic', sans-serif" },
+  { value: "permanentMarker", label: "Permanent Marker", shotstack: "Permanent Marker", css: "'Permanent Marker', cursive" },
+  { value: "sueEllen", label: "Sue Ellen Francisco", shotstack: "Sue Ellen Francisco", css: "'Sue Ellen Francisco', cursive" },
+  { value: "uniNeue", label: "Uni Neue", shotstack: "Uni Neue", css: "'Uni Neue', sans-serif" },
+];
+
+function getSubtitleFontShotstack(value) {
+  const opt = SUBTITLE_FONT_OPTIONS.find((o) => o.value === value);
+  return opt?.shotstack ?? "Clear Sans";
+}
+
+function getSubtitleFontCss(value) {
+  const opt = SUBTITLE_FONT_OPTIONS.find((o) => o.value === value);
+  return opt?.css ?? "ui-sans-serif, system-ui, sans-serif";
+}
+
 /** Build Shotstack text track from subtitle cues for burned-in subtitles.
  * Output size assumed 1080×1920 (portrait). Uses subtitleTimingOverrides when present. */
 function buildSubtitleTextTrack(
@@ -95,12 +119,7 @@ function buildSubtitleTextTrack(
   );
   const overrides = subtitleTextOverrides ?? {};
   const timingOverrides = subtitleTimingOverrides ?? {};
-  const fontFamily =
-    subtitleFont === "serif"
-      ? "Arapey Regular"
-      : subtitleFont === "mono"
-        ? "Roboto"
-        : "Clear Sans";
+  const fontFamily = getSubtitleFontShotstack(subtitleFont);
   const fontPx = Math.max(24, Math.min(96, Math.round((Number(subtitleFontSize) || 14) * 4)));
   const color = /^#[0-9A-Fa-f]{6}$/.test(String(subtitleTextColor))
     ? String(subtitleTextColor)
@@ -161,7 +180,8 @@ function buildSubtitleTextTrack(
   return textClips;
 }
 
-/** Build initial edit JSON from videos + voiceover + music (used when no saved edit) */
+/** Build initial edit JSON from videos + optional voiceover + optional music (used when no saved edit).
+ * When voiceoverUrl is null, builds timeline with video track only or video + music (no voiceover track). */
 function buildInitialEdit(
   videos,
   voiceoverUrl,
@@ -171,13 +191,14 @@ function buildInitialEdit(
   getSceneDurationSeconds,
   oldSettings = {},
 ) {
-  if (!videos?.length || !voiceoverUrl) return null;
+  if (!videos?.length) return null;
 
+  const maxClipSec = videos.length === 1 && !voiceoverUrl ? 60 : 15;
   const clampDurationSeconds = (value, fallback = 8) => {
     const n = Number(value);
     return Number.isFinite(n)
-      ? Math.max(1, Math.min(15, Math.round(n)))
-      : Math.max(1, Math.min(15, Math.round(fallback)));
+      ? Math.max(1, Math.min(maxClipSec, Math.round(n)))
+      : Math.max(1, Math.min(maxClipSec, Math.round(fallback)));
   };
 
   const sortedVideos = (() => {
@@ -258,6 +279,12 @@ function buildInitialEdit(
     ) {
       clip.transition = { in: inTransition, out: outTransition };
     }
+    const videoFilter = oldSettings.videoFilter === "darken" ? "darken" : "none";
+    const videoOpacity = Number.isFinite(Number(oldSettings.videoOpacity))
+      ? Math.max(0.2, Math.min(1, Number(oldSettings.videoOpacity)))
+      : 1;
+    if (videoFilter !== "none") clip.filter = videoFilter;
+    if (videoOpacity < 1) clip.opacity = videoOpacity;
     sumPrev += durationSeconds;
     if (idx < numGaps) sumOverlapPrev += getOverlap(idx);
     return clip;
@@ -300,22 +327,26 @@ function buildInitialEdit(
           voLenNum ?? 30,
         )
       : voVol;
-  const voiceoverClip = {
-    asset: {
-      type: "audio",
-      src: voiceoverUrl,
-      ...(Array.isArray(voVolAsset)
-        ? { volume: voVolAsset }
-        : { volume: voVolAsset, ...(voEffect && { volumeEffect: voEffect }) }),
-    },
-    start: 0,
-    length: voLen,
-  };
-  if (voTrim > 0) voiceoverClip.trim = voTrim;
+  const voiceoverClip = voiceoverUrl
+    ? {
+        asset: {
+          type: "audio",
+          src: voiceoverUrl,
+          ...(Array.isArray(voVolAsset)
+            ? { volume: voVolAsset }
+            : { volume: voVolAsset, ...(voEffect && { volumeEffect: voEffect }) }),
+        },
+        start: 0,
+        length: voLen,
+      }
+    : null;
+  if (voiceoverClip && voTrim > 0) voiceoverClip.trim = voTrim;
 
-  const tracks = [{ clips: videoClips }, { clips: [voiceoverClip] }];
+  const tracks = [{ clips: videoClips }];
+  if (voiceoverClip) tracks.push({ clips: [voiceoverClip] });
+  const musicTrackIndex = voiceoverUrl ? 2 : 1;
   if (backgroundMusicUrl) {
-    const musFade = getClipSettings(2, 0) ?? clipSettings.music;
+    const musFade = getClipSettings(musicTrackIndex, 0) ?? clipSettings.music;
     const musFadeIn = !!musFade?.fadeIn;
     const musFadeOut = !!musFade?.fadeOut;
     const musEffect =
@@ -365,6 +396,12 @@ const TimelineEditor = forwardRef(function TimelineEditor(
     scriptData,
     projectId = null,
     initialTimelineSettings = null,
+    projectPatchBasePath = "/api/projects",
+    requireVoiceover = true,
+    quoteText: quoteTextProp = null,
+    grainOverlayUrl = null,
+    grainOpacity = 0.2,
+    onTimelineSettingsSaved = null,
   },
   ref,
 ) {
@@ -394,6 +431,11 @@ const TimelineEditor = forwardRef(function TimelineEditor(
       return Number.isFinite(n) && n >= 0 && n <= 48 ? n : 12;
     },
   );
+  // Sync grain opacity from prop so preview reliably updates when parent slider changes
+  const [grainOpacityDisplay, setGrainOpacityDisplay] = useState(grainOpacity);
+  useEffect(() => {
+    setGrainOpacityDisplay(grainOpacity);
+  }, [grainOpacity]);
   const [subtitleTextColor, setSubtitleTextColor] = useState(
     () => {
       const v = initialTimelineSettings?.subtitleTextColor;
@@ -413,6 +455,16 @@ const TimelineEditor = forwardRef(function TimelineEditor(
   );
   const [subtitleStroke, setSubtitleStroke] = useState(
     () => initialTimelineSettings?.subtitleStroke === true,
+  );
+  const [subtitleShadow, setSubtitleShadow] = useState(
+    () => initialTimelineSettings?.subtitleShadow !== false,
+  );
+  const [subtitleShadowStrength, setSubtitleShadowStrength] = useState(
+    () => {
+      const v = initialTimelineSettings?.subtitleShadowStrength;
+      const n = Number(v);
+      return Number.isFinite(n) && n >= 0 && n <= 100 ? n : 85;
+    },
   );
   const [showSubtitleTextEdit, setShowSubtitleTextEdit] = useState(false);
   const timelineContainerRef = useRef(null);
@@ -457,8 +509,56 @@ const TimelineEditor = forwardRef(function TimelineEditor(
 
     // Use saved edit only if valid and video clip count matches current project (scenes may have been added/removed)
     if (saved?.timeline && saved?.output && clipCountMatches) {
-      const tracks = saved.timeline?.tracks ?? [];
+      let edit = JSON.parse(JSON.stringify(saved));
+      let tracks = edit.timeline?.tracks ?? [];
       const oldSettings = initialTimelineSettings || {};
+      const videoFilter = oldSettings.videoFilter === "darken" ? "darken" : "none";
+      const videoOpacity = Number.isFinite(Number(oldSettings.videoOpacity))
+        ? Math.max(0.2, Math.min(1, Number(oldSettings.videoOpacity)))
+        : 1;
+      // Sync video clip URLs and lengths from current selection so timeline preview matches Step 3 (quote-videos)
+      if (effectiveVideos?.length > 0 && tracks[0]?.clips?.length === effectiveVideos.length) {
+        const maxClipSec = effectiveVideos.length === 1 && !voiceoverUrl ? 60 : 15;
+        const clampDurationSeconds = (value, fallback = 8) => {
+          const n = Number(value);
+          return Number.isFinite(n)
+            ? Math.max(1, Math.min(maxClipSec, Math.round(n)))
+            : Math.max(1, Math.min(maxClipSec, Math.round(fallback)));
+        };
+        tracks[0].clips = tracks[0].clips.map((c, i) => {
+          const v = effectiveVideos[i];
+          if (!v?.video_url) return c;
+          const durationSeconds = clampDurationSeconds(
+            sceneDurations?.[v.scene_id] ??
+              (scriptData?.scenes && getSceneDurationSeconds
+                ? getSceneDurationSeconds(
+                    scriptData.scenes.find((s) => String(s?.id) === String(v.scene_id)),
+                  )
+                : null),
+            8,
+          );
+          return {
+            ...c,
+            asset: { ...c.asset, src: v.video_url },
+            length: durationSeconds,
+            ...(videoFilter !== "none" ? { filter: videoFilter } : {}),
+            ...(videoOpacity < 1 ? { opacity: videoOpacity } : {}),
+          };
+        });
+      } else if (tracks[0]?.clips?.length) {
+        edit.timeline.tracks[0].clips = edit.timeline.tracks[0].clips.map((c) => ({
+          ...c,
+          ...(videoFilter !== "none" ? { filter: videoFilter } : {}),
+          ...(videoOpacity < 1 ? { opacity: videoOpacity } : {}),
+        }));
+      }
+      // When no voiceover (e.g. quote-videos), normalize 3-track edit to 2 tracks (video + music at index 1) so we don't show two music rows
+      if (!voiceoverUrl && tracks.length === 3) {
+        const videoTrack = edit.timeline.tracks[0];
+        const musicTrack = tracks[2]?.clips?.length ? tracks[2] : tracks[1]?.clips?.length ? tracks[1] : { clips: [] };
+        edit.timeline.tracks = [videoTrack, musicTrack];
+        tracks = edit.timeline.tracks;
+      }
       const clipSettings = oldSettings.clipAudioSettings ?? {};
       const getClipSettings = (trackIdx, clipIdx) =>
         clipSettings[`${trackIdx}-${clipIdx}`] ??
@@ -468,10 +568,11 @@ const TimelineEditor = forwardRef(function TimelineEditor(
 
       const needsVoiceover = voiceoverUrl && tracks.length < 2;
       const needsMusic =
-        backgroundMusicUrl && tracks.length < 3;
+        backgroundMusicUrl &&
+        (voiceoverUrl ? tracks.length < 3 : tracks.length < 2);
 
       if (needsVoiceover || needsMusic) {
-        const clone = JSON.parse(JSON.stringify(saved));
+        const clone = JSON.parse(JSON.stringify(edit));
         const vol =
           getClipSettings(1, 0)?.volume != null
             ? Math.max(0, Math.min(1, Number(getClipSettings(1, 0).volume)))
@@ -520,7 +621,8 @@ const TimelineEditor = forwardRef(function TimelineEditor(
         }
 
         if (needsMusic) {
-          const musFade = getClipSettings(2, 0) ?? clipSettings.music;
+          const musicTrackIdx = voiceoverUrl ? 2 : 1;
+          const musFade = getClipSettings(musicTrackIdx, 0) ?? clipSettings.music;
           const musEffect =
             musFade?.fadeIn && musFade?.fadeOut
               ? "fadeInFadeOut"
@@ -540,10 +642,10 @@ const TimelineEditor = forwardRef(function TimelineEditor(
             length: musLen,
           };
           if (musTrim > 0) musicClip.trim = musTrim;
-          while (clone.timeline.tracks.length < 3) {
+          while (clone.timeline.tracks.length <= musicTrackIdx) {
             clone.timeline.tracks.push({ clips: [] });
           }
-          clone.timeline.tracks[2] = { clips: [musicClip] };
+          clone.timeline.tracks[musicTrackIdx] = { clips: [musicClip] };
         }
 
         return clone;
@@ -551,9 +653,10 @@ const TimelineEditor = forwardRef(function TimelineEditor(
 
       // Ensure music track when we have 2 tracks but no music (saved edit may lack it)
       if (backgroundMusicUrl && tracks.length >= 2 && tracks.length < 3) {
+        const musicTrackIdx = voiceoverUrl ? 2 : 1;
         const musVol =
-          getClipSettings(2, 0)?.volume != null
-            ? Math.max(0, Math.min(1, Number(getClipSettings(2, 0).volume)))
+          getClipSettings(musicTrackIdx, 0)?.volume != null
+            ? Math.max(0, Math.min(1, Number(getClipSettings(musicTrackIdx, 0).volume)))
             : Math.max(0, Math.min(1, Number(oldSettings.musicVolume ?? 0.25)));
         const musTrim = Math.max(0, Number(oldSettings.musicTrim ?? 0));
         const musLen =
@@ -566,11 +669,12 @@ const TimelineEditor = forwardRef(function TimelineEditor(
           length: musLen,
         };
         if (musTrim > 0) musicClip.trim = musTrim;
-        const clone = JSON.parse(JSON.stringify(saved));
-        while (clone.timeline.tracks.length < 3) {
+        const clone = JSON.parse(JSON.stringify(edit));
+        const targetLength = voiceoverUrl ? 3 : 2;
+        while (clone.timeline.tracks.length < targetLength) {
           clone.timeline.tracks.push({ clips: [] });
         }
-        clone.timeline.tracks[2] = { clips: [musicClip] };
+        clone.timeline.tracks[musicTrackIdx] = { clips: [musicClip] };
         return clone;
       }
 
@@ -595,7 +699,7 @@ const TimelineEditor = forwardRef(function TimelineEditor(
           length: musLen,
         };
         if (musTrim > 0) musicClip.trim = musTrim;
-        const clone = JSON.parse(JSON.stringify(saved));
+        const clone = JSON.parse(JSON.stringify(edit));
         clone.timeline.tracks[2] = { clips: [musicClip] };
         return clone;
       }
@@ -635,12 +739,12 @@ const TimelineEditor = forwardRef(function TimelineEditor(
           length: musLen,
         };
         if (musTrim > 0) musicClip.trim = musTrim;
-        const clone = JSON.parse(JSON.stringify(saved));
+        const clone = JSON.parse(JSON.stringify(edit));
         clone.timeline.tracks[2] = { clips: [musicClip] };
         return clone;
       }
 
-      return saved;
+      return edit;
     }
 
     return buildInitialEdit(
@@ -732,12 +836,33 @@ const TimelineEditor = forwardRef(function TimelineEditor(
         });
         if (cancelled) return;
 
-        const {
-          Edit: StudioEdit,
-          Canvas,
-          Controls,
-          Timeline: StudioTimeline,
-        } = await import("@shotstack/shotstack-studio");
+        let StudioEdit, Canvas, Controls, StudioTimeline;
+        try {
+          const mod = await import("@shotstack/shotstack-studio");
+          StudioEdit = mod.Edit;
+          Canvas = mod.Canvas;
+          Controls = mod.Controls;
+          StudioTimeline = mod.Timeline;
+        } catch (importErr) {
+          const msg = importErr?.message || String(importErr);
+          const isHmr = /deleted by an HMR|HMR update/i.test(msg);
+          if (isHmr) {
+            await new Promise((r) => setTimeout(r, 150));
+            if (cancelled) return;
+            try {
+              const mod = await import("@shotstack/shotstack-studio");
+              StudioEdit = mod.Edit;
+              Canvas = mod.Canvas;
+              Controls = mod.Controls;
+              StudioTimeline = mod.Timeline;
+            } catch (retryErr) {
+              console.warn("[TimelineEditor] Shotstack SDK failed after HMR retry. Refresh the page.", retryErr);
+              return;
+            }
+          } else {
+            throw importErr;
+          }
+        }
 
         if (cancelled) return;
 
@@ -773,6 +898,9 @@ const TimelineEditor = forwardRef(function TimelineEditor(
           for (const track of tracks) {
             for (const clip of track.clips || []) {
               delete clip.alias;
+              // Studio SDK loadEdit rejects filter/opacity on clips (ZodError unrecognized_keys) — strip so preview loads
+              if ("filter" in clip) delete clip.filter;
+              if ("opacity" in clip) delete clip.opacity;
               const asset = clip?.asset;
               if (asset?.src && typeof asset.src === "string") {
                 let src = asset.src;
@@ -798,6 +926,10 @@ const TimelineEditor = forwardRef(function TimelineEditor(
               }
             }
           }
+
+          // Grain is NOT added as a Studio track: PixiJS/SDK cannot load .mov (or some grain URLs),
+          // which would cause loadEdit to fail. Grain is shown only via the DOM overlay on top of the canvas.
+
           studioEditJson.timeline.tracks = tracks;
         } catch {
           /* best-effort */
@@ -820,14 +952,20 @@ const TimelineEditor = forwardRef(function TimelineEditor(
         try {
           await studioEdit.loadEdit(studioEditJson);
         } catch (loadErr) {
-          // PixiJS/SDK may fail to load audio (parser not found). Fall back to video-only for preview.
+          // PixiJS/SDK may fail (e.g. audio parser, or overlay/grain clip). Keep video + audio tracks so preview still has sound.
           console.warn(
-            "[TimelineEditor] loadEdit failed (audio loading may have failed), retrying with video-only for preview",
+            "[TimelineEditor] loadEdit failed, retrying with video + audio tracks only (no overlay/grain)",
             loadErr,
           );
           usedVideoOnlyFallbackRef.current = true;
-          studioEditJson.timeline.tracks =
-            studioEditJson.timeline.tracks?.slice(0, 1) ?? [];
+          const allTracks = studioEditJson.timeline?.tracks ?? [];
+          const videoTrack = allTracks[0];
+          const audioTracks = allTracks.slice(1).filter(
+            (t) => (t?.clips ?? []).length > 0 && (t.clips ?? []).every((c) => c?.asset?.type === "audio"),
+          );
+          studioEditJson.timeline.tracks = videoTrack
+            ? [videoTrack, ...audioTracks]
+            : allTracks.slice(0, 1);
           await studioEdit.loadEdit(studioEditJson);
         }
 
@@ -930,9 +1068,9 @@ const TimelineEditor = forwardRef(function TimelineEditor(
         if (instances?.controls?.dispose) instances.controls.dispose();
         if (edit?.dispose) edit.dispose();
       } catch (e) {
-        // PixiJS TexturePool bug on unmount (e.g. HMR): "Cannot read properties of undefined (reading 'push')"
-        // Shotstack SDK triggers this during dispose; safe to ignore.
+        // PixiJS/SDK bugs on unmount (e.g. HMR or double-invoke): push/canvas already null; safe to ignore.
         if (e?.message?.includes?.("push")) return;
+        if (e?.message?.includes?.("canvas")) return;
         console.warn("[TimelineEditor] SDK dispose error:", e);
       }
       studioSdkInstancesRef.current = null;
@@ -1036,7 +1174,7 @@ const TimelineEditor = forwardRef(function TimelineEditor(
           ? initialTimelineSettings
           : {};
         const subtitleFromRef = subtitleSettingsRef.current || {};
-        fetch(`/api/projects/${projectId}`, {
+        fetch(`${projectPatchBasePath}/${projectId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -1049,7 +1187,7 @@ const TimelineEditor = forwardRef(function TimelineEditor(
               clipAudioSettings: Object.keys(clipAudioSettings).length > 0 ? clipAudioSettings : prev.clipAudioSettings,
             },
           }),
-        }).catch((err) => console.warn("Timeline auto-save failed:", err));
+        }).then(() => { onTimelineSettingsSaved?.(); }).catch((err) => console.warn("Timeline auto-save failed:", err));
       }, DEBOUNCE_MS);
     };
 
@@ -1060,7 +1198,7 @@ const TimelineEditor = forwardRef(function TimelineEditor(
       studioEdit.events?.off?.("timeline:updated", onTimelineUpdated);
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
-  }, [projectId, editKey, studioReadyTick, initialTimelineSettings]); // studioReadyTick: attach when init completes
+  }, [projectId, projectPatchBasePath, editKey, studioReadyTick, initialTimelineSettings, onTimelineSettingsSaved]); // studioReadyTick: attach when init completes
 
   useImperativeHandle(
     ref,
@@ -1129,19 +1267,21 @@ const TimelineEditor = forwardRef(function TimelineEditor(
           });
         });
 
-        // Add subtitle text track for burned-in captions (Shotstack renders; Studio UI does not show it)
-        const subtitleClips = buildSubtitleTextTrack(
-          edit,
-          scriptData,
-          subtitleTextOverrides,
-          subtitleTimingOverrides,
-          subtitlePosition,
-          subtitleFont,
-          subtitleFontSize,
-          subtitleTextColor,
-          subtitleFade,
-          subtitleStroke,
-        );
+        // Add subtitle text track only when NOT using quote overlay (quote-videos use DOM-only quote; SDK must not render it or we get double text + wrong shadow).
+        const subtitleClips = quoteTextProp
+          ? []
+          : buildSubtitleTextTrack(
+              edit,
+              scriptData,
+              subtitleTextOverrides,
+              subtitleTimingOverrides,
+              subtitlePosition,
+              subtitleFont,
+              subtitleFontSize,
+              subtitleTextColor,
+              subtitleFade,
+              subtitleStroke,
+            );
         if (subtitleClips.length > 0) {
           // Shotstack: first track = top layer. Put subtitles first so they overlay the video.
           edit.timeline.tracks = [{ clips: subtitleClips }, ...(edit.timeline.tracks || [])];
@@ -1149,9 +1289,16 @@ const TimelineEditor = forwardRef(function TimelineEditor(
 
         return edit;
       },
+      /** Return current subtitle/timeline settings so parent can send them to assemble and render uses exact UI values (e.g. shadow strength, video filter/opacity). */
+      getTimelineSettings: () => ({
+        ...(subtitleSettingsRef.current || {}),
+        videoFilter: initialTimelineSettings?.videoFilter === "darken" ? "darken" : "none",
+        videoOpacity: Number.isFinite(Number(initialTimelineSettings?.videoOpacity)) ? Math.max(0.2, Math.min(1, Number(initialTimelineSettings?.videoOpacity))) : 1,
+      }),
     }),
     [
       initialTimelineSettings,
+      quoteTextProp,
       scriptData,
       subtitleTextOverrides,
       subtitleTimingOverrides,
@@ -1161,6 +1308,8 @@ const TimelineEditor = forwardRef(function TimelineEditor(
       subtitleTextColor,
       subtitleFade,
       subtitleStroke,
+      subtitleShadow,
+      subtitleShadowStrength,
     ],
   );
 
@@ -1168,11 +1317,22 @@ const TimelineEditor = forwardRef(function TimelineEditor(
   const structureEdit = editToLoad;
   const liveEdit = studioEditRef.current?.getEdit?.();
 
-  // Subtitle cues: clip start/end (ms) + text from overrides or scene voiceover
-  // Uses subtitleTimingOverrides when present; otherwise clip timing
+  // Subtitle cues: clip start/end (ms) + text from overrides or scene voiceover.
+  // When quoteTextProp is provided (e.g. quote-videos), show it as a single overlay for the full timeline.
   const subtitleCues = useMemo(() => {
     const edit = liveEdit ?? structureEdit;
     const clips = edit?.timeline?.tracks?.[0]?.clips ?? [];
+    const quoteText = (quoteTextProp && String(quoteTextProp).trim()) || "";
+    if (quoteText) {
+      const totalEnd = clips.reduce(
+        (end, c) => Math.max(end, (Number(c?.start) || 0) + (Number(c?.length) || 0)),
+        0,
+      );
+      const totalDurationMs = totalEnd * 1000;
+      if (totalDurationMs > 0) {
+        return [{ startMs: 0, endMs: totalDurationMs, text: quoteText, clipStart: 0, clipLength: totalEnd }];
+      }
+    }
     const scenes = [...(scriptData?.scenes ?? [])].sort(
       (a, b) => Number(a?.id ?? 0) - Number(b?.id ?? 0),
     );
@@ -1199,11 +1359,12 @@ const TimelineEditor = forwardRef(function TimelineEditor(
       cues.push({ startMs, endMs, text, clipStart, clipLength });
     }
     return cues;
-  }, [liveEdit, structureEdit, scriptData?.scenes, subtitleTextOverrides, subtitleTimingOverrides]);
+  }, [liveEdit, structureEdit, scriptData?.scenes, subtitleTextOverrides, subtitleTimingOverrides, quoteTextProp]);
 
   const lastSubtitleRef = useRef("");
   const subtitleContainerRef = useRef(null);
   const subtitleTextRef = useRef(null);
+  const lastSyncedProjectIdForShadowRef = useRef(null);
 
   // Debug: log subtitle and container dimensions
   useEffect(() => {
@@ -1237,6 +1398,8 @@ const TimelineEditor = forwardRef(function TimelineEditor(
       subtitleTimingOverrides,
       subtitleFade,
       subtitleStroke,
+      subtitleShadow,
+      subtitleShadowStrength,
     };
   }, [
     subtitlePosition,
@@ -1248,9 +1411,30 @@ const TimelineEditor = forwardRef(function TimelineEditor(
     subtitleTimingOverrides,
     subtitleFade,
     subtitleStroke,
+    subtitleShadow,
+    subtitleShadowStrength,
   ]);
 
-  // Sync subtitle settings when loading a different project
+  // Debug: log shadow overlay state so we can see why preview may not show shadow
+  useEffect(() => {
+    const strengthNum = Number(subtitleShadowStrength);
+    const condition = subtitleShadow && strengthNum > 0;
+    const str = Math.max(0, Math.min(100, strengthNum || 0));
+    const opacity = 0.4 + (str / 100) * 0.55;
+    const blur = 2 + (str / 100) * 12;
+    const textShadowStyle = condition ? `2px 2px ${blur}px rgba(0,0,0,${opacity})` : null;
+    console.log("[TimelineEditor] Shadow overlay:", {
+      hasSubtitle: !!currentSubtitle,
+      subtitlePosition,
+      subtitleShadow,
+      subtitleShadowStrength: strengthNum,
+      conditionApplyShadow: condition,
+      computed: condition ? { blur, opacity, textShadow: textShadowStyle } : "none",
+    });
+  }, [currentSubtitle, subtitlePosition, subtitleShadow, subtitleShadowStrength]);
+
+  // Sync subtitle settings when loading a different project. Only sync shadow/shadowStrength when
+  // projectId changes so a refetch after save doesn't overwrite the slider with stale data (85).
   useEffect(() => {
     const pos = initialTimelineSettings?.subtitlePosition ?? "bottom";
     const font = initialTimelineSettings?.subtitleFont ?? "sans";
@@ -1264,6 +1448,8 @@ const TimelineEditor = forwardRef(function TimelineEditor(
     const timingOverrides = initialTimelineSettings?.subtitleTimingOverrides;
     const fade = initialTimelineSettings?.subtitleFade;
     const stroke = initialTimelineSettings?.subtitleStroke;
+    const shadow = initialTimelineSettings?.subtitleShadow;
+    const shadowStr = initialTimelineSettings?.subtitleShadowStrength;
     setSubtitlePosition(pos);
     setSubtitleFont(font);
     setSubtitleFontSize(size);
@@ -1277,6 +1463,16 @@ const TimelineEditor = forwardRef(function TimelineEditor(
     );
     setSubtitleFade(fade !== false);
     setSubtitleStroke(stroke === true);
+    const projectChanged = projectId !== lastSyncedProjectIdForShadowRef.current;
+    if (projectChanged) {
+      lastSyncedProjectIdForShadowRef.current = projectId;
+      setSubtitleShadow(shadow !== false);
+      setSubtitleShadowStrength(
+        Number.isFinite(Number(shadowStr)) && Number(shadowStr) >= 0 && Number(shadowStr) <= 100
+          ? Number(shadowStr)
+          : 85,
+      );
+    }
   }, [
     projectId,
     initialTimelineSettings?.subtitlePosition,
@@ -1288,6 +1484,8 @@ const TimelineEditor = forwardRef(function TimelineEditor(
     initialTimelineSettings?.subtitleTimingOverrides,
     initialTimelineSettings?.subtitleFade,
     initialTimelineSettings?.subtitleStroke,
+    initialTimelineSettings?.subtitleShadow,
+    initialTimelineSettings?.subtitleShadowStrength,
   ]);
 
   const FADE_DUR_MS = 300;
@@ -1324,14 +1522,17 @@ const TimelineEditor = forwardRef(function TimelineEditor(
     };
   }, [subtitleCues, subtitleFade]);
 
-  if (!effectiveVideos.length || !voiceoverUrl) {
+  if (!effectiveVideos.length) {
     return (
       <div className="rounded-xl border border-gray-300 bg-gray-50 p-8 text-center text-sm text-gray-600 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400">
-        {!effectiveVideos.length && !voiceoverUrl
-          ? "Loading project data…"
-          : !effectiveVideos.length
-            ? "No videos found. Generate videos in Step 4 first."
-            : "No voiceover found. Generate voiceover in Step 2 first."}
+        {!voiceoverUrl && requireVoiceover ? "Loading project data…" : "No videos found. Generate videos in Step 4 first."}
+      </div>
+    );
+  }
+  if (requireVoiceover && !voiceoverUrl) {
+    return (
+      <div className="rounded-xl border border-gray-300 bg-gray-50 p-8 text-center text-sm text-gray-600 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400">
+        No voiceover found. Generate voiceover in Step 2 first.
       </div>
     );
   }
@@ -1437,8 +1638,12 @@ const TimelineEditor = forwardRef(function TimelineEditor(
         ...v0.map((c) => (Number(c.start) || 0) + (Number(c.length) || 0)),
       );
     const list = [];
-    const trackNames = ["Video", "Voiceover", "Music"];
-    structureTracks.forEach((structureTrack, ti) => {
+    const trackNames = voiceoverUrl
+      ? ["Video", "Voiceover", "Music"]
+      : ["Video", "Music"];
+    // When no voiceover (e.g. quote-videos), only show Video + Music (one music row)
+    const tracksToShow = voiceoverUrl ? structureTracks : structureTracks.slice(0, 2);
+    tracksToShow.forEach((structureTrack, ti) => {
       const structureClips = structureTrack?.clips ?? [];
       const liveTrack = tracks[ti];
       const liveClips = liveTrack?.clips ?? [];
@@ -1518,7 +1723,7 @@ const TimelineEditor = forwardRef(function TimelineEditor(
         }
       }
     }
-    // SDK rejects volumeEffect on asset; strip it so loadEdit succeeds (clone first to avoid mutating base)
+    // SDK rejects volumeEffect on asset, and filter/opacity on clips (ZodError); strip so loadEdit succeeds
     if (edit?.timeline?.tracks) {
       edit = JSON.parse(JSON.stringify(edit));
       for (const track of edit.timeline.tracks) {
@@ -1527,6 +1732,8 @@ const TimelineEditor = forwardRef(function TimelineEditor(
             const { volumeEffect: _, ...rest } = clip.asset;
             clip.asset = rest;
           }
+          if ("filter" in clip) delete clip.filter;
+          if ("opacity" in clip) delete clip.opacity;
         }
       }
     }
@@ -1566,15 +1773,18 @@ const TimelineEditor = forwardRef(function TimelineEditor(
           </span>
         </div>
           <div className="flex flex-1 flex-col gap-3 min-h-0 overflow-hidden">
-          {/* Preview – above timeline, with subtitle overlay. Strict clip to 260×462. */}
-          <div className="shrink-0 min-w-0 flex justify-center bg-black overflow-hidden">
+          {/* Preview – above timeline, with subtitle overlay. Allow overflow when shadow is on so text shadow is not clipped. */}
+          <div
+            className="shrink-0 min-w-0 flex justify-center bg-black"
+            style={{ overflow: "hidden" }}
+          >
             <div
               ref={subtitleContainerRef}
               style={{
                 position: "relative",
                 width: "260px",
                 height: "462px",
-                overflow: "clip",
+                overflow: "hidden",
                 borderRadius: "6px",
                 backgroundColor: "#000",
               }}
@@ -1582,40 +1792,121 @@ const TimelineEditor = forwardRef(function TimelineEditor(
               <div
                 data-shotstack-studio
                 className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-md bg-black"
+                style={{ zIndex: 0 }}
               />
+              {/* Video darken overlay: Studio SDK doesn't support clip filter/opacity, so we simulate with a DOM overlay */}
+              {(() => {
+                const videoFilter = initialTimelineSettings?.videoFilter === "darken" ? "darken" : "none";
+                const videoOpacity = Number.isFinite(Number(initialTimelineSettings?.videoOpacity))
+                  ? Math.max(0.2, Math.min(1, Number(initialTimelineSettings.videoOpacity)))
+                  : 1;
+                const opacityFromSlider = 1 - videoOpacity;
+                const darkenExtra = videoFilter === "darken" ? 0.15 : 0;
+                const overlayOpacity = Math.min(0.6, opacityFromSlider + darkenExtra);
+                if (overlayOpacity <= 0) return null;
+                return (
+                  <div
+                    className="absolute inset-0 rounded-md pointer-events-none"
+                    style={{
+                      zIndex: 50,
+                      backgroundColor: "#000",
+                      opacity: overlayOpacity,
+                    }}
+                    aria-hidden
+                  />
+                );
+              })()}
+              {grainOverlayUrl && /^https?:\/\//i.test(grainOverlayUrl) && (() => {
+                // Cap at 60% so the grain overlay never fully hides the video underneath
+                const GRAIN_OPACITY_MAX = 0.6;
+                const grainOpacityValue = (() => {
+                  const n = Number(grainOpacityDisplay);
+                  const raw = Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0.2;
+                  return Math.min(raw, GRAIN_OPACITY_MAX);
+                })();
+                return (
+                  <div
+                    className="absolute inset-0 rounded-md overflow-hidden pointer-events-none"
+                    style={{ zIndex: 100 }}
+                    aria-hidden
+                  >
+                    {/\.(mp4|webm|mov)(\?|$)/i.test(grainOverlayUrl) ? (
+                      <video
+                        src={grainOverlayUrl}
+                        className="w-full h-full object-cover"
+                        style={{ opacity: grainOpacityValue }}
+                        muted
+                        loop
+                        playsInline
+                        autoPlay
+                      />
+                    ) : (
+                      <div
+                        className="w-full h-full bg-cover bg-center"
+                        style={{ backgroundImage: `url(${grainOverlayUrl})`, opacity: grainOpacityValue }}
+                      />
+                    )}
+                  </div>
+                );
+              })()}
               {currentSubtitle && (
                 <div
                   style={{
                     position: "absolute",
                     left: 0,
                     right: 0,
-                    width: "260px",
-                    padding: `${subtitlePadding}px`,
+                    width: "100%",
+                    maxWidth: "260px",
+                    paddingTop: subtitlePadding,
+                    paddingRight: subtitlePadding,
+                    paddingBottom: subtitlePadding,
+                    paddingLeft: subtitlePadding,
                     pointerEvents: "none",
                     boxSizing: "border-box",
+                    zIndex: 110,
                     opacity: subtitleOpacity,
                     transition: subtitleFade ? "opacity 0.05s linear" : "none",
+                    overflow: "hidden",
                     ...(subtitlePosition === "bottom"
-                      ? { bottom: 0, display: "flex", justifyContent: "center", alignItems: "flex-end", minHeight: "28%", maxHeight: "35%", background: "linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.7), transparent)" }
+                      ? {
+                          bottom: 0,
+                          display: "flex",
+                          justifyContent: "center",
+                          alignItems: "flex-end",
+                          minHeight: "28%",
+                          maxHeight: "40%",
+                          paddingBottom: subtitleShadow && Number(subtitleShadowStrength) > 0 ? 20 : subtitlePadding,
+                          background: "linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.7), transparent)",
+                        }
                       : subtitlePosition === "top"
-                        ? { top: 0, display: "flex", justifyContent: "center", alignItems: "flex-start", minHeight: "28%", maxHeight: "35%", background: "linear-gradient(to bottom, rgba(0,0,0,0.9), rgba(0,0,0,0.7), transparent)" }
-                        : { inset: 0, display: "flex", justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.6)" }),
+                        ? {
+                            top: 0,
+                            display: "flex",
+                            justifyContent: "center",
+                            alignItems: "flex-start",
+                            minHeight: "28%",
+                            maxHeight: "40%",
+                            paddingTop: subtitleShadow && Number(subtitleShadowStrength) > 0 ? 20 : subtitlePadding,
+                            background: "linear-gradient(to bottom, rgba(0,0,0,0.9), rgba(0,0,0,0.7), transparent)",
+                          }
+                        : { inset: 0, display: "flex", justifyContent: "center", alignItems: "center" }),
                   }}
                 >
                   <div
                     ref={subtitleTextRef}
                     style={{
-                      width: `${260 - subtitlePadding * 2}px`,
+                      fontFamily: getSubtitleFontCss(subtitleFont),
+                      width: "100%",
                       maxWidth: `${260 - subtitlePadding * 2}px`,
-                      overflow: subtitleStroke ? "visible" : "hidden",
+                      overflow: "hidden",
                       fontSize: `${Number(subtitleFontSize) || 14}px`,
                       color: subtitleTextColor,
                       textAlign: "center",
                       fontWeight: 500,
                       lineHeight: 1.5,
-                      maxHeight: `${((Number(subtitleFontSize) || 14) * 1.5 * 3)}px`,
+                      maxHeight: `${((Number(subtitleFontSize) || 14) * 1.5 * 5)}px`,
                       display: "-webkit-box",
-                      WebkitLineClamp: 3,
+                      WebkitLineClamp: 5,
                       WebkitBoxOrient: "vertical",
                       wordBreak: "break-word",
                       overflowWrap: "anywhere",
@@ -1624,11 +1915,23 @@ const TimelineEditor = forwardRef(function TimelineEditor(
                             WebkitTextStroke: "2px #000000",
                             WebkitTextFillColor: subtitleTextColor,
                             paintOrder: "stroke fill",
-                            filter: "drop-shadow(-1px -1px 0 #000) drop-shadow(1px -1px 0 #000) drop-shadow(-1px 1px 0 #000) drop-shadow(1px 1px 0 #000)",
+                            ...(subtitleShadow && Number(subtitleShadowStrength) > 0
+                              ? { filter: "drop-shadow(-1px -1px 0 #000) drop-shadow(1px -1px 0 #000) drop-shadow(-1px 1px 0 #000) drop-shadow(1px 1px 0 #000)" }
+                              : {}),
                           }
-                        : { textShadow: "0 1px 2px rgba(0,0,0,0.9)" }),
+                        : {}),
+                      // Shadow: applied for all positions; strength 0 = none, 1–100 = blur/opacity scale (single shadow so strength fully controls visibility).
+                      ...(subtitleShadow && Number(subtitleShadowStrength) > 0
+                        ? (() => {
+                            const str = Math.max(0, Math.min(100, Number(subtitleShadowStrength) || 0));
+                            const opacity = 0.4 + (str / 100) * 0.55;
+                            const blur = 2 + (str / 100) * 12;
+                            return {
+                              textShadow: `2px 2px ${blur}px rgba(0,0,0,${opacity})`,
+                            };
+                          })()
+                        : {}),
                     }}
-                    className={subtitleFont === "serif" ? "font-serif" : subtitleFont === "mono" ? "font-mono" : "font-sans"}
                   >
                     {currentSubtitle.length > 120 ? `${currentSubtitle.slice(0, 117)}...` : currentSubtitle}
                   </div>
@@ -1647,7 +1950,7 @@ const TimelineEditor = forwardRef(function TimelineEditor(
                   onClick={() => {
                     setSubtitlePosition(pos);
                     if (projectId) {
-                      fetch(`/api/projects/${projectId}`, {
+                      fetch(`${projectPatchBasePath}/${projectId}`, {
                         method: "PATCH",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
@@ -1661,9 +1964,11 @@ const TimelineEditor = forwardRef(function TimelineEditor(
                             subtitleTimingOverrides,
                             subtitleFade,
                             subtitleStroke,
+                            subtitleShadow,
+                            subtitleShadowStrength,
                           },
                         }),
-                      }).catch(() => {});
+                      }).then(() => { onTimelineSettingsSaved?.(); }).catch(() => {});
                     }
                   }}
                   className={`px-2 py-1 rounded capitalize ${
@@ -1682,7 +1987,7 @@ const TimelineEditor = forwardRef(function TimelineEditor(
                 const font = e.target.value;
                 setSubtitleFont(font);
                 if (projectId) {
-                  fetch(`/api/projects/${projectId}`, {
+                  fetch(`${projectPatchBasePath}/${projectId}`, {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -1696,16 +2001,18 @@ const TimelineEditor = forwardRef(function TimelineEditor(
                         subtitleTimingOverrides,
                         subtitleFade,
                         subtitleStroke,
+                        subtitleShadow,
+                        subtitleShadowStrength,
                       },
                     }),
-                  }).catch(() => {});
+                  }).then(() => { onTimelineSettingsSaved?.(); }).catch(() => {});
                 }
               }}
-              className="rounded bg-gray-700 text-gray-200 px-2 py-1 border-0 text-xs"
+              className="rounded bg-gray-700 text-gray-200 px-2 py-1 border-0 text-xs min-w-[140px]"
             >
-              <option value="sans">Sans</option>
-              <option value="serif">Serif</option>
-              <option value="mono">Mono</option>
+              {SUBTITLE_FONT_OPTIONS.map((f) => (
+                <option key={f.value} value={f.value}>{f.label}</option>
+              ))}
             </select>
             <select
               value={subtitleFontSize}
@@ -1713,7 +2020,7 @@ const TimelineEditor = forwardRef(function TimelineEditor(
                 const size = Math.max(8, Math.min(48, Number(e.target.value) || 14));
                 setSubtitleFontSize(size);
                 if (projectId) {
-                  fetch(`/api/projects/${projectId}`, {
+                  fetch(`${projectPatchBasePath}/${projectId}`, {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -1727,9 +2034,11 @@ const TimelineEditor = forwardRef(function TimelineEditor(
                         subtitleTimingOverrides,
                         subtitleFade,
                         subtitleStroke,
+                        subtitleShadow,
+                        subtitleShadowStrength,
                       },
                     }),
-                  }).catch(() => {});
+                  }).then(() => { onTimelineSettingsSaved?.(); }).catch(() => {});
                 }
               }}
               className="rounded bg-gray-700 text-gray-200 px-2 py-1 border-0 text-xs"
@@ -1744,7 +2053,7 @@ const TimelineEditor = forwardRef(function TimelineEditor(
                 const pad = Math.max(0, Math.min(48, Number(e.target.value) || 12));
                 setSubtitlePadding(pad);
                 if (projectId) {
-                  fetch(`/api/projects/${projectId}`, {
+                  fetch(`${projectPatchBasePath}/${projectId}`, {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -1758,9 +2067,11 @@ const TimelineEditor = forwardRef(function TimelineEditor(
                         subtitleTimingOverrides,
                         subtitleFade,
                         subtitleStroke,
+                        subtitleShadow,
+                        subtitleShadowStrength,
                       },
                     }),
-                  }).catch(() => {});
+                  }).then(() => { onTimelineSettingsSaved?.(); }).catch(() => {});
                 }
               }}
               className="rounded bg-gray-700 text-gray-200 px-2 py-1 border-0 text-xs"
@@ -1780,7 +2091,7 @@ const TimelineEditor = forwardRef(function TimelineEditor(
                   if (/^#[0-9A-Fa-f]{6}$/.test(hex)) {
                     setSubtitleTextColor(hex);
                     if (projectId) {
-                      fetch(`/api/projects/${projectId}`, {
+                      fetch(`${projectPatchBasePath}/${projectId}`, {
                         method: "PATCH",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
@@ -1794,9 +2105,11 @@ const TimelineEditor = forwardRef(function TimelineEditor(
                             subtitleTimingOverrides,
                             subtitleFade,
                             subtitleStroke,
+                            subtitleShadow,
+                            subtitleShadowStrength,
                           },
                         }),
-                      }).catch(() => {});
+                      }).then(() => { onTimelineSettingsSaved?.(); }).catch(() => {});
                     }
                   }
                 }}
@@ -1812,7 +2125,7 @@ const TimelineEditor = forwardRef(function TimelineEditor(
                   setSubtitleFade(v);
                   if (projectId) {
                     const prev = initialTimelineSettings && typeof initialTimelineSettings === "object" ? initialTimelineSettings : {};
-                    fetch(`/api/projects/${projectId}`, {
+                    fetch(`${projectPatchBasePath}/${projectId}`, {
                       method: "PATCH",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({
@@ -1826,6 +2139,8 @@ const TimelineEditor = forwardRef(function TimelineEditor(
                           subtitleTextColor,
                           subtitleTimingOverrides,
                           subtitleStroke,
+                          subtitleShadow,
+                          subtitleShadowStrength,
                         },
                       }),
                     }).catch(() => {});
@@ -1844,7 +2159,7 @@ const TimelineEditor = forwardRef(function TimelineEditor(
                   setSubtitleStroke(v);
                   if (projectId) {
                     const prev = initialTimelineSettings && typeof initialTimelineSettings === "object" ? initialTimelineSettings : {};
-                    fetch(`/api/projects/${projectId}`, {
+                    fetch(`${projectPatchBasePath}/${projectId}`, {
                       method: "PATCH",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({
@@ -1858,9 +2173,11 @@ const TimelineEditor = forwardRef(function TimelineEditor(
                           subtitleTextColor,
                           subtitleTimingOverrides,
                           subtitleFade,
+                          subtitleShadow,
+                          subtitleShadowStrength,
                         },
                       }),
-                    }).catch(() => {});
+                    }).then(() => { onTimelineSettingsSaved?.(); }).catch(() => {});
                   }
                 }}
                 className="rounded border-gray-500 bg-gray-700 text-amber-600"
@@ -1894,13 +2211,13 @@ const TimelineEditor = forwardRef(function TimelineEditor(
                 const persistTiming = (next) => {
                   if (projectId) {
                     const prev = initialTimelineSettings && typeof initialTimelineSettings === "object" ? initialTimelineSettings : {};
-                    fetch(`/api/projects/${projectId}`, {
+                    fetch(`${projectPatchBasePath}/${projectId}`, {
                       method: "PATCH",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({
                         timeline_settings: { ...prev, subtitleTimingOverrides: next },
                       }),
-                    }).catch(() => {});
+                    }).then(() => { onTimelineSettingsSaved?.(); }).catch(() => {});
                   }
                 };
                 return (
@@ -1998,13 +2315,13 @@ const TimelineEditor = forwardRef(function TimelineEditor(
                         const next = { ...subtitleTextOverrides, [String(i)]: v };
                         if (projectId) {
                           const prev = initialTimelineSettings && typeof initialTimelineSettings === "object" ? initialTimelineSettings : {};
-                          fetch(`/api/projects/${projectId}`, {
+                          fetch(`${projectPatchBasePath}/${projectId}`, {
                             method: "PATCH",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({
-                              timeline_settings: { ...prev, subtitleTextOverrides: next, subtitleTimingOverrides, subtitleFade, subtitleStroke },
+                              timeline_settings: { ...prev, subtitleTextOverrides: next, subtitleTimingOverrides, subtitleFade, subtitleStroke, subtitleShadow, subtitleShadowStrength },
                             }),
-                          }).catch(() => {});
+                          }).then(() => { onTimelineSettingsSaved?.(); }).catch(() => {});
                         }
                       }}
                       placeholder={defaultText || "Enter subtitle…"}

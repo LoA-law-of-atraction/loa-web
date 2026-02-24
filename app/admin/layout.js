@@ -11,7 +11,7 @@ export default function AdminLayout({ children }) {
   const router = useRouter();
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [desktopMenuOpen, setDesktopMenuOpen] = useState(null); // 'video' | 'more' | null
+  const [desktopMenuOpen, setDesktopMenuOpen] = useState(null); // 'video' | 'quote' | 'more' | null
   const desktopNavRef = useRef(null);
 
   const postsItem = {
@@ -32,17 +32,8 @@ export default function AdminLayout({ children }) {
     match: (p) => p.startsWith("/admin/setup"),
   };
 
-  const videoStudioItems = [
-    {
-      href: "/admin/video-generator",
-      label: "Video Generator",
-      match: (p) => p.startsWith("/admin/video-generator"),
-    },
-    {
-      href: "/admin/video-editor",
-      label: "Video Editor",
-      match: (p) => p.startsWith("/admin/video-editor"),
-    },
+  // Character Shorts: all related admin pages
+  const characterShortsItems = [
     {
       href: "/admin/projects",
       label: "Projects",
@@ -74,14 +65,14 @@ export default function AdminLayout({ children }) {
       match: (p) => p.startsWith("/admin/character-motions"),
     },
     {
-      href: "/admin/music-themes",
-      label: "Music Themes",
-      match: (p) => p.startsWith("/admin/music-themes"),
+      href: "/admin/musics",
+      label: "Musics",
+      match: (p) => p.startsWith("/admin/musics"),
     },
     {
-      href: "/admin/instruments",
-      label: "Instruments",
-      match: (p) => p.startsWith("/admin/instruments"),
+      href: "/admin/rendered-videos",
+      label: "Rendered Videos",
+      match: (p) => p.startsWith("/admin/rendered-videos"),
     },
     {
       href: "/admin/topics",
@@ -100,7 +91,26 @@ export default function AdminLayout({ children }) {
     },
   ];
 
-  const isVideoStudioActive = videoStudioItems.some((i) => i.match(pathname));
+  const quoteVideosItems = [
+    {
+      href: "/admin/quote-videos/projects",
+      label: "Projects",
+      match: (p) => p.startsWith("/admin/quote-videos/projects"),
+    },
+    {
+      href: "/admin/quote-videos/quotes",
+      label: "Quotes",
+      match: (p) => p.startsWith("/admin/quote-videos/quotes"),
+    },
+    {
+      href: "/admin/quote-videos/music-base-prompts",
+      label: "Music base prompts",
+      match: (p) => p.startsWith("/admin/quote-videos/music-base-prompts"),
+    },
+  ];
+
+  const isCharacterShortsActive = characterShortsItems.some((i) => i.match(pathname));
+  const isQuoteVideosActive = quoteVideosItems.some((i) => i.match(pathname));
 
   const navLinkClass = (active) =>
     "px-4 py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap " +
@@ -186,21 +196,66 @@ export default function AdminLayout({ children }) {
                           )
                         }
                         className={dropdownButtonClass(
-                          isVideoStudioActive || desktopMenuOpen === "video",
+                          isCharacterShortsActive || desktopMenuOpen === "video",
                         )}
                         aria-haspopup="menu"
                         aria-expanded={desktopMenuOpen === "video"}
                       >
-                        Video Studio
+                        Character Shorts
                         <ChevronDown size={16} className="opacity-80" />
                       </button>
 
                       {desktopMenuOpen === "video" && (
                         <div
                           role="menu"
-                          className="absolute left-0 top-full mt-2 w-64 admin-card-solid p-2 shadow-lg"
+                          className="absolute left-0 top-full mt-2 w-64 admin-card-solid p-2 shadow-lg max-h-[70vh] overflow-y-auto"
                         >
-                          {videoStudioItems.map((item) => {
+                          {characterShortsItems.map((item) => {
+                            const active = item.match(pathname);
+                            return (
+                              <a
+                                key={item.href}
+                                href={item.href}
+                                onClick={() => setDesktopMenuOpen(null)}
+                                className={
+                                  "block px-3 py-2 rounded-xl text-sm font-medium transition-colors " +
+                                  (active
+                                    ? "bg-blue-600 text-white"
+                                    : "text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800")
+                                }
+                              >
+                                {item.label}
+                              </a>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setDesktopMenuOpen((v) =>
+                            v === "quote" ? null : "quote",
+                          )
+                        }
+                        className={dropdownButtonClass(
+                          isQuoteVideosActive || desktopMenuOpen === "quote",
+                        )}
+                        aria-haspopup="menu"
+                        aria-expanded={desktopMenuOpen === "quote"}
+                      >
+                        Quote Videos
+                        <ChevronDown size={16} className="opacity-80" />
+                      </button>
+
+                      {desktopMenuOpen === "quote" && (
+                        <div
+                          role="menu"
+                          className="absolute left-0 top-full mt-2 w-52 admin-card-solid p-2 shadow-lg"
+                        >
+                          {quoteVideosItems.map((item) => {
                             const active = item.match(pathname);
                             return (
                               <a
@@ -338,9 +393,30 @@ export default function AdminLayout({ children }) {
                     </a>
 
                     <div className="mt-2 px-3 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                      Video Studio
+                      Character Shorts
                     </div>
-                    {videoStudioItems.map((item) => {
+                    {characterShortsItems.map((item) => {
+                      const active = item.match(pathname);
+                      return (
+                        <a
+                          key={item.href}
+                          href={item.href}
+                          onClick={() => setMobileMenuOpen(false)}
+                          className={
+                            "ml-2 px-3 py-2 rounded-xl text-sm font-medium transition-colors " +
+                            (active
+                              ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900"
+                              : "text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800")
+                          }
+                        >
+                          {item.label}
+                        </a>
+                      );
+                    })}
+                    <div className="mt-2 px-3 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      Quote Videos
+                    </div>
+                    {quoteVideosItems.map((item) => {
                       const active = item.match(pathname);
                       return (
                         <a
