@@ -143,7 +143,12 @@ export async function getInstagramCredentials() {
       user_id_length: userIdStr.length,
       access_token_length: accessToken.length,
     });
-    return { user_id: userIdStr, access_token: accessToken, _debug: firestoreDebug };
+    return {
+      user_id: userIdStr,
+      access_token: accessToken,
+      username: typeof data.username === "string" ? data.username.trim() : undefined,
+      _debug: firestoreDebug,
+    };
   }
 
   LOG({

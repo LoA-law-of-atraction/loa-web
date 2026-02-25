@@ -98,6 +98,8 @@ function QuoteVideosContent() {
   const [backgroundImageInfoUrl, setBackgroundImageInfoUrl] = useState(null);
   const [deletingBackgroundImageUrl, setDeletingBackgroundImageUrl] =
     useState(null);
+  const [uploadingSceneImage, setUploadingSceneImage] = useState(false);
+  const sceneImageFileInputRef = useRef(null);
   const [applyingGrain, setApplyingGrain] = useState(false);
   const [grainStyle, setGrainStyle] = useState("modern");
   const [grainIntensity, setGrainIntensity] = useState(0.4);
@@ -2792,6 +2794,92 @@ function QuoteVideosContent() {
                         }
                       };
 
+                      const handleUploadSceneImage = async (file) => {
+                        if (!file || !currentProjectId) return;
+                        setUploadingSceneImage(true);
+                        try {
+                          const form = new FormData();
+                          form.append("file", file);
+                          form.append("project_id", currentProjectId);
+                          const res = await fetch(
+                            "/api/quote-videos/upload-scene-image",
+                            { method: "POST", body: form },
+                          );
+                          const data = await res.json();
+                          if (!data.success || !data.url) {
+                            await alert(
+                              data.error || "Upload failed",
+                              "error",
+                            );
+                            return;
+                          }
+                          const newUrl = data.url;
+                          if (useScenes && currentScene?.id) {
+                            const urls = Array.isArray(currentScene.image_urls)
+                              ? currentScene.image_urls
+                              : [];
+                            const prompts = Array.isArray(currentScene.image_prompts)
+                              ? currentScene.image_prompts
+                              : [];
+                            const meta = Array.isArray(currentScene.image_metadata)
+                              ? currentScene.image_metadata
+                              : [];
+                            const newUrls = [...urls, newUrl].slice(-30);
+                            const newPrompts = [...prompts, ""].slice(-30);
+                            const newMeta = [...meta, {}].slice(-30);
+                            await fetch(
+                              `/api/quote-videos/projects/${currentProjectId}/scenes/${currentScene.id}`,
+                              {
+                                method: "PATCH",
+                                headers: {
+                                  "Content-Type": "application/json",
+                                },
+                                body: JSON.stringify({
+                                  image_urls: newUrls,
+                                  image_prompts: newPrompts,
+                                  image_metadata: newMeta,
+                                  selected_image_index: newUrls.length - 1,
+                                }),
+                              },
+                            );
+                          } else {
+                            const hist = Array.isArray(
+                              project?.background_image_history,
+                            )
+                              ? project.background_image_history
+                              : [];
+                            const legacyUrls = hist.map((e) =>
+                              typeof e === "string" ? e : e?.url,
+                            ).filter(Boolean);
+                            const newHist = [...legacyUrls, newUrl].slice(-30);
+                            await fetch(
+                              `/api/quote-videos/projects/${currentProjectId}`,
+                              {
+                                method: "PATCH",
+                                headers: {
+                                  "Content-Type": "application/json",
+                                },
+                                body: JSON.stringify({
+                                  background_image_url: newUrl,
+                                  background_image_history: newHist,
+                                }),
+                              },
+                            );
+                            setBackgroundImageUrl(newUrl);
+                          }
+                          await loadProject(currentProjectId);
+                        } catch (e) {
+                          await alert(
+                            e.message || "Failed to upload image",
+                            "error",
+                          );
+                        } finally {
+                          setUploadingSceneImage(false);
+                          if (sceneImageFileInputRef.current)
+                            sceneImageFileInputRef.current.value = "";
+                        }
+                      };
+
                       return (
                         <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/80 p-5 shadow-sm">
                           {useScenes && (
@@ -2832,13 +2920,57 @@ function QuoteVideosContent() {
                             <button
                               type="button"
                               onClick={() =>
-                                setShowSceneImageGalleryModal(true)
+                                setShowReferenceGalleryModal(true)
                               }
                               className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600"
                             >
-                              Select from gallery
+                              Open uploaded gallery (full view)
                             </button>
                           </div>
+                          {(() => {
+                            const refHistory = Array.isArray(project?.reference_image_history)
+                              ? project.reference_image_history
+                              : [];
+                            const uploadedUrls = refHistory
+                              .map((e) => (typeof e === "string" ? e : e?.url))
+                              .filter(Boolean);
+                            if (uploadedUrls.length === 0) return null;
+                            return (
+                              <div className="mb-4">
+                                <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
+                                  Uploaded gallery — click to use as scene image
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                  {uploadedUrls.map((url) => {
+                                    const isSelected = url === selectedUrl;
+                                    return (
+                                      <button
+                                        key={url}
+                                        type="button"
+                                        onClick={() => handleSelectFromGallery(url)}
+                                        className={`relative aspect-[9/16] w-20 rounded-lg overflow-hidden border-2 shrink-0 transition-all ${
+                                          isSelected
+                                            ? "border-blue-500 ring-2 ring-blue-500/50"
+                                            : "border-gray-200 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500"
+                                        }`}
+                                      >
+                                        <img
+                                          src={url}
+                                          alt="Uploaded"
+                                          className="w-full h-full object-cover"
+                                        />
+                                        {isSelected && (
+                                          <div className="absolute top-0.5 left-0.5 bg-blue-500 text-white px-1.5 py-0.5 rounded text-xs font-medium">
+                                            ✓
+                                          </div>
+                                        )}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })()}
                           <div className="flex flex-wrap gap-3">
                             {entries.map((entry, index) => {
                               const url = entry.url;
@@ -5074,6 +5206,14 @@ function QuoteVideosContent() {
                                       <SiInstagram className="w-7 h-7" /> Post
                                       to Instagram
                                     </button>
+                                    {(instagramTokenDebug?.username != null && instagramTokenDebug.username !== "") || (instagramTokenDebug?.user_id != null && instagramTokenDebug.user_id !== "") ? (
+                                      <p className="text-sm text-gray-600 dark:text-gray-400 font-mono">
+                                        Connected account:{" "}
+                                        <span className="break-all">
+                                          {instagramTokenDebug?.username ? `@${instagramTokenDebug.username}` : `ID ${instagramTokenDebug?.user_id}`}
+                                        </span>
+                                      </p>
+                                    ) : null}
                                     <div className="flex items-center gap-3 flex-wrap">
                                       <button
                                         type="button"
@@ -5101,6 +5241,12 @@ function QuoteVideosContent() {
                                         <div className="font-semibold text-gray-600 dark:text-gray-400 mb-1">
                                           Token (debug)
                                         </div>
+                                        {(instagramTokenDebug.username != null && instagramTokenDebug.username !== "") && (
+                                          <div className="mb-1">Username: @{instagramTokenDebug.username}</div>
+                                        )}
+                                        {instagramTokenDebug.user_id != null && instagramTokenDebug.user_id !== "" && (
+                                          <div className="mb-1">User ID: {instagramTokenDebug.user_id}</div>
+                                        )}
                                         <div>
                                           Preview:{" "}
                                           {instagramTokenDebug.access_token_preview ??
@@ -5514,7 +5660,10 @@ function QuoteVideosContent() {
           currentReferenceUrl={
             referenceImageUrl || project?.reference_image_url
           }
-          onSelect={(url) => setReferenceImageUrl(url)}
+          onSelect={(url) => {
+            setReferenceImageUrl(url);
+            handleSelectFromGallery(url);
+          }}
           projectId={project?.id}
           onDeleted={() => project?.id && loadProject(project.id)}
         />

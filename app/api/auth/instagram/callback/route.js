@@ -196,6 +196,20 @@ export async function GET(request) {
     return redirectAndClearCookies(failUrlWithReason("missing_after_exchange"));
   }
 
+  let username = "";
+  try {
+    const graphRes = await fetch(
+      `https://graph.instagram.com/${userId}?fields=username&access_token=${encodeURIComponent(accessToken)}`
+    );
+    const graph = await graphRes.json();
+    if (typeof graph?.username === "string" && graph.username.trim()) {
+      username = graph.username.trim();
+      LOG({ step: "callback", action: "graph_username", username });
+    }
+  } catch (e) {
+    LOG({ step: "callback", action: "graph_username_fail", error: e?.message });
+  }
+
   const db = getAdminDb();
   const ref = db.collection("integrations").doc(INTEGRATIONS_DOC);
   const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000); // 60 days
@@ -204,11 +218,13 @@ export async function GET(request) {
     action: "firestore_set",
     user_id_length: userId.length,
     access_token_length: accessToken.length,
+    has_username: !!username,
   });
 
   await ref.set({
     user_id: userId,
     access_token: accessToken,
+    ...(username && { username }),
     expires_at: expiresAt.toISOString(),
     updated_at: new Date().toISOString(),
   });

@@ -23,7 +23,13 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const withDebug = searchParams.get("debug") === "1" || searchParams.get("debug") === "true";
     const body = { connected };
-    if (withDebug && creds?._debug) body.debug = creds._debug;
+    if (withDebug && creds) {
+      body.debug = {
+        ...(creds._debug || {}),
+        user_id: creds.user_id ?? null,
+        username: creds.username ?? null,
+      };
+    }
     return NextResponse.json(body);
   } catch (e) {
     LOG({ step: "status", outcome: "error", error: e.message });
