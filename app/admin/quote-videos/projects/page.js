@@ -96,7 +96,7 @@ export default function QuoteVideosProjectsPage() {
                 </p>
                 {p.quote_text && (
                   <p className="text-sm text-gray-500 dark:text-gray-400 truncate mt-0.5">
-                    "{p.quote_text}"
+                    &ldquo;{p.quote_text}&rdquo;
                   </p>
                 )}
                 {p.theme && (

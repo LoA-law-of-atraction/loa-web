@@ -88,7 +88,7 @@ export default function QuoteVideosQuotesPage() {
               className="p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900"
             >
               <p className="text-lg text-gray-900 dark:text-gray-100 font-medium">
-                "{q.quote}"
+                &ldquo;{q.quote}&rdquo;
               </p>
               <div className="mt-2 flex flex-wrap gap-2 text-sm text-gray-500 dark:text-gray-400">
                 {q.theme && (

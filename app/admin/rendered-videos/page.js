@@ -98,7 +98,7 @@ export default function RenderedVideosPage() {
                 </p>
                 {v.quote_text && (
                   <p className="text-sm text-gray-500 dark:text-gray-400 truncate mt-0.5">
-                    "{v.quote_text}"
+                    &ldquo;{v.quote_text}&rdquo;
                   </p>
                 )}
                 <div className="flex flex-wrap gap-2 mt-2 text-xs text-gray-500 dark:text-gray-400">
