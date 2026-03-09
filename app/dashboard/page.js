@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -164,7 +164,7 @@ function TemplateSelect({ value, onChange, defaultTemplates, label, variant = "m
   );
 }
 
-export default function DashboardPage() {
+function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tabFromUrl = searchParams.get("tab");
@@ -1667,6 +1667,22 @@ function StatCard({ label, value, icon }) {
       <p className="mt-2 text-xs uppercase tracking-wider text-white/50">{label}</p>
       <p className="mt-1 text-2xl font-semibold">{value}</p>
     </article>
+  );
+}
+
+function DashboardPageFallback() {
+  return (
+    <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-white/70" />
+    </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<DashboardPageFallback />}>
+      <DashboardContent />
+    </Suspense>
   );
 }
 
