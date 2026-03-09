@@ -1,0 +1,73 @@
+/**
+ * Default affirmation templates (global, read-only in app).
+ * Seeded into Firestore root collection: affirmation_templates
+ */
+
+export const DEFAULT_AFFIRMATION_TEMPLATES = [
+  // Identity Templates
+  { category: "Identity", content: "I am the type of person who ______." },
+  { category: "Identity", content: "I am becoming more ______ every day." },
+  { category: "Identity", content: "I am naturally ______." },
+  { category: "Identity", content: "I embody the energy of ______." },
+  { category: "Identity", content: "I am someone who easily ______." },
+  { category: "Identity", content: "I am aligned with ______." },
+  { category: "Identity", content: "I am confident in my ability to ______." },
+  { category: "Identity", content: "I am worthy of ______." },
+  { category: "Identity", content: "I am open to ______." },
+  { category: "Identity", content: "I am capable of achieving ______." },
+  // Attraction Templates
+  { category: "Attraction", content: "I effortlessly attract ______ into my life." },
+  { category: "Attraction", content: "______ flows to me naturally." },
+  { category: "Attraction", content: "Opportunities for ______ come to me easily." },
+  { category: "Attraction", content: "I attract people who ______." },
+  { category: "Attraction", content: "I am a magnet for ______." },
+  { category: "Attraction", content: "Everything in my life supports my ______." },
+  { category: "Attraction", content: "The universe is bringing me ______." },
+  { category: "Attraction", content: "I welcome more ______ into my life." },
+  { category: "Attraction", content: "I easily receive ______." },
+  { category: "Attraction", content: "My life attracts ______." },
+  // Gratitude Templates
+  { category: "Gratitude", content: "I am grateful for ______." },
+  { category: "Gratitude", content: "Thank you for bringing ______ into my life." },
+  { category: "Gratitude", content: "I appreciate the abundance of ______ around me." },
+  { category: "Gratitude", content: "I am thankful that ______ is happening for me." },
+  { category: "Gratitude", content: "I celebrate the presence of ______ in my life." },
+  { category: "Gratitude", content: "I deeply appreciate ______." },
+  { category: "Gratitude", content: "I am grateful for the opportunity to ______." },
+  { category: "Gratitude", content: "I acknowledge the blessings of ______." },
+  { category: "Gratitude", content: "I feel grateful for every step toward ______." },
+  { category: "Gratitude", content: "I appreciate how ______ is unfolding." },
+  // Present Reality Templates
+  { category: "Present Reality", content: "My life is filled with ______." },
+  { category: "Present Reality", content: "I now experience ______." },
+  { category: "Present Reality", content: "Every day I enjoy more ______." },
+  { category: "Present Reality", content: "I live a life of ______." },
+  { category: "Present Reality", content: "My reality reflects ______." },
+  { category: "Present Reality", content: "I am living in ______." },
+  { category: "Present Reality", content: "My life is becoming more ______ each day." },
+  { category: "Present Reality", content: "I am surrounded by ______." },
+  { category: "Present Reality", content: "I am experiencing ______ right now." },
+  { category: "Present Reality", content: "My world is full of ______." },
+  // Energy & Mindset Templates
+  { category: "Energy & Mindset", content: "My mindset supports ______." },
+  { category: "Energy & Mindset", content: "My thoughts attract ______." },
+  { category: "Energy & Mindset", content: "My energy creates ______." },
+  { category: "Energy & Mindset", content: "I align my energy with ______." },
+  { category: "Energy & Mindset", content: "My focus brings more ______ into my life." },
+  { category: "Energy & Mindset", content: "I radiate ______." },
+  { category: "Energy & Mindset", content: "I carry the energy of ______." },
+  { category: "Energy & Mindset", content: "My vibration attracts ______." },
+  { category: "Energy & Mindset", content: "I think in ways that create ______." },
+  { category: "Energy & Mindset", content: "My energy welcomes ______." },
+  // Simple Power Templates
+  { category: "Simple Power", content: "I choose ______." },
+  { category: "Simple Power", content: "I welcome ______." },
+  { category: "Simple Power", content: "I allow ______." },
+  { category: "Simple Power", content: "I receive ______." },
+  { category: "Simple Power", content: "I claim ______." },
+  { category: "Simple Power", content: "I create ______." },
+  { category: "Simple Power", content: "I invite ______." },
+  { category: "Simple Power", content: "I attract ______." },
+  { category: "Simple Power", content: "I experience ______." },
+  { category: "Simple Power", content: "I embody ______." },
+];

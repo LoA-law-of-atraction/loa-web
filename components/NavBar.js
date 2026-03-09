@@ -91,6 +91,11 @@ const Navbar = () => {
             </Link>
           </li>
           <li>
+            <Link href="/dashboard" className={isActive("/dashboard")}>
+              Dashboard
+            </Link>
+          </li>
+          <li>
             <Link href="/download" className={isActive("/download")}>
               Download
             </Link>
@@ -196,6 +201,15 @@ const Navbar = () => {
               onClick={toggleMenu}
             >
               Premium
+            </Link>
+          </li>
+          <li className="text-3xl">
+            <Link
+              href="/dashboard"
+              className={isActive("/dashboard")}
+              onClick={toggleMenu}
+            >
+              Dashboard
             </Link>
           </li>
           <li className="text-3xl">

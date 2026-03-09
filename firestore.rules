@@ -1,0 +1,62 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Blog posts - public read, authenticated write
+    match /blog_posts/{postId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // Blog categories - public read, authenticated write
+    match /blog_categories/{categoryId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // Blog config - public read, authenticated write
+    match /blog_config/{configId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // Contacts - anyone can submit (create), only authenticated can read
+    match /contacts/{document} {
+      allow create: if true;
+      allow read, update, delete: if request.auth != null;
+    }
+
+    // Waitlist - anyone can submit, only authenticated can read
+    match /waitlist/{document} {
+      allow create: if true;
+      allow read, update, delete: if request.auth != null;
+    }
+
+    // Default affirmation templates (root collection) - public read, server/admin write
+    match /affirmation_templates/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // LoA dashboard - user data (per-uid subcollections)
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+
+      match /affirmations/{docId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+
+      // User's own templates (same collection name, under users)
+      match /affirmation_templates/{docId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+
+      match /streak/{docId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+
+      match /intercept/{docId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+    }
+  }
+}

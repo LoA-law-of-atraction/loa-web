@@ -15,6 +15,7 @@ const MetaPixelNoSSR = dynamic(() => import("@/components/MetaPixelEvents"), {
 export default function ClientLayout({ children }) {
   const pathname = usePathname();
   const isAdminPage = pathname?.startsWith("/admin");
+  const isDashboardPage = pathname?.startsWith("/dashboard");
 
   const pageVariants = {
     initial: { opacity: 0, x: -100 },
@@ -31,7 +32,7 @@ export default function ClientLayout({ children }) {
   };
 
   // Don't show navbar/footer on admin pages
-  if (isAdminPage) {
+  if (isAdminPage || isDashboardPage) {
     return children;
   }
 
