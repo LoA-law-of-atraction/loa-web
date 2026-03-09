@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import {
   GoogleAuthProvider,
   onAuthStateChanged,
@@ -14,7 +14,7 @@ import { ArrowRight, Sparkles } from "lucide-react";
 import { FcGoogle } from "react-icons/fc";
 import { auth } from "@/utils/firebase";
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirect") || "/dashboard";
@@ -142,5 +142,21 @@ export default function LoginPage() {
         </section>
       </div>
     </div>
+  );
+}
+
+function LoginPageFallback() {
+  return (
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#0f172a_0%,_#020617_55%,_#000_100%)] flex items-center justify-center">
+      <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-cyan-400/70" />
+    </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginPageFallback />}>
+      <LoginContent />
+    </Suspense>
   );
 }
