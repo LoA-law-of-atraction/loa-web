@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { getBlogPosts } from "@/utils/blogService";
 import {
   generateBlogListMetadata,
@@ -46,8 +47,10 @@ export default async function BlogPage({ searchParams }) {
             </p>
           </div>
 
-          {/* Category Filter */}
-          <CategoryFilter />
+          {/* Category Filter (useSearchParams requires Suspense for static generation) */}
+          <Suspense fallback={<div className="h-10 mb-6" />}>
+            <CategoryFilter />
+          </Suspense>
 
           {/* Blog Posts List */}
           {posts && posts.length > 0 ? (

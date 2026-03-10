@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -16,7 +16,7 @@ const dashboardTabs = [
   { id: "gallery", label: "Gallery", icon: GalleryHorizontalEnd, href: "/dashboard?tab=gallery" },
 ];
 
-export default function AffirmationPreviewPage() {
+function AffirmationPreviewContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const docId = params?.docId ?? null;
@@ -357,5 +357,21 @@ export default function AffirmationPreviewPage() {
         </article>
       </main>
     </div>
+  );
+}
+
+function PreviewPageFallback() {
+  return (
+    <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-white/70" />
+    </div>
+  );
+}
+
+export default function AffirmationPreviewPage() {
+  return (
+    <Suspense fallback={<PreviewPageFallback />}>
+      <AffirmationPreviewContent />
+    </Suspense>
   );
 }
