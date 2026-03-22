@@ -178,7 +178,7 @@ export default function AffirmationTemplatesPage() {
     setForm(emptyTemplate);
   };
 
-  const useDefaultTemplate = async (t) => {
+  const addDefaultTemplate = async (t) => {
     if (!uid) return;
     try {
       setUsingDefaultId(t.id);
@@ -489,7 +489,7 @@ export default function AffirmationTemplatesPage() {
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => useDefaultTemplate(t)}
+                                  onClick={() => addDefaultTemplate(t)}
                                   disabled={saving || usingDefaultId !== null}
                                   className="rounded-lg border border-white/20 px-2.5 py-1.5 text-xs font-medium hover:bg-white/10 disabled:opacity-50 inline-flex items-center gap-1"
                                 >

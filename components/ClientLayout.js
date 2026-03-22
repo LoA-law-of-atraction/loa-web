@@ -31,7 +31,7 @@ export default function ClientLayout({ children }) {
     },
   };
 
-  // Don't show navbar/footer on admin pages
+  // Don't show main site navbar/footer on admin or dashboard (including preview – dashboard has its own bar)
   if (isAdminPage || isDashboardPage) {
     return children;
   }
