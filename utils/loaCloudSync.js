@@ -6,6 +6,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  onSnapshot,
   orderBy,
   query,
   serverTimestamp,
@@ -40,6 +41,27 @@ function tsToIso(value) {
   return null;
 }
 
+/** Milliseconds for last-write-wins (sync with mobile / other clients). */
+export function readAffirmationUpdatedAtMs(raw) {
+  if (raw == null) return 0;
+  if (typeof raw.updated_at === "number" && Number.isFinite(raw.updated_at)) {
+    return raw.updated_at;
+  }
+  if (typeof raw.updatedAt?.toMillis === "function") return raw.updatedAt.toMillis();
+  if (typeof raw.updatedAt?.toDate === "function") return raw.updatedAt.toDate().getTime();
+  if (typeof raw.createdAt?.toMillis === "function") return raw.createdAt.toMillis();
+  if (typeof raw.createdAt?.toDate === "function") return raw.createdAt.toDate().getTime();
+  return 0;
+}
+
+/** Tombstone: soft-delete from web (deletedAt) or mobile-style is_deleted. */
+export function isAffirmationDeleted(raw) {
+  if (raw == null) return true;
+  if (raw.is_deleted === true) return true;
+  if (raw.deletedAt) return true;
+  return false;
+}
+
 function getDefaultInterceptSettings() {
   return {
     isEnabled: true,
@@ -71,6 +93,87 @@ async function resolveStorageUrl(cloudImagePath) {
   }
 }
 
+/**
+ * Map one Firestore affirmation doc to the dashboard shape (includes updatedAtMs for LWW).
+ */
+export async function mapAffirmationDocument(docSnap) {
+  const raw = docSnap.data();
+  const cloudImagePaths = Array.isArray(raw.cloudImagePaths)
+    ? raw.cloudImagePaths.filter(Boolean)
+    : raw.cloudImagePath
+      ? [raw.cloudImagePath]
+      : [];
+  const imageUrls = (
+    await Promise.all(cloudImagePaths.map((path) => resolveStorageUrl(path)))
+  ).filter(Boolean);
+  const updatedAtMs = readAffirmationUpdatedAtMs(raw);
+  return {
+    docId: docSnap.id,
+    localId: Number(docSnap.id.split("_")[0]) || Date.now(),
+    content: raw.content || "",
+    category: raw.category || "",
+    isFavorite: Boolean(raw.isFavorite),
+    affirmCount: Number(raw.affirmCount || 0),
+    cloudImagePath: cloudImagePaths[0] || "",
+    cloudImagePaths,
+    imageUrl: imageUrls[0] || "",
+    imageUrls,
+    createdAt: tsToIso(raw.createdAt),
+    updatedAt: tsToIso(raw.updatedAt),
+    updatedAtMs,
+    deletedAt: tsToIso(raw.deletedAt),
+    isDeleted: isAffirmationDeleted(raw),
+  };
+}
+
+/**
+ * Last-write-wins merge by docId (for offline / multi-device). Keeps the row with higher updatedAtMs.
+ */
+export function mergeAffirmationsByLWW(localList, remoteList) {
+  const byId = new Map();
+  for (const r of remoteList) {
+    if (r?.docId) byId.set(r.docId, r);
+  }
+  for (const l of localList) {
+    if (!l?.docId) continue;
+    const existing = byId.get(l.docId);
+    if (!existing) {
+      byId.set(l.docId, l);
+      continue;
+    }
+    const lMs = Number(l.updatedAtMs ?? 0);
+    const rMs = Number(existing.updatedAtMs ?? 0);
+    byId.set(l.docId, lMs >= rMs ? l : existing);
+  }
+  return [...byId.values()].filter((a) => !a.isDeleted && !a.deletedAt);
+}
+
+/**
+ * Realtime listener: same document shape as fetchLoACloudData affirmations (Deckbase-style live sync).
+ * @returns {() => void} unsubscribe
+ */
+export function subscribeLoAAffirmations(uid, onNext, onError) {
+  const affirmationsRef = collection(db, `users/${uid}/affirmations`);
+  const affirmationsQ = query(affirmationsRef, orderBy("createdAt", "desc"));
+  return onSnapshot(
+    affirmationsQ,
+    async (snapshot) => {
+      const affirmations = await Promise.all(
+        snapshot.docs.map((d) => mapAffirmationDocument(d)),
+      );
+      onNext(affirmations.filter((a) => !a.isDeleted && !a.deletedAt));
+    },
+    (err) => {
+      if (onError) onError(err);
+    },
+  );
+}
+
+/** One-shot “full sync” pull — same bundle as initial load (name mirrors mobile performFullSync pull phase). */
+export async function performLoAFullSync(uid) {
+  return fetchLoACloudData(uid);
+}
+
 export async function fetchLoACloudData(uid) {
   const affirmationsRef = collection(db, `users/${uid}/affirmations`);
   const affirmationsQ = query(affirmationsRef, orderBy("createdAt", "desc"));
@@ -84,36 +187,11 @@ export async function fetchLoACloudData(uid) {
     ]);
 
   const affirmations = await Promise.all(
-    affirmationsSnap.docs.map(async (item) => {
-      const raw = item.data();
-      const cloudImagePaths = Array.isArray(raw.cloudImagePaths)
-        ? raw.cloudImagePaths.filter(Boolean)
-        : raw.cloudImagePath
-          ? [raw.cloudImagePath]
-          : [];
-      const imageUrls = (
-        await Promise.all(cloudImagePaths.map((path) => resolveStorageUrl(path)))
-      ).filter(Boolean);
-      return {
-        docId: item.id,
-        localId: Number(item.id.split("_")[0]) || Date.now(),
-        content: raw.content || "",
-        category: raw.category || "",
-        isFavorite: Boolean(raw.isFavorite),
-        affirmCount: Number(raw.affirmCount || 0),
-        cloudImagePath: cloudImagePaths[0] || "",
-        cloudImagePaths,
-        imageUrl: imageUrls[0] || "",
-        imageUrls,
-        createdAt: tsToIso(raw.createdAt),
-        updatedAt: tsToIso(raw.updatedAt),
-        deletedAt: tsToIso(raw.deletedAt),
-      };
-    }),
+    affirmationsSnap.docs.map((item) => mapAffirmationDocument(item)),
   );
 
   return {
-    affirmations: affirmations.filter((a) => !a.deletedAt),
+    affirmations: affirmations.filter((a) => !a.isDeleted && !a.deletedAt),
     streak: streakSnap.exists() ? streakSnap.data() : null,
     interceptSettings: settingsSnap.exists()
       ? settingsSnap.data().data || getDefaultInterceptSettings()
@@ -129,30 +207,9 @@ export async function fetchAffirmationById(uid, docId) {
   const ref = doc(db, `users/${uid}/affirmations/${docId}`);
   const snap = await getDoc(ref);
   if (!snap.exists()) return null;
-  const raw = snap.data();
-  if (raw.deletedAt) return null;
-  const cloudImagePaths = Array.isArray(raw.cloudImagePaths)
-    ? raw.cloudImagePaths.filter(Boolean)
-    : raw.cloudImagePath
-      ? [raw.cloudImagePath]
-      : [];
-  const imageUrls = (
-    await Promise.all(cloudImagePaths.map((path) => resolveStorageUrl(path)))
-  ).filter(Boolean);
-  return {
-    docId: snap.id,
-    localId: Number(snap.id.split("_")[0]) || Date.now(),
-    content: raw.content || "",
-    category: raw.category || "",
-    isFavorite: Boolean(raw.isFavorite),
-    affirmCount: Number(raw.affirmCount || 0),
-    cloudImagePath: cloudImagePaths[0] || "",
-    cloudImagePaths,
-    imageUrl: imageUrls[0] || "",
-    imageUrls,
-    createdAt: tsToIso(raw.createdAt),
-    updatedAt: tsToIso(raw.updatedAt),
-  };
+  const mapped = await mapAffirmationDocument(snap);
+  if (mapped.isDeleted || mapped.deletedAt) return null;
+  return mapped;
 }
 
 export async function ensureStreakDoc(uid) {
@@ -184,6 +241,7 @@ export async function createAffirmation(uid, payload) {
   }
 
   const createdAtTs = Timestamp.fromMillis(createdAtMs);
+  const nowMs = Date.now();
   await setDoc(doc(db, `users/${uid}/affirmations/${docId}`), {
     content: payload.content,
     category: payload.category || "",
@@ -193,6 +251,8 @@ export async function createAffirmation(uid, payload) {
     cloudImagePaths,
     createdAt: createdAtTs,
     updatedAt: serverTimestamp(),
+    updated_at: nowMs,
+    is_deleted: false,
     deletedAt: null,
   });
 
@@ -210,6 +270,7 @@ export async function updateAffirmation(uid, docId, patch) {
     allowed.cloudImagePath = patch.cloudImagePaths[0] || null;
   }
   allowed.updatedAt = serverTimestamp();
+  allowed.updated_at = Date.now();
 
   await updateDoc(doc(db, `users/${uid}/affirmations/${docId}`), allowed);
 }
@@ -244,13 +305,17 @@ export async function deleteAffirmationImage(uid, docId, storagePath, currentClo
     cloudImagePaths: nextPaths,
     cloudImagePath: nextPaths[0] || null,
     updatedAt: serverTimestamp(),
+    updated_at: Date.now(),
   });
 }
 
 export async function softDeleteAffirmation(uid, docId) {
+  const nowMs = Date.now();
   await updateDoc(doc(db, `users/${uid}/affirmations/${docId}`), {
     deletedAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
+    updated_at: nowMs,
+    is_deleted: true,
   });
 }
 

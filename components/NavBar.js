@@ -2,28 +2,19 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { useRouter, usePathname } from "next/navigation";
-import Button from "./Button";
+import { usePathname } from "next/navigation";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const router = useRouter();
   const pathname = usePathname();
 
-  // Check if on blog pages (white background)
-  const isBlogPage = pathname?.startsWith("/blog");
-
   const isActive = (path) => {
-    const baseTextClass = isBlogPage ? "text-gray-900" : "text-white";
-    const hoverClass = isBlogPage
-      ? "hover:text-purple-600"
-      : "hover:text-gray-300";
+    const baseTextClass = "text-white";
+    const hoverClass = "hover:text-gray-300";
     return pathname === path
-      ? isBlogPage
-        ? "text-purple-600"
-        : "text-silver"
+      ? "text-silver"
       : `${baseTextClass} ${hoverClass} transition-colors duration-300`;
   };
 
@@ -38,11 +29,7 @@ const Navbar = () => {
 
   return (
     <motion.nav
-      className={`fixed top-0 left-0 w-full h-[80px] z-50 border-b flex items-center ${
-        isBlogPage
-          ? "bg-white border-gray-200"
-          : "bg-black/30 backdrop-blur-lg border-white/10"
-      }`}
+      className="fixed top-0 left-0 w-full h-[80px] z-50 border-b flex items-center bg-black/30 backdrop-blur-lg border-white/10"
       variants={navbarVariants}
       initial="hidden"
       animate="visible"
@@ -50,9 +37,7 @@ const Navbar = () => {
       <article className="px-5 md:px-[5%] w-full mx-auto flex items-center justify-between h-full">
         <Link
           href="/"
-          className={`flex items-center cursor-pointer font-ubuntu md:text-xl font-bold ${
-            isBlogPage ? "text-gray-900" : "text-white"
-          }`}
+          className="flex items-center cursor-pointer font-ubuntu md:text-xl font-bold text-white"
           onClick={() => setIsOpen(false)}
         >
           <Image
@@ -65,47 +50,45 @@ const Navbar = () => {
           LoA
         </Link>
 
-        <ul className="hidden md:flex space-x-12">
-          <li>
-            <Link
-              href="/features"
-              className={isActive("/features")}
-              onClick={toggleMenu}
-            >
-              Features
-            </Link>
-          </li>
-          <li>
-            <Link href="/about-us" className={isActive("/about-us")}>
-              About
-            </Link>
-          </li>
-          <li>
-            <Link href="/blog" className={isActive("/blog")}>
-              Blog
-            </Link>
-          </li>
-          <li>
-            <Link href="/premium" className={isActive("/premium")}>
-              Premium
-            </Link>
-          </li>
-          <li>
-            <Link href="/dashboard" className={isActive("/dashboard")}>
-              Dashboard
-            </Link>
-          </li>
-          <li>
-            <Link href="/download" className={isActive("/download")}>
-              Download
-            </Link>
-          </li>
-          <li>
-            <Link href="/contact-us" className={isActive("/contact-us")}>
-              Contact
-            </Link>
-          </li>
-        </ul>
+        <div className="hidden md:flex items-center gap-10">
+          <ul className="flex space-x-12">
+            <li>
+              <Link
+                href="/features"
+                className={isActive("/features")}
+                onClick={toggleMenu}
+              >
+                Features
+              </Link>
+            </li>
+            <li>
+              <Link href="/about-us" className={isActive("/about-us")}>
+                About
+              </Link>
+            </li>
+            <li>
+              <Link href="/pricing" className={isActive("/pricing")}>
+                Pricing
+              </Link>
+            </li>
+            <li>
+              <Link href="/download" className={isActive("/download")}>
+                Download
+              </Link>
+            </li>
+            <li>
+              <Link href="/contact-us" className={isActive("/contact-us")}>
+                Contact
+              </Link>
+            </li>
+          </ul>
+          <Link
+            href="/login"
+            className="rounded-lg px-4 py-2 font-medium transition-colors bg-white text-black hover:bg-gray-100"
+          >
+            Sign in
+          </Link>
+        </div>
 
         {/* Mobile Menu Button */}
         <article className="md:hidden flex items-center justify-between w-[50%]">
@@ -116,7 +99,7 @@ const Navbar = () => {
           >
             {isOpen ? (
               <svg
-                className={`w-8 h-8 ${isBlogPage ? "text-gray-900" : "text-white"}`}
+                className="w-8 h-8 text-white"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -131,7 +114,7 @@ const Navbar = () => {
               </svg>
             ) : (
               <svg
-                className={`w-8 h-8 ${isBlogPage ? "text-gray-900" : "text-white"}`}
+                className="w-8 h-8 text-white"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -153,9 +136,7 @@ const Navbar = () => {
       <motion.article
         className={`md:hidden ${
           isOpen
-            ? `fixed block inset-0 min-h-[100vh] top-[80px] transform translate-y-0 transition-transform duration-300 w-full ${
-                isBlogPage ? "bg-white/95" : "bg-black/90"
-              } backdrop-blur-xl`
+            ? "fixed block inset-0 min-h-[100vh] top-[80px] transform translate-y-0 transition-transform duration-300 w-full bg-black/90 backdrop-blur-xl"
             : "fixed hidden inset-0 transform -translate-y-full transition-transform duration-300"
         }`}
         initial={{ opacity: 0, y: -10 }}
@@ -163,9 +144,7 @@ const Navbar = () => {
         transition={{ duration: 0.3 }}
       >
         <ul
-          className={`flex flex-col items-center pt-28 space-y-14 ${
-            isBlogPage ? "text-gray-900" : "text-secondary"
-          }`}
+          className="flex flex-col items-center pt-28 space-y-14 text-secondary"
         >
           <li className="text-3xl">
             <Link
@@ -187,29 +166,20 @@ const Navbar = () => {
           </li>
           <li className="text-3xl">
             <Link
-              href="/blog"
-              className={isActive("/blog")}
+              href="/pricing"
+              className={isActive("/pricing")}
               onClick={toggleMenu}
             >
-              Blog
+              Pricing
             </Link>
           </li>
-          <li className="text-3xl">
+          <li className="pt-4">
             <Link
-              href="/premium"
-              className={isActive("/premium")}
+              href="/login"
               onClick={toggleMenu}
+              className="inline-block rounded-xl px-8 py-3 font-semibold transition-colors bg-white text-black hover:bg-gray-100"
             >
-              Premium
-            </Link>
-          </li>
-          <li className="text-3xl">
-            <Link
-              href="/dashboard"
-              className={isActive("/dashboard")}
-              onClick={toggleMenu}
-            >
-              Dashboard
+              Sign in
             </Link>
           </li>
           <li className="text-3xl">

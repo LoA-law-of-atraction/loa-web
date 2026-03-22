@@ -52,16 +52,10 @@ const Footer = () => {
                 Features
               </Link>
               <Link
-                href="/blog"
-                className="cursor-pointer transition-all min-w-fit hover:text-silver"
-              >
-                Blog
-              </Link>
-              <Link
-                href="/premium"
+                href="/pricing"
                 className="cursor-pointer transition-all hover:text-silver"
               >
-                Premium
+                Pricing
               </Link>
               <Link
                 href="/updates"

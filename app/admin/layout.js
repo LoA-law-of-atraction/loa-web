@@ -14,12 +14,6 @@ export default function AdminLayout({ children }) {
   const [desktopMenuOpen, setDesktopMenuOpen] = useState(null); // 'video' | 'quote' | 'more' | null
   const desktopNavRef = useRef(null);
 
-  const postsItem = {
-    href: "/admin/blog",
-    label: "Posts",
-    match: (p) => p === "/admin/blog" || p.startsWith("/admin/blog/"),
-  };
-
   const apisItem = {
     href: "/admin/apis",
     label: "APIs",
@@ -169,7 +163,7 @@ export default function AdminLayout({ children }) {
               <div className="flex justify-between items-center h-16">
                 <div className="flex items-center gap-8">
                   <a
-                    href="/admin/blog"
+                    href="/admin/setup"
                     className="text-xl font-semibold tracking-tight text-gray-900 dark:text-gray-100"
                   >
                     LoA Admin
@@ -180,13 +174,6 @@ export default function AdminLayout({ children }) {
                     ref={desktopNavRef}
                     className="hidden md:flex gap-1 items-center relative"
                   >
-                    <a
-                      href={postsItem.href}
-                      className={navLinkClass(postsItem.match(pathname))}
-                    >
-                      {postsItem.label}
-                    </a>
-
                     <div className="relative">
                       <button
                         type="button"
@@ -379,19 +366,6 @@ export default function AdminLayout({ children }) {
               {mobileMenuOpen && (
                 <nav className="md:hidden py-4 border-t dark:border-gray-800">
                   <div className="flex flex-col gap-1">
-                    <a
-                      href={postsItem.href}
-                      onClick={() => setMobileMenuOpen(false)}
-                      className={
-                        "px-3 py-2 rounded-xl text-sm font-medium transition-colors " +
-                        (postsItem.match(pathname)
-                          ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900"
-                          : "text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800")
-                      }
-                    >
-                      {postsItem.label}
-                    </a>
-
                     <div className="mt-2 px-3 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                       Character Shorts
                     </div>

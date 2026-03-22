@@ -1,9 +1,6 @@
-import { getAllPublishedSlugs } from "@/utils/blogService";
-
 export default async function sitemap() {
   const baseUrl = "https://www.loa-lawofattraction.co";
 
-  // Static pages
   const staticPages = [
     {
       url: baseUrl,
@@ -24,13 +21,7 @@ export default async function sitemap() {
       priority: 0.8,
     },
     {
-      url: `${baseUrl}/blog`,
-      lastModified: new Date(),
-      changeFrequency: "weekly",
-      priority: 0.9,
-    },
-    {
-      url: `${baseUrl}/premium`,
+      url: `${baseUrl}/pricing`,
       lastModified: new Date(),
       changeFrequency: "monthly",
       priority: 0.7,
@@ -61,19 +52,5 @@ export default async function sitemap() {
     },
   ];
 
-  // Fetch blog posts dynamically
-  let blogPosts = [];
-  try {
-    const posts = await getAllPublishedSlugs();
-    blogPosts = posts.map((post) => ({
-      url: `${baseUrl}/blog/${post.slug}`,
-      lastModified: new Date(),
-      changeFrequency: "weekly",
-      priority: 0.7,
-    }));
-  } catch (error) {
-    console.error("Error fetching blog posts for sitemap:", error);
-  }
-
-  return [...staticPages, ...blogPosts];
+  return staticPages;
 }

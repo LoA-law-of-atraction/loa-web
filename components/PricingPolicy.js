@@ -1,34 +1,69 @@
 "use client";
+
+import { useState } from "react";
 import { motion } from "framer-motion";
 
 const plans = [
   {
     id: "01",
-    title: "Free Tier",
-    price: "$0",
-    billing: "Free",
+    title: "Manifest Starter",
+    priceMonthly: 0,
+    priceYearly: 0,
     benefits: [
-      "Basic mindful pause before opening blocked apps",
+      "Basic affirmations",
+      "Vision board",
       "Basic streak tracking",
+      "Local only – no cloud backup",
     ],
   },
   {
     id: "02",
-    title: "Premium Tier",
-    price: "$4.99",
-    billing: "Billed Annually at $29.99",
-    benefits: ["Unlimited Affirmation"],
+    title: "Manifest Creator",
+    priceMonthly: 4.99,
+    priceYearly: 29.99,
+    benefits: [
+      "Everything in Manifest Starter",
+      "50 AI affirmation generations per month",
+      "1 GB storage for images & content",
+      "Cloud backup – sync & restore",
+      "Unlimited manual affirmations",
+    ],
+  },
+  {
+    id: "03",
+    title: "Manifest Master",
+    priceMonthly: 9.99,
+    priceYearly: 79.99,
+    benefits: [
+      "Everything in Manifest Creator",
+      "150 AI affirmation generations per month",
+      "5 GB storage for images & content",
+      "Cloud backup – sync & restore",
+      "Priority support",
+    ],
   },
 ];
 
+function formatPrice(n) {
+  return n === 0 ? "$0" : `$${n.toFixed(2)}`;
+}
+
+function yearlyDiscountPercent(monthly, yearly) {
+  if (monthly <= 0) return 0;
+  const fullYear = monthly * 12;
+  return Math.round(((fullYear - yearly) / fullYear) * 100);
+}
+
 const PricingPlans = () => {
+  const [yearly, setYearly] = useState(true);
+
   return (
     <motion.section
       initial={{ opacity: 0 }}
       animate={{ opacity: 1, transition: { duration: 0.8 } }}
       className="relative z-10 w-full bg-white "
     >
-      <article className="container mx-auto py-14 p-4 px-5 md:px-[5%] 2xl:px-0 max-w-[1200px] gap-4flex flex-col items-center justify-center gap-4">
+      <article className="container mx-auto py-14 p-4 px-5 md:px-[5%] 2xl:px-0 max-w-[1200px] flex flex-col gap-4 items-center justify-center">
         <div className="flex flex-col items-center justify-center">
           <h2 className="text-h2 lg:text-h3 font-bold text-center tracking-tight w-full px-4">
             <span className="block sm:inline">Affordable</span>
@@ -46,52 +81,102 @@ const PricingPlans = () => {
           </h2>
 
           <article className="flex flex-col items-center justify-center mt-16">
-            <p className="text-justify md:max-w-[60%] md:text-center">
-              Compare our Basic and Premium plans to find the perfect fit for
-              your journaling and biography goals. Start your free trial now.
+            <p className="text-justify md:max-w-[60%] md:text-center text-gray-600">
+              Manifest Starter, Manifest Creator, and Manifest Master—plans that
+              grow with your practice. Clear limits on AI and storage keep pricing fair and sustainable.
             </p>
           </article>
-        </div>
-        <div className="mt-16 lg:mt-26 grid grid-cols-1 md:grid-cols-2 gap-16">
-          {plans.map((paragraph) => (
-            <motion.article
-              key={paragraph.id}
-              initial={{ opacity: 0, y: 100 }}
-              whileInView={{ opacity: 1, y: 0, transition: { duration: 0.5 } }}
-              viewport={{ once: true }}
-              className="my-2 border shadow-lg flex flex-col gap-4 lg:p-10 p-10 rounded-xl"
+
+          {/* Billing toggle */}
+          <div className="mt-10 flex items-center gap-3">
+            <span className={`text-sm font-medium ${!yearly ? "text-gray-900" : "text-gray-400"}`}>
+              Monthly
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={yearly}
+              onClick={() => setYearly((v) => !v)}
+              className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 ${
+                yearly ? "bg-gray-900" : "bg-gray-300"
+              }`}
             >
-              <h3 className="text-h2 font-bold">
-                {paragraph.price}
-                <span className="text-h5 font-inter">/Month</span>
-              </h3>
-              <h4 className="text-h4 font-bold font-inter mt-3 lg:mt-0">
-                {paragraph.title}
-              </h4>
-              <p className="text-[#505050]">{paragraph.billing}</p>
-              <ul className="mt-2 grid grid-cols-1 gap-4 mb-5">
-                {paragraph.benefits.map((benefit, index) => (
-                  <li key={index} className="flex items-center">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="w-6 h-6 mr-3"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
-                    <span className="text-gray-700">{benefit}</span>
-                  </li>
-                ))}
-              </ul>
-            </motion.article>
-          ))}
+              <span
+                className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition ${
+                  yearly ? "translate-x-5" : "translate-x-1"
+                }`}
+              />
+            </button>
+            <span className={`text-sm font-medium ${yearly ? "text-gray-900" : "text-gray-400"}`}>
+              Yearly
+            </span>
+            <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
+              Save up to 50%
+            </span>
+          </div>
+        </div>
+
+        <div className="mt-12 lg:mt-16 grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-10">
+          {plans.map((plan) => {
+            const isFree = plan.priceMonthly === 0 && plan.priceYearly === 0;
+            const discount = !isFree ? yearlyDiscountPercent(plan.priceMonthly, plan.priceYearly) : 0;
+            const priceMonthlyDisplay = yearly && !isFree ? plan.priceYearly / 12 : plan.priceMonthly;
+            const priceYearlyDisplay = plan.priceYearly;
+
+            return (
+              <motion.article
+                key={plan.id}
+                initial={{ opacity: 0, y: 100 }}
+                whileInView={{ opacity: 1, y: 0, transition: { duration: 0.5 } }}
+                viewport={{ once: true }}
+                className="my-2 border shadow-lg flex flex-col gap-4 lg:p-10 p-10 rounded-xl relative"
+              >
+                {!isFree && yearly && discount > 0 && (
+                  <span className="absolute top-4 right-4 rounded-full bg-emerald-500 px-2.5 py-1 text-xs font-bold text-white">
+                    Save {discount}%
+                  </span>
+                )}
+                <h3 className="text-h2 font-bold">
+                  {isFree ? "Free" : formatPrice(priceMonthlyDisplay)}
+                  {!isFree && <span className="text-h5 font-inter">/month</span>}
+                </h3>
+                {yearly && !isFree && (
+                  <p className="text-sm text-[#505050] -mt-2">
+                    {formatPrice(priceYearlyDisplay)}/year billed annually
+                  </p>
+                )}
+                <h4 className="text-h4 font-bold font-inter mt-3 lg:mt-0">
+                  {plan.title}
+                </h4>
+                {(isFree || !yearly) && (
+                  <p className="text-[#505050]">
+                    {isFree ? "Free forever" : "Billed monthly"}
+                  </p>
+                )}
+                <ul className="mt-2 grid grid-cols-1 gap-4 mb-5">
+                  {plan.benefits.map((benefit, index) => (
+                    <li key={index} className="flex items-center">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="w-6 h-6 mr-3 shrink-0"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                      <span className="text-gray-700">{benefit}</span>
+                    </li>
+                  ))}
+                </ul>
+              </motion.article>
+            );
+          })}
         </div>
       </article>
     </motion.section>

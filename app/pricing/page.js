@@ -12,7 +12,7 @@ import AppStoreDownloadButton from "@/components/AppStoreDownloadButton";
 import GooglePlayDownloadButton from "@/components/GooglePlayDownloadButton";
 import SolarSystemBackground from "@/components/SolarSystemBackground";
 
-export default function Premium() {
+export default function Pricing() {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
@@ -42,10 +42,10 @@ export default function Premium() {
               transition={{ delay: 0.8, duration: 0.5 }}
               className="text-white max-w-[85%] md:max-w-[70%] lg:max-w-[100%] md:leading-8 text-center lg:text-left"
             >
-              LoA Premium amplifies your manifestation practice with advanced
-              features designed to accelerate your Law of Attraction journey.
-              Access deeper insights, powerful visualization tools, and
-              exclusive content to attract your desires faster.
+              LoA Premium amplifies your manifestation practice with more
+              AI-generated affirmations (50/month), extra storage (1 GB), and
+              the same mindful pause and streak tools. Clear limits keep pricing
+              fair and sustainable.
             </motion.p>
 
             <div className="mt-8 flex justify-center lg:justify-start w-full">

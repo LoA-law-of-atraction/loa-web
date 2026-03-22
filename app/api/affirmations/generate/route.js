@@ -42,8 +42,9 @@ export async function POST(request) {
 
     const systemMessage = systemPromptFromClient || SYSTEM_PROMPT;
 
+    // Haiku for cost efficiency; override with ANTHROPIC_MODEL if needed
     const message = await anthropic.messages.create({
-      model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5-20250929",
+      model: process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001",
       max_tokens: 256,
       system: systemMessage,
       messages: [{ role: "user", content: userMessage }],

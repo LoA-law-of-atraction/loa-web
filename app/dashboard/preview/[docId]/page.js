@@ -21,8 +21,18 @@ function AffirmationPreviewContent() {
   const searchParams = useSearchParams();
   const docId = params?.docId ?? null;
   const from = searchParams?.get?.("from") || "home";
-  const backHref = from === "affirmations" ? "/dashboard?tab=affirmations" : "/dashboard?tab=home";
-  const backLabel = from === "affirmations" ? "Back to Affirmations" : "Back to Overview";
+  const backHref =
+    from === "affirmations"
+      ? "/dashboard?tab=affirmations"
+      : from === "gallery"
+        ? "/dashboard?tab=gallery"
+        : "/dashboard?tab=home";
+  const backLabel =
+    from === "affirmations"
+      ? "Back to Affirmations"
+      : from === "gallery"
+        ? "Back to Gallery"
+        : "Back to Overview";
 
   const [uid, setUid] = useState("");
   const [userLabel, setUserLabel] = useState("");

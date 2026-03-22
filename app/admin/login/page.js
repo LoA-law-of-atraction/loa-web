@@ -40,7 +40,7 @@ function LoginForm() {
       }
 
       // Redirect to intended page or dashboard
-      const redirectTo = searchParams.get("redirect") || "/admin/blog";
+      const redirectTo = searchParams.get("redirect") || "/admin/setup";
       router.push(redirectTo);
       router.refresh();
     } catch (err) {
@@ -87,7 +87,7 @@ function LoginForm() {
         return;
       }
 
-      const redirectTo = searchParams.get("redirect") || "/admin/blog";
+      const redirectTo = searchParams.get("redirect") || "/admin/setup";
       router.push(redirectTo);
       router.refresh();
     } catch (err) {

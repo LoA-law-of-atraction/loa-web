@@ -6,6 +6,8 @@ const nextConfig = {
   reactStrictMode: true,
   async redirects() {
     return [
+      // Legacy: premium page renamed to pricing
+      { source: "/premium", destination: "/pricing", permanent: true },
       // Redirect non-www to www
       {
         source: "/:path*",

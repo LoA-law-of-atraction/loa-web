@@ -9,10 +9,12 @@ import Autoplay from "embla-carousel-autoplay";
 import EmblaCarousel from "embla-carousel-react";
 import {
   AlertCircle,
+  Bug,
   Cloud,
   GalleryHorizontalEnd,
   House,
   ImagePlus,
+  Lock,
   LogOut,
   Sparkles,
   Star,
@@ -23,6 +25,7 @@ import {
   Pencil,
   Trash2,
   Eye,
+  X,
 } from "lucide-react";
 import { auth } from "@/utils/firebase";
 import {
@@ -30,6 +33,7 @@ import {
   ensureStreakDoc,
   fetchLoACloudData,
   softDeleteAffirmation,
+  subscribeLoAAffirmations,
   updateAffirmation,
   uploadAffirmationImages,
   deleteAffirmationImage,
@@ -220,6 +224,18 @@ function DashboardContent() {
   const nextImageAppendRef = useRef(false);
   const activeMeta = tabMeta[activeTab] || tabMeta.home;
 
+  const [debugMenuOpen, setDebugMenuOpen] = useState(false);
+  const [showPaywallDemo, setShowPaywallDemo] = useState(false);
+  const debugMenuRef = useRef(null);
+
+  useEffect(() => {
+    const onOutside = (e) => {
+      if (debugMenuRef.current && !debugMenuRef.current.contains(e.target)) setDebugMenuOpen(false);
+    };
+    if (debugMenuOpen) document.addEventListener("click", onOutside);
+    return () => document.removeEventListener("click", onOutside);
+  }, [debugMenuOpen]);
+
   const [emblaRef, emblaApi] = EmblaCarousel(
     {
       loop: affirmations.length > 1,
@@ -274,6 +290,15 @@ function DashboardContent() {
     });
     return () => unsubscribe();
   }, []);
+
+  // Realtime affirmation sync (same contract as mobile: live Firestore + updated_at / is_deleted).
+  useEffect(() => {
+    if (!uid) return undefined;
+    const unsub = subscribeLoAAffirmations(uid, setAffirmations, (err) => {
+      console.error("[LoA] affirmation sync subscription failed:", err);
+    });
+    return () => unsub();
+  }, [uid]);
 
   const affirmationsWithImages = useMemo(
     () => affirmations.filter((a) => a.imageUrl?.trim()),
@@ -787,6 +812,30 @@ function DashboardContent() {
             })}
           </div>
           <div className="flex items-center gap-2">
+            <div className="relative" ref={debugMenuRef}>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setDebugMenuOpen((v) => !v); }}
+                className="rounded-lg p-2 text-white/50 hover:text-white/80 hover:bg-white/10 transition-colors"
+                title="Debug menu"
+                aria-label="Debug menu"
+                aria-expanded={debugMenuOpen}
+              >
+                <Bug className="h-5 w-5" />
+              </button>
+              {debugMenuOpen && (
+                <div className="absolute right-0 top-full mt-1.5 w-48 rounded-xl border border-white/10 bg-black/95 backdrop-blur py-1 shadow-xl z-50">
+                  <button
+                    type="button"
+                    onClick={() => { setShowPaywallDemo(true); setDebugMenuOpen(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-left text-white/90 hover:bg-white/10 transition-colors"
+                  >
+                    <Lock className="h-4 w-4 text-amber-400/80" />
+                    Paywall demo view
+                  </button>
+                </div>
+              )}
+            </div>
             <span className="rounded-full px-3 py-1.5 text-xs bg-white/5 border border-white/10 text-white/80">
               {userLabel}
             </span>
@@ -800,6 +849,48 @@ function DashboardContent() {
           </div>
         </div>
       </nav>
+
+      {showPaywallDemo && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          onClick={() => setShowPaywallDemo(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Paywall demo"
+        >
+          <div
+            className="bg-gradient-to-b from-slate-900 to-black border border-white/10 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 text-center">
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-amber-500/20 text-amber-400 mb-4">
+                <Lock className="h-7 w-7" />
+              </div>
+              <h2 className="text-xl font-semibold text-white mb-2">Premium feature</h2>
+              <p className="text-white/70 text-sm mb-6">
+                This is how the paywall appears in the app. Upgrade to LoA Premium to unlock advanced manifestation tools and unlimited affirmations.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Link
+                  href="/pricing"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-semibold px-5 py-2.5 text-sm transition-colors"
+                >
+                  View Premium
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setShowPaywallDemo(false)}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/20 text-white/90 hover:bg-white/10 px-5 py-2.5 text-sm transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                  Close demo
+                </button>
+              </div>
+            </div>
+            <p className="px-6 pb-4 text-center text-[10px] text-white/40">Debug: Paywall demo view</p>
+          </div>
+        </div>
+      )}
 
       <div className="max-w-7xl mx-auto px-4 py-8 pt-24 text-white">
       <section className="mb-6">
@@ -1616,41 +1707,75 @@ function DashboardContent() {
         <section className="rounded-xl bg-white/5 border border-white/10 p-4">
           <h2 className="text-lg font-semibold">Gallery</h2>
           <div className="mt-4 grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {affirmationsWithImages.map((item) => (
-              <article key={item.docId} className="rounded-xl overflow-hidden border border-white/10">
-                <div
-                  className={`grid ${item.imageUrls?.length > 1 ? "grid-cols-2" : "grid-cols-1"} gap-1 bg-black/20 p-1`}
-                >
-                  {(item.imageUrls?.length ? item.imageUrls : [item.imageUrl]).slice(0, 4).map((url, index) => (
+            {affirmationsWithImages.map((item) => {
+              const urls = item.imageUrls?.length ? item.imageUrls : item.imageUrl ? [item.imageUrl] : [];
+              const displayUrls = urls.slice(0, 4);
+              const n = displayUrls.length;
+              const getCellStyle = (i) => {
+                if (n === 1) return { span: "col-span-2" };
+                if (n === 3 && i === 1) return { span: "row-span-2" };
+                return { span: "" };
+              };
+              const imageAreaAspect = "aspect-square";
+              const gridColsClass = "grid-cols-2";
+              const gridRowsClass =
+                n === 0 ? "grid-rows-1" : n === 1 ? "grid-rows-1" : n === 2 ? "grid-rows-1" : "grid-rows-2";
+
+              return (
+                <article key={item.docId} className="rounded-xl overflow-hidden border border-white/10 flex flex-col">
+                  <div className="rounded-t-xl overflow-hidden flex flex-col w-full shrink-0">
                     <div
-                      key={`${item.docId}-${index}`}
-                      className="relative group aspect-[9/16] rounded-md overflow-hidden"
+                      className={`grid gap-1.5 shrink-0 w-full overflow-hidden ${imageAreaAspect} ${gridColsClass} ${gridRowsClass}`}
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={url}
-                        alt={`${item.content} ${index + 1}`}
-                        className="w-full h-full object-cover"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => deleteImageFromGallery(item, index)}
-                        className="absolute top-1 right-1 w-7 h-7 rounded-full bg-black/70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-500/90 transition-opacity"
-                        aria-label="Delete image"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {n > 0 ? (
+                        displayUrls.map((url, i) => {
+                          const { span } = getCellStyle(i);
+                          return (
+                            <div
+                              key={`${item.docId}-img-${i}`}
+                              className={`relative group rounded-lg overflow-hidden border border-white/20 min-h-0 min-w-0 w-full h-full ${span}`}
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={url} alt="" className="relative z-0 w-full h-full object-cover object-center pointer-events-none" />
+                              <Link
+                                href={`/dashboard/preview/${item.docId}?from=gallery`}
+                                className="absolute inset-0 z-[1]"
+                                aria-label="Open affirmation preview"
+                              >
+                                <span className="sr-only">Open preview</span>
+                              </Link>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  deleteImageFromGallery(item, i);
+                                }}
+                                className="absolute top-1 right-1 w-7 h-7 rounded-full bg-black/70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-500/90 transition-opacity z-[2]"
+                                aria-label="Delete image"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="col-span-2 flex flex-col items-center justify-center gap-1.5 rounded-lg border border-white/10 border-dashed w-full h-full min-h-0">
+                          <Sparkles className="w-8 h-8 text-white/25" />
+                          <span className="text-[11px] text-white/40">No image</span>
+                        </div>
+                      )}
                     </div>
-                  ))}
-                </div>
-                <div className="p-3 bg-black/30">
-                  <p className="text-sm line-clamp-2">{item.content}</p>
-                  <p className="mt-1 text-[11px] text-white/40">
-                    {item.cloudImagePaths?.length || 1} image(s)
-                  </p>
-                </div>
-              </article>
-            ))}
+                  </div>
+                  <div className="p-3 bg-black/30 flex-1 flex flex-col min-h-0">
+                    <p className="text-sm line-clamp-2">{item.content}</p>
+                    <p className="mt-1 text-[11px] text-white/40">
+                      {item.cloudImagePaths?.length || n || 1} image(s)
+                    </p>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         </section>
       )}
