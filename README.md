@@ -19,7 +19,7 @@
 
 # 🌟 LoA - Law of Attraction for the Digital Age <a name="about-project"></a>
 
-**LoA** is a revolutionary mobile app that applies the Law of Attraction to your digital habits. By intercepting app usage and showing personalized affirmation screens, LoA helps users transform mindless scrolling into conscious manifestation moments. This landing page project uses Firebase for data storage (waitlist sign-ups and contact form submissions) and provides a user-friendly interface for exploring the app's manifestation-focused features.
+**LoA** applies the Law of Attraction to your daily practice through affirmations, vision-style imagery, and a focused web experience—without intercepting or blocking other apps. This project uses Firebase for data storage (waitlist sign-ups, contact form submissions, and user content such as affirmations) and provides a user-friendly interface for exploring manifestation-focused features.
 
 ## 🏷 Git Tagging <a name="git-tagging"></a>
 
