@@ -769,8 +769,8 @@ function DashboardContent() {
   }
 
   return (
-    <div className="min-h-screen bg-black">
-      <nav className="fixed top-0 left-0 right-0 h-16 bg-black border-b border-white/10 z-50">
+    <div className="min-h-screen bg-black bg-[radial-gradient(ellipse_at_top,_rgba(88,28,135,0.10)_0%,_transparent_55%)]">
+      <nav className="fixed top-0 left-0 right-0 h-16 bg-black/85 backdrop-blur-md border-b border-white/8 z-50">
         <div className="h-full max-w-7xl mx-auto px-4 flex items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-2">
             <Image
@@ -788,8 +788,8 @@ function DashboardContent() {
               const active = activeTab === tab.id;
               const className = `inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors ${
                 active
-                  ? "bg-white/10 text-white border border-white/20"
-                  : "text-white/70 hover:text-white hover:bg-white/10"
+                  ? "bg-purple-500/15 text-white border border-purple-500/30"
+                  : "text-white/60 hover:text-white hover:bg-white/8"
               }`;
               if (tab.href) {
                 return (
@@ -894,12 +894,12 @@ function DashboardContent() {
 
       <div className="max-w-7xl mx-auto px-4 py-8 pt-24 text-white">
       <section className="mb-6">
-            <p className="inline-flex items-center gap-2 text-white/50 text-xs uppercase tracking-wider">
+            <p className="inline-flex items-center gap-2 text-purple-400/70 text-xs uppercase tracking-widest font-medium">
               <Cloud className="h-3.5 w-3.5" />
-              Dashboard
+              LoA Dashboard
             </p>
-            <h1 className="text-3xl font-bold mt-2">{activeMeta.title}</h1>
-            <p className="text-white/60 mt-1">
+            <h1 className="font-tiempos text-3xl font-bold mt-2 text-white">{activeMeta.title}</h1>
+            <p className="text-white/50 mt-1">
               {activeMeta.description}
             </p>
         <div className="mt-4 grid grid-cols-2 gap-2 md:hidden">
@@ -907,8 +907,8 @@ function DashboardContent() {
             const active = activeTab === tab.id;
             const className = `rounded-lg border px-3 py-2 text-sm text-left ${
               active
-                ? "bg-white/10 border-white/20 text-white"
-                : "bg-white/5 border-white/10 text-white/80"
+                ? "bg-purple-500/15 border-purple-500/30 text-white"
+                : "bg-white/5 border-white/10 text-white/70"
             }`;
             if (tab.href) {
               return (
@@ -938,14 +938,16 @@ function DashboardContent() {
       {activeTab === "home" && (
         <section className="space-y-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatCard label="Affirmations" value={affirmations.length} icon={<Sparkles className="h-4 w-4" />} />
-            <StatCard label="Favorites" value={favoriteCount} icon={<Star className="h-4 w-4" />} />
-            <StatCard label="Gallery Items" value={affirmationsWithImages.length} icon={<GalleryHorizontalEnd className="h-4 w-4" />} />
-            <StatCard label="Total Affirms" value={totalAffirmCount} icon={<TrendingUp className="h-4 w-4" />} />
+            <StatCard label="Affirmations" value={affirmations.length} icon={<Sparkles className="h-4 w-4" />} accent="purple" />
+            <StatCard label="Favorites" value={favoriteCount} icon={<Star className="h-4 w-4" />} accent="yellow" />
+            <StatCard label="Gallery Items" value={affirmationsWithImages.length} icon={<GalleryHorizontalEnd className="h-4 w-4" />} accent="indigo" />
+            <StatCard label="Total Affirms" value={totalAffirmCount} icon={<TrendingUp className="h-4 w-4" />} accent="pink" />
           </div>
 
-          <article className="rounded-xl border border-white/10 p-4">
-            <h2 className="text-lg font-semibold mb-3">Streak</h2>
+          <article className="rounded-xl border border-orange-500/20 bg-gradient-to-br from-orange-500/8 to-transparent p-4">
+            <h2 className="text-lg font-semibold mb-3 inline-flex items-center gap-2">
+              🔥 <span>Streak</span>
+            </h2>
             <div className="grid grid-cols-3 gap-2">
               <MiniStat label="Current" value={streak?.currentStreak ?? 0} />
               <MiniStat label="Longest" value={streak?.longestStreak ?? 0} />
@@ -955,7 +957,10 @@ function DashboardContent() {
 
           {affirmations.length > 0 && (
             <article className="rounded-xl p-4 max-w-xl">
-              <h2 className="text-lg font-semibold mb-2">Affirmation carousel</h2>
+              <h2 className="text-lg font-semibold mb-2 text-white inline-flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-purple-400" />
+                Affirmation Carousel
+              </h2>
               <div className="embla overflow-hidden" ref={emblaRef}>
                 <div className="embla__container flex gap-4">
                   {affirmations.map((item) => {
@@ -1192,7 +1197,7 @@ function DashboardContent() {
               <button
                 onClick={addAffirmation}
                 disabled={saving}
-                className="w-full rounded-xl bg-white text-black px-3 py-2.5 text-sm font-medium disabled:opacity-50"
+                className="w-full rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-400 hover:to-indigo-400 text-white px-3 py-2.5 text-sm font-semibold disabled:opacity-50 transition-all shadow-lg shadow-purple-500/20"
               >
                 {saving ? "Saving..." : "Create Affirmation"}
               </button>
@@ -1434,10 +1439,10 @@ function DashboardContent() {
             </div>
           </aside>
 
-          <div className="rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5">
+          <div className="rounded-2xl bg-white/[0.03] border border-white/10 p-4 md:p-5">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Affirmation Library</h2>
-              <span className="text-xs text-white/50">{affirmations.length} total</span>
+              <h2 className="text-lg font-semibold text-white">Affirmation Library</h2>
+              <span className="text-xs text-white/40 bg-white/5 border border-white/10 rounded-full px-2.5 py-0.5">{affirmations.length} total</span>
             </div>
 
             {affirmations.length === 0 && (
@@ -1450,7 +1455,7 @@ function DashboardContent() {
               {affirmations.map((item) => (
                 <article
                   key={item.docId}
-                  className="rounded-xl border border-white/10 bg-black/30 p-4 hover:bg-black/40 transition-colors"
+                  className="rounded-xl border border-white/8 bg-white/[0.03] p-4 hover:bg-white/[0.06] hover:border-white/15 transition-all duration-200"
                 >
                   {editingAffirmationDocId === item.docId ? (
                     <div className="space-y-3">
@@ -1599,7 +1604,7 @@ function DashboardContent() {
                         <button
                           onClick={saveEditAffirmation}
                           disabled={saving}
-                          className="rounded-md bg-white text-black px-3 py-1.5 text-xs font-medium hover:bg-white/90 disabled:opacity-50"
+                          className="rounded-md bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-400 hover:to-indigo-400 text-white px-3 py-1.5 text-xs font-semibold disabled:opacity-50 transition-all"
                         >
                           {saving ? "Saving…" : "Save"}
                         </button>
@@ -1704,8 +1709,11 @@ function DashboardContent() {
       )}
 
       {activeTab === "gallery" && (
-        <section className="rounded-xl bg-white/5 border border-white/10 p-4">
-          <h2 className="text-lg font-semibold">Gallery</h2>
+        <section className="rounded-xl bg-white/[0.03] border border-white/10 p-4">
+          <h2 className="text-lg font-semibold text-white inline-flex items-center gap-2">
+            <GalleryHorizontalEnd className="h-4 w-4 text-indigo-400" />
+            Gallery
+          </h2>
           <div className="mt-4 grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {affirmationsWithImages.map((item) => {
               const urls = item.imageUrls?.length ? item.imageUrls : item.imageUrl ? [item.imageUrl] : [];
@@ -1785,12 +1793,20 @@ function DashboardContent() {
   );
 }
 
-function StatCard({ label, value, icon }) {
+const STAT_ACCENTS = {
+  purple: { card: "bg-gradient-to-br from-purple-500/15 to-purple-500/5 border border-purple-500/25", icon: "text-purple-400" },
+  yellow: { card: "bg-gradient-to-br from-yellow-500/15 to-yellow-500/5 border border-yellow-500/25", icon: "text-yellow-400" },
+  indigo: { card: "bg-gradient-to-br from-indigo-500/15 to-indigo-500/5 border border-indigo-500/25", icon: "text-indigo-400" },
+  pink:   { card: "bg-gradient-to-br from-pink-500/15 to-pink-500/5 border border-pink-500/25",   icon: "text-pink-400"   },
+};
+
+function StatCard({ label, value, icon, accent = "purple" }) {
+  const styles = STAT_ACCENTS[accent] || STAT_ACCENTS.purple;
   return (
-    <article className="rounded-xl border border-white/10 p-4">
-      <div className="text-white/70">{icon}</div>
+    <article className={`rounded-xl p-4 ${styles.card}`}>
+      <div className={styles.icon}>{icon}</div>
       <p className="mt-2 text-xs uppercase tracking-wider text-white/50">{label}</p>
-      <p className="mt-1 text-2xl font-semibold">{value}</p>
+      <p className="mt-1 text-2xl font-semibold text-white">{value}</p>
     </article>
   );
 }
@@ -1813,9 +1829,9 @@ export default function DashboardPage() {
 
 function MiniStat({ label, value }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-black/30 p-3">
-      <p className="text-white/50 text-xs uppercase tracking-wider">{label}</p>
-      <p className="text-xl font-semibold mt-1">{value}</p>
+    <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-center">
+      <p className="text-2xl font-bold text-white">{value}</p>
+      <p className="text-white/45 text-xs uppercase tracking-wider mt-1">{label}</p>
     </div>
   );
 }

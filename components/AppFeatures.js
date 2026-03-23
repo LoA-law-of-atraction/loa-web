@@ -53,15 +53,16 @@ const AppFeatures = () => {
     <motion.section
       initial={{ opacity: 0 }}
       animate={{ opacity: 1, transition: { duration: 0.8 } }}
-      className="relative z-10 w-full bg-white py-16 overflow-hidden"
+      className="relative z-10 w-full bg-[#050508] py-16 overflow-hidden"
     >
+      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-indigo-500/30 to-transparent" />
       <div className="container mx-auto p-4 px-5 md:px-[5%] 2xl:px-0 max-w-[1200px]">
         <div className="text-center mb-12">
           <motion.h2
             initial={{ opacity: 0, y: 50 }}
             whileInView={{ opacity: 1, y: 0, transition: { duration: 0.8 } }}
             viewport={{ once: true }}
-            className="text-h2 lg:text-h1 font-bold mb-4 text-black"
+            className="text-h2 lg:text-h1 font-bold mb-4 text-white"
           >
             Features That Align Your Digital Life with the Law of Attraction
           </motion.h2>
@@ -73,7 +74,7 @@ const AppFeatures = () => {
               transition: { duration: 0.8, delay: 0.2 },
             }}
             viewport={{ once: true }}
-            className="text-lg text-gray-600 max-w-2xl mx-auto"
+            className="text-lg text-white/60 max-w-2xl mx-auto"
           >
             Discover how LoA transforms every phone interaction into an
             opportunity for conscious awareness, manifestation practice, and
@@ -92,15 +93,15 @@ const AppFeatures = () => {
                 transition: { duration: 0.6, delay: index * 0.1 },
               }}
               viewport={{ once: true }}
-              className="bg-white p-6 rounded-lg shadow-lg border border-gray-100 hover:shadow-xl transition-shadow duration-300 hover:border-purple-200"
+              className="bg-white/5 backdrop-blur-md p-6 rounded-xl border border-white/10 hover:border-purple-400/40 hover:bg-white/8 transition-all duration-300"
             >
-              <div className="text-transparent bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text mb-4">
-                <div className="text-indigo-500">{feature.icon}</div>
+              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-600/20 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-4">
+                {feature.icon}
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">
+              <h3 className="text-xl font-semibold text-white mb-3">
                 {feature.title}
               </h3>
-              <p className="text-gray-600 leading-relaxed">
+              <p className="text-white/60 leading-relaxed">
                 {feature.description}
               </p>
             </motion.div>
