@@ -120,18 +120,18 @@ function AffirmationPreviewContent() {
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-white/70" />
+        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-purple-400/70" />
       </div>
     );
   }
 
   if (error && !affirmation) {
     return (
-      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-4">
-        <p className="text-red-400 mb-4">{error}</p>
+      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-4 gap-4">
+        <p className="text-red-400 text-sm">{error}</p>
         <Link
           href={backHref}
-          className="inline-flex items-center gap-2 rounded-xl border border-white/20 px-4 py-2 text-sm hover:bg-white/10"
+          className="inline-flex items-center gap-2 rounded-xl border border-white/15 px-4 py-2 text-sm text-white/60 hover:bg-white/8 transition-all"
         >
           <ArrowLeft className="h-4 w-4" />
           {backLabel}
@@ -143,20 +143,16 @@ function AffirmationPreviewContent() {
   const urls = affirmation?.imageUrls?.length ? affirmation.imageUrls : (affirmation?.imageUrl ? [affirmation.imageUrl] : []);
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      {/* Dashboard bar – same as main dashboard */}
-      <nav className="fixed top-0 left-0 right-0 h-16 bg-black border-b border-white/10 z-50">
+    <div className="min-h-screen bg-black bg-[radial-gradient(ellipse_at_top,_rgba(88,28,135,0.10)_0%,_transparent_55%)] text-white">
+
+      {/* Nav — matches dashboard */}
+      <nav className="fixed top-0 left-0 right-0 h-16 bg-black/85 backdrop-blur-md border-b border-white/8 z-50">
         <div className="h-full max-w-7xl mx-auto px-4 flex items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-2">
-            <Image
-              src="/app_logo.svg"
-              alt="LoA"
-              width={28}
-              height={28}
-              className="rounded-lg"
-            />
+            <Image src="/app_logo.svg" alt="LoA" width={28} height={28} className="rounded-lg" />
             <span className="text-white font-bold text-lg hidden sm:block">LoA</span>
           </Link>
+
           <div className="hidden md:flex items-center gap-1">
             {dashboardTabs.map((tab) => {
               const Icon = tab.icon;
@@ -164,7 +160,7 @@ function AffirmationPreviewContent() {
                 <Link
                   key={tab.id}
                   href={tab.href}
-                  className="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+                  className="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-white/55 hover:text-white hover:bg-white/8 transition-colors"
                 >
                   <Icon className="w-4 h-4" />
                   <span>{tab.label}</span>
@@ -172,33 +168,31 @@ function AffirmationPreviewContent() {
               );
             })}
           </div>
+
           <div className="flex items-center gap-2">
             <Link
               href={backHref}
-              className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm text-white/70 hover:text-white hover:bg-white/10 transition-colors"
-              aria-label={backLabel}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/12 px-3 py-1.5 text-sm text-white/60 hover:text-white hover:bg-white/8 transition-all"
             >
-              <ArrowLeft className="h-4 w-4" />
-              <span className="hidden sm:inline">Back</span>
+              <ArrowLeft className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">{backLabel}</span>
+              <span className="sm:hidden">Back</span>
             </Link>
-            <span className="rounded-full px-3 py-1.5 text-xs bg-white/5 border border-white/10 text-white/80">
+            <span className="rounded-full px-3 py-1.5 text-xs bg-white/5 border border-white/10 text-white/50 hidden sm:block">
               {userLabel}
             </span>
-            <button
-              onClick={handleLogout}
-              className="text-white/70 hover:text-red-400 transition-colors p-2"
-              title="Sign Out"
-            >
-              <LogOut className="w-5 h-5" />
+            <button onClick={handleLogout} className="text-white/35 hover:text-red-400 transition-colors p-2" title="Sign Out">
+              <LogOut className="w-4 h-4" />
             </button>
           </div>
         </div>
-        <div className="md:hidden flex flex-wrap gap-2 px-4 pb-3">
+
+        <div className="md:hidden flex gap-1.5 px-4 pb-3 overflow-x-auto">
           {dashboardTabs.map((tab) => (
             <Link
               key={tab.id}
               href={tab.href}
-              className="rounded-lg border border-white/10 px-3 py-2 text-sm text-white/80 hover:bg-white/10"
+              className="rounded-lg bg-white/5 border border-white/8 px-3 py-1.5 text-sm text-white/60 shrink-0"
             >
               {tab.label}
             </Link>
@@ -206,165 +200,158 @@ function AffirmationPreviewContent() {
         </div>
       </nav>
 
-      <main className="max-w-2xl mx-auto px-4 pt-24 pb-6">
-        <article className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
-          {urls.length > 0 ? (
-            <div className="relative bg-black/30 p-4">
-              {/* Main 9:16 preview */}
-              <div className="relative flex items-center justify-center">
+      <main className="max-w-lg mx-auto px-4 pt-24 pb-12">
+
+        {/* Image section */}
+        {urls.length > 0 ? (
+          <div className="relative">
+            {/* Ambient glow behind image */}
+            <div className="absolute inset-x-8 top-4 bottom-0 bg-purple-600/20 blur-3xl rounded-full pointer-events-none" />
+
+            {/* Main 9:16 image */}
+            <div className="relative flex items-center justify-center">
+              {urls.length > 1 && (
                 <button
                   type="button"
                   onClick={() => setImageIndex((i) => (i <= 0 ? urls.length - 1 : i - 1))}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 z-10 rounded-full p-2 text-white/80 hover:text-white hover:bg-white/20 transition-colors"
+                  className="absolute left-0 top-1/2 -translate-y-1/2 z-10 rounded-full p-2 text-white/50 hover:text-white hover:bg-white/15 transition-all"
                   aria-label="Previous image"
                 >
-                  <ChevronLeft className="h-8 w-8" />
+                  <ChevronLeft className="h-6 w-6" />
                 </button>
-                <div className="rounded-xl overflow-hidden border border-white/10 aspect-[9/16] w-full max-w-[280px] mx-auto relative">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={urls[imageIndex]}
-                    alt=""
-                    className="w-full h-full object-cover"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setExpandedImage(true)}
-                    className="absolute top-2 right-2 z-10 rounded-lg p-2 bg-black/60 text-white/90 hover:bg-black/80 hover:text-white transition-colors"
-                    aria-label="Expand image"
-                    title="Expand image"
-                  >
-                    <Maximize2 className="h-5 w-5" />
-                  </button>
-                </div>
+              )}
+
+              <div className="relative rounded-2xl overflow-hidden aspect-[9/16] w-full max-w-[300px] mx-auto shadow-2xl shadow-black/60">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={urls[imageIndex]} alt="" className="w-full h-full object-cover" />
                 <button
                   type="button"
-                  onClick={() => setImageIndex((i) => (i >= urls.length - 1 ? 0 : i + 1))}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 z-10 rounded-full p-2 text-white/80 hover:text-white hover:bg-white/20 transition-colors"
-                  aria-label="Next image"
+                  onClick={() => setExpandedImage(true)}
+                  className="absolute top-3 right-3 z-10 rounded-xl p-2 bg-black/50 backdrop-blur-sm text-white/80 hover:bg-black/70 hover:text-white transition-all"
+                  aria-label="Expand image"
                 >
-                  <ChevronRight className="h-8 w-8" />
+                  <Maximize2 className="h-4 w-4" />
                 </button>
                 {urls.length > 1 && (
-                  <span className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[11px] text-white/50">
+                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/50 backdrop-blur-sm rounded-full px-2.5 py-1 text-[11px] text-white/70">
                     {imageIndex + 1} / {urls.length}
-                  </span>
+                  </div>
                 )}
               </div>
 
-              {/* Expanded image modal – 9:16 ratio, horizontal scroll */}
-              {expandedImage && (
-                <div
-                  className="fixed inset-0 z-[100] bg-black/95 flex flex-col"
-                  role="dialog"
-                  aria-modal="true"
-                  aria-label="Expanded image"
-                  onClick={() => setExpandedImage(false)}
-                >
-                  <div className="flex-shrink-0 flex justify-end p-2">
-                    <button
-                      type="button"
-                      onClick={() => setExpandedImage(false)}
-                      className="rounded-full p-2 text-white/80 hover:text-white hover:bg-white/20 transition-colors"
-                      aria-label="Close"
-                    >
-                      <X className="h-8 w-8" />
-                    </button>
-                  </div>
-                  {/* One 9:16 slot visible at a time; horizontal scroll to see rest */}
-                  <div className="flex-1 min-h-0 flex justify-center overflow-hidden">
-                    <div
-                      ref={expandedScrollRef}
-                      className="h-[calc(100vh-5rem)] overflow-x-auto overflow-y-hidden flex items-center gap-4 px-4 pb-4"
-                      style={{
-                        scrollBehavior: "smooth",
-                        width: "min(100%, calc((100vh - 5rem) * 9 / 16))",
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {urls.map((url, idx) => (
-                        <div
-                          key={idx}
-                          ref={(el) => { expandedItemRefs.current[idx] = el; }}
-                          className="flex-shrink-0 h-full aspect-[9/16] rounded-xl overflow-hidden border border-white/10 bg-black"
-                        >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={url}
-                          alt=""
-                          className="w-full h-full object-cover cursor-default"
-                        />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  {/* Affirmation text in expanded view */}
-                  <div className="flex-shrink-0 px-4 pb-4 pt-2 border-t border-white/10 text-center" onClick={(e) => e.stopPropagation()}>
-                    <p className="text-base leading-relaxed text-white/95 whitespace-pre-wrap">
-                      {affirmation?.content || "No content."}
-                    </p>
-                    {affirmation?.category && (
-                      <p className="mt-2 text-sm text-white/50">
-                        {affirmation.category}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Small 9:16 thumbnails below – tap to switch main preview */}
               {urls.length > 1 && (
-                <div className="mt-4 flex gap-2 overflow-x-auto pb-1 justify-center flex-wrap">
-                  {urls.map((url, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => setImageIndex(idx)}
-                      className={`flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all focus:outline-none focus:ring-2 focus:ring-white/50 ${
-                        idx === imageIndex
-                          ? "border-white ring-2 ring-white/30"
-                          : "border-white/20 hover:border-white/40 opacity-80 hover:opacity-100"
-                      }`}
-                      style={{ width: 52, height: (52 * 16) / 9 }}
-                      aria-label={`Show image ${idx + 1}`}
-                      aria-pressed={idx === imageIndex}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={url}
-                        alt=""
-                        className="w-full h-full object-cover pointer-events-none"
-                      />
-                    </button>
-                  ))}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setImageIndex((i) => (i >= urls.length - 1 ? 0 : i + 1))}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 z-10 rounded-full p-2 text-white/50 hover:text-white hover:bg-white/15 transition-all"
+                  aria-label="Next image"
+                >
+                  <ChevronRight className="h-6 w-6" />
+                </button>
               )}
             </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center gap-3 py-12 px-4 bg-black/20 border-b border-white/10 min-h-[180px]">
-              <Sparkles className="w-12 h-12 text-white/25" />
-              <span className="text-sm text-white/40">No image</span>
-            </div>
-          )}
-          <div className="p-5">
-            <p className="text-lg leading-relaxed text-white/95 whitespace-pre-wrap">
-              {affirmation?.content || "No content."}
-            </p>
-            {affirmation?.category && (
-              <p className="mt-3 text-sm text-white/50">
-                {affirmation.category}
-              </p>
+
+            {/* Thumbnails */}
+            {urls.length > 1 && (
+              <div className="mt-4 flex gap-2 justify-center flex-wrap">
+                {urls.map((url, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setImageIndex(idx)}
+                    className={`flex-shrink-0 rounded-lg overflow-hidden transition-all ${
+                      idx === imageIndex
+                        ? "ring-2 ring-purple-400/70 opacity-100"
+                        : "opacity-45 hover:opacity-75"
+                    }`}
+                    style={{ width: 44, height: (44 * 16) / 9 }}
+                    aria-label={`Show image ${idx + 1}`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={url} alt="" className="w-full h-full object-cover pointer-events-none" />
+                  </button>
+                ))}
+              </div>
             )}
-            <div className="mt-4 flex flex-wrap gap-2 text-xs text-white/40">
-              {affirmation?.affirmCount != null && (
-                <span>Affirmed {affirmation.affirmCount} time(s)</span>
-              )}
-              {affirmation?.isFavorite && (
-                <span className="text-amber-400/80">Favorite</span>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-purple-500/20 bg-purple-500/5 py-20">
+            <Sparkles className="w-10 h-10 text-purple-400/30" />
+            <span className="text-sm text-white/35">No image</span>
+          </div>
+        )}
+
+        {/* Affirmation content */}
+        <div className="mt-8 text-center px-2">
+          <blockquote className="font-tiempos text-2xl italic leading-relaxed text-white/90 whitespace-pre-wrap">
+            &ldquo;{affirmation?.content || "No content."}&rdquo;
+          </blockquote>
+
+          <div className="mt-5 flex items-center justify-center gap-3 flex-wrap">
+            {affirmation?.category && (
+              <span className="text-[10px] tracking-[0.14em] uppercase font-medium text-purple-300/65 bg-purple-500/10 rounded-full px-3 py-1">
+                {affirmation.category}
+              </span>
+            )}
+            {affirmation?.affirmCount != null && (
+              <span className="text-xs text-white/30">{affirmation.affirmCount} affirms</span>
+            )}
+            {affirmation?.isFavorite && (
+              <span className="text-xs text-amber-400/70">&#9733; Favorite</span>
+            )}
+          </div>
+        </div>
+
+        {/* Expanded image modal */}
+        {expandedImage && (
+          <div
+            className="fixed inset-0 z-[100] bg-black/97 backdrop-blur-sm flex flex-col"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => setExpandedImage(false)}
+          >
+            <div className="flex-shrink-0 flex justify-end p-3">
+              <button
+                type="button"
+                onClick={() => setExpandedImage(false)}
+                className="rounded-full p-2 text-white/60 hover:text-white hover:bg-white/12 transition-colors"
+                aria-label="Close"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="flex-1 min-h-0 flex justify-center overflow-hidden">
+              <div
+                ref={expandedScrollRef}
+                className="h-[calc(100vh-5rem)] overflow-x-auto overflow-y-hidden flex items-center gap-3 px-4 pb-4"
+                style={{ scrollBehavior: "smooth", width: "min(100%, calc((100vh - 5rem) * 9 / 16))" }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {urls.map((url, idx) => (
+                  <div
+                    key={idx}
+                    ref={(el) => { expandedItemRefs.current[idx] = el; }}
+                    className="flex-shrink-0 h-full aspect-[9/16] rounded-2xl overflow-hidden bg-black shadow-2xl"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={url} alt="" className="w-full h-full object-cover cursor-default" />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex-shrink-0 px-4 pb-6 pt-3 text-center" onClick={(e) => e.stopPropagation()}>
+              <p className="font-tiempos text-lg italic text-white/85 leading-relaxed">
+                &ldquo;{affirmation?.content || "No content."}&rdquo;
+              </p>
+              {affirmation?.category && (
+                <p className="mt-2 text-[11px] tracking-[0.14em] uppercase text-white/35">{affirmation.category}</p>
               )}
             </div>
           </div>
-        </article>
+        )}
+
       </main>
     </div>
   );
