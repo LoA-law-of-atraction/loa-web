@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { onAuthStateChanged, signInAnonymously, signOut } from "firebase/auth";
+import { motion } from "framer-motion";
 import Autoplay from "embla-carousel-autoplay";
 import EmblaCarousel from "embla-carousel-react";
 import {
@@ -83,6 +84,49 @@ Rules:
 - category: one short word or phrase (e.g. "Abundance", "Love", "Health", "Career", "Peace", "Relationship").`;
 
 const USER_PROMPT_SUFFIX = "\n\nGenerate one short affirmation and a category. Return only JSON: { \"affirmation\": \"...\", \"category\": \"...\" }";
+
+function AffirmationImageGrid({ urls = [] }) {
+  const displayUrls = urls.slice(0, 4);
+  const n = displayUrls.length;
+  const hiddenCount = urls.length - n;
+  const lastIndex = n - 1;
+
+  const getCellSpan = (i) => {
+    if (n === 1) return "col-span-2";
+    if (n === 3 && i === 1) return "row-span-2";
+    return "";
+  };
+
+  const gridRowsClass = n <= 2 ? "grid-rows-1" : "grid-rows-2";
+
+  if (n === 0) {
+    return (
+      <div className="aspect-square grid-cols-2 flex flex-col items-center justify-center gap-1.5 rounded-lg border border-white/10 border-dashed w-full">
+        <Sparkles className="w-8 h-8 text-white/25" />
+        <span className="text-[11px] text-white/40">No image</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`grid grid-cols-2 gap-1.5 shrink-0 w-full overflow-hidden aspect-square ${gridRowsClass}`}>
+      {displayUrls.map((url, i) => (
+        <div
+          key={i}
+          className={`relative rounded-lg overflow-hidden border border-white/20 min-h-0 min-w-0 w-full h-full ${getCellSpan(i)}`}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={url} alt="" className="w-full h-full object-cover object-center" />
+          {i === lastIndex && hiddenCount > 0 && (
+            <div className="absolute inset-0 bg-black/55 flex items-center justify-center rounded-lg">
+              <span className="text-white font-semibold text-lg">+{hiddenCount}</span>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function TemplateSelect({ value, onChange, defaultTemplates, label, variant = "manual" }) {
   const [open, setOpen] = useState(false);
@@ -226,6 +270,7 @@ function DashboardContent() {
 
   const [debugMenuOpen, setDebugMenuOpen] = useState(false);
   const [showPaywallDemo, setShowPaywallDemo] = useState(false);
+  const [showSystemPrompt, setShowSystemPrompt] = useState(false);
   const debugMenuRef = useRef(null);
 
   useEffect(() => {
@@ -769,8 +814,8 @@ function DashboardContent() {
   }
 
   return (
-    <div className="min-h-screen bg-black">
-      <nav className="fixed top-0 left-0 right-0 h-16 bg-black border-b border-white/10 z-50">
+    <div className="min-h-screen bg-black bg-[radial-gradient(ellipse_at_top,_rgba(88,28,135,0.10)_0%,_transparent_55%)]">
+      <nav className="fixed top-0 left-0 right-0 h-16 bg-black/85 backdrop-blur-md border-b border-white/8 z-50">
         <div className="h-full max-w-7xl mx-auto px-4 flex items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-2">
             <Image
@@ -788,8 +833,8 @@ function DashboardContent() {
               const active = activeTab === tab.id;
               const className = `inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors ${
                 active
-                  ? "bg-white/10 text-white border border-white/20"
-                  : "text-white/70 hover:text-white hover:bg-white/10"
+                  ? "bg-purple-500/15 text-white border border-purple-500/30"
+                  : "text-white/60 hover:text-white hover:bg-white/8"
               }`;
               if (tab.href) {
                 return (
@@ -900,12 +945,12 @@ function DashboardContent() {
 
       <div className="max-w-7xl mx-auto px-4 py-8 pt-24 text-white">
       <section className="mb-6">
-            <p className="inline-flex items-center gap-2 text-white/50 text-xs uppercase tracking-wider">
+            <p className="inline-flex items-center gap-2 text-purple-400/70 text-xs uppercase tracking-widest font-medium">
               <Cloud className="h-3.5 w-3.5" />
-              Dashboard
+              LoA Dashboard
             </p>
-            <h1 className="text-3xl font-bold mt-2">{activeMeta.title}</h1>
-            <p className="text-white/60 mt-1">
+            <h1 className="font-tiempos text-3xl font-bold mt-2 text-white">{activeMeta.title}</h1>
+            <p className="text-white/50 mt-1">
               {activeMeta.description}
             </p>
         <div className="mt-4 grid grid-cols-2 gap-2 md:hidden">
@@ -913,8 +958,8 @@ function DashboardContent() {
             const active = activeTab === tab.id;
             const className = `rounded-lg border px-3 py-2 text-sm text-left ${
               active
-                ? "bg-white/10 border-white/20 text-white"
-                : "bg-white/5 border-white/10 text-white/80"
+                ? "bg-purple-500/15 border-purple-500/30 text-white"
+                : "bg-white/5 border-white/10 text-white/70"
             }`;
             if (tab.href) {
               return (
@@ -942,41 +987,106 @@ function DashboardContent() {
       </section>
 
       {activeTab === "home" && (
-        <section className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatCard label="Affirmations" value={affirmations.length} icon={<Sparkles className="h-4 w-4" />} />
-            <StatCard label="Favorites" value={favoriteCount} icon={<Star className="h-4 w-4" />} />
-            <StatCard label="Gallery Items" value={affirmationsWithImages.length} icon={<GalleryHorizontalEnd className="h-4 w-4" />} />
-            <StatCard label="Total Affirms" value={totalAffirmCount} icon={<TrendingUp className="h-4 w-4" />} />
+        <section className="space-y-3">
+
+          {/* ── Bento grid ── */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+
+            {/* Hero: Affirmations — 2 cols wide on lg */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="col-span-2 rounded-2xl bg-gradient-to-br from-purple-500/20 via-purple-900/10 to-transparent border border-purple-500/25 p-6 flex flex-col justify-between min-h-[150px]"
+            >
+              <div className="flex items-center justify-between">
+                <Sparkles className="h-4 w-4 text-purple-400/60" />
+                <span className="text-[10px] uppercase tracking-[0.2em] text-purple-400/50 font-medium">Affirmations</span>
+              </div>
+              <div className="mt-3">
+                <p className="font-tiempos text-7xl font-bold text-white leading-none">{affirmations.length}</p>
+                <p className="text-xs text-purple-300/45 mt-2 tracking-wide">manifestations crafted</p>
+              </div>
+            </motion.div>
+
+            {/* Favorites */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.08 }}
+              className="rounded-2xl bg-gradient-to-br from-yellow-500/15 to-yellow-900/5 border border-yellow-500/20 p-5 flex flex-col justify-between min-h-[150px]"
+            >
+              <Star className="h-4 w-4 text-yellow-400/70" />
+              <div>
+                <p className="font-tiempos text-5xl font-bold text-white leading-none">{favoriteCount}</p>
+                <p className="text-[10px] text-yellow-300/45 mt-1.5 uppercase tracking-[0.15em]">Favorites</p>
+              </div>
+            </motion.div>
+
+            {/* Gallery */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.13 }}
+              className="rounded-2xl bg-gradient-to-br from-indigo-500/15 to-indigo-900/5 border border-indigo-500/20 p-5 flex flex-col justify-between min-h-[150px]"
+            >
+              <GalleryHorizontalEnd className="h-4 w-4 text-indigo-400/70" />
+              <div>
+                <p className="font-tiempos text-5xl font-bold text-white leading-none">{affirmationsWithImages.length}</p>
+                <p className="text-[10px] text-indigo-300/45 mt-1.5 uppercase tracking-[0.15em]">Gallery</p>
+              </div>
+            </motion.div>
+
           </div>
 
-          <article className="rounded-xl border border-white/10 p-4">
-            <h2 className="text-lg font-semibold mb-3">Streak</h2>
-            <div className="grid grid-cols-3 gap-2">
-              <MiniStat label="Current" value={streak?.currentStreak ?? 0} />
-              <MiniStat label="Longest" value={streak?.longestStreak ?? 0} />
-              <MiniStat label="Total Days" value={streak?.totalDaysCompleted ?? 0} />
+          {/* Total Affirms — thin horizontal banner */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.18 }}
+            className="rounded-xl border border-pink-500/20 bg-gradient-to-r from-pink-500/8 via-pink-500/4 to-transparent px-5 py-3.5 flex items-center justify-between"
+          >
+            <div className="flex items-center gap-2.5">
+              <TrendingUp className="h-4 w-4 text-pink-400" />
+              <span className="text-sm text-white/55">Total times affirmed</span>
             </div>
-          </article>
+            <span className="font-tiempos text-2xl font-bold text-white">{totalAffirmCount}</span>
+          </motion.div>
+
+          {/* Streak — staggered number hierarchy */}
+          <motion.article
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.23 }}
+            className="rounded-2xl border border-orange-500/20 bg-gradient-to-br from-orange-500/10 via-orange-500/4 to-transparent p-5"
+          >
+            <p className="text-[10px] uppercase tracking-[0.2em] text-orange-400/60 font-medium mb-5">🔥 Streak</p>
+            <div className="flex items-end gap-8">
+              <div>
+                <p className="font-tiempos text-6xl font-bold text-white leading-none">{streak?.currentStreak ?? 0}</p>
+                <p className="text-xs text-white/35 uppercase tracking-widest mt-2">Current</p>
+              </div>
+              <div className="pb-0.5">
+                <p className="font-tiempos text-4xl font-bold text-white/55 leading-none">{streak?.longestStreak ?? 0}</p>
+                <p className="text-xs text-white/30 uppercase tracking-widest mt-2">Longest</p>
+              </div>
+              <div className="pb-0.5">
+                <p className="font-tiempos text-4xl font-bold text-white/55 leading-none">{streak?.totalDaysCompleted ?? 0}</p>
+                <p className="text-xs text-white/30 uppercase tracking-widest mt-2">Total Days</p>
+              </div>
+            </div>
+          </motion.article>
 
           {affirmations.length > 0 && (
             <article className="rounded-xl p-4 max-w-xl">
-              <h2 className="text-lg font-semibold mb-2">Affirmation carousel</h2>
+              <h2 className="text-lg font-semibold mb-2 text-white inline-flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-purple-400" />
+                Affirmation Carousel
+              </h2>
               <div className="embla overflow-hidden" ref={emblaRef}>
                 <div className="embla__container flex gap-4">
                   {affirmations.map((item) => {
                     const urls = item.imageUrls?.length ? item.imageUrls : (item.imageUrl ? [item.imageUrl] : []);
-                    const displayUrls = urls.slice(0, 4);
-                    const n = displayUrls.length;
-                    // Spec: 1 image → 8:16 | 2 images → 8:16, 8:16 | 3 images → 2×2, 2nd fills vertically (row-span-2) | 4 images → 2×2
-                    const getCellStyle = (i) => {
-                      if (n === 1) return { span: "col-span-2" };
-                      if (n === 3 && i === 1) return { span: "row-span-2" };
-                      return { span: "" };
-                    };
-                    const imageAreaAspect = "aspect-square";
-                    const gridColsClass = "grid-cols-2";
-                    const gridRowsClass = n === 0 ? "grid-rows-1" : n === 1 ? "grid-rows-1" : n === 2 ? "grid-rows-1" : "grid-rows-2";
                     return (
                       <div
                         key={item.docId}
@@ -986,31 +1096,9 @@ function DashboardContent() {
                           href={`/dashboard/preview/${item.docId}?from=home`}
                           className="block rounded-xl overflow-hidden flex flex-col w-full cursor-pointer"
                         >
-                          <div
-                            className={`grid gap-1.5 shrink-0 w-full overflow-hidden ${imageAreaAspect} ${gridColsClass} ${gridRowsClass}`}
-                          >
-                            {n > 0 ? (
-                              displayUrls.map((url, i) => {
-                                const { span } = getCellStyle(i);
-                                return (
-                                  <div
-                                    key={i}
-                                    className={`rounded-lg overflow-hidden border border-white/20 min-h-0 min-w-0 w-full h-full ${span}`}
-                                  >
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={url} alt="" className="w-full h-full object-cover object-center" />
-                                  </div>
-                                );
-                              })
-                            ) : (
-                              <div className="col-span-2 flex flex-col items-center justify-center gap-1.5 rounded-lg border border-white/10 border-dashed w-full h-full min-h-0">
-                                <Sparkles className="w-8 h-8 text-white/25" />
-                                <span className="text-[11px] text-white/40">No image</span>
-                              </div>
-                            )}
-                          </div>
+                          <AffirmationImageGrid urls={urls} />
                           <div className="p-3 shrink-0">
-                            <p className="text-sm text-white/90 line-clamp-3">{item.content}</p>
+                            <p className="font-tiempos text-xl italic leading-relaxed text-white/85 line-clamp-3">&ldquo;{item.content}&rdquo;</p>
                             {item.category && (
                               <p className="mt-1.5 text-[11px] text-white/50">{item.category}</p>
                             )}
@@ -1030,10 +1118,13 @@ function DashboardContent() {
         <section className="grid lg:grid-cols-[380px_1fr] gap-5">
           <aside className="space-y-5 lg:sticky lg:top-24 h-fit">
             {/* ——— Create manually ——— */}
-            <div className="rounded-2xl bg-gradient-to-b from-white/10 to-white/[0.03] border border-white/15 p-5 space-y-4">
+            <div className="rounded-2xl bg-gradient-to-b from-purple-500/10 to-purple-500/[0.02] border border-purple-500/20 p-5 space-y-4">
               <div>
-                <h2 className="text-lg font-semibold">Create manually</h2>
-                <p className="text-xs text-white/50 mt-1">Write your affirmation and attach a vision image.</p>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="w-5 h-5 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-[10px] text-purple-400 font-bold shrink-0">✦</span>
+                  <h2 className="font-tiempos text-lg font-semibold text-white">Write it yourself</h2>
+                </div>
+                <p className="text-xs text-white/40 pl-7">Craft your affirmation and attach a vision image.</p>
               </div>
               {defaultTemplates.length > 0 && (
                 <TemplateSelect
@@ -1050,13 +1141,13 @@ function DashboardContent() {
                   onChange={(e) => setNewAffirmation((s) => ({ ...s, content: e.target.value }))}
                   placeholder="I am already living my dream life."
                   rows={4}
-                  className="w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2.5 text-sm placeholder:text-white/30 focus:outline-none focus:border-white/30 resize-none"
+                  className="w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2.5 text-sm placeholder:text-white/25 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20 resize-none transition-all"
                 />
                 <input
                   value={newAffirmation.category}
                   onChange={(e) => setNewAffirmation((s) => ({ ...s, category: e.target.value }))}
                   placeholder="Category (e.g. Abundance)"
-                  className="w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2.5 text-sm placeholder:text-white/30 focus:outline-none focus:border-white/30"
+                  className="w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2.5 text-sm placeholder:text-white/25 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20 transition-all"
                 />
                 <div
                   className={`rounded-xl border border-white/10 bg-black/30 p-3 transition-colors ${isDragOverManualImages ? "border-white/40 bg-white/10" : ""}`}
@@ -1198,23 +1289,26 @@ function DashboardContent() {
               <button
                 onClick={addAffirmation}
                 disabled={saving}
-                className="w-full rounded-xl bg-white text-black px-3 py-2.5 text-sm font-medium disabled:opacity-50"
+                className="w-full rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-400 hover:to-indigo-400 text-white px-3 py-2.5 text-sm font-semibold disabled:opacity-50 transition-all shadow-lg shadow-purple-500/20"
               >
                 {saving ? "Saving..." : "Create Affirmation"}
               </button>
             </div>
 
-            {/* ——— Create with AI ——— */}
+            {/* ——— Generate with AI ——— */}
             <div className="rounded-2xl bg-gradient-to-b from-amber-500/10 to-amber-500/[0.02] border border-amber-400/20 p-5 space-y-4">
-              <div>
-                <h2 className="text-lg font-semibold inline-flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-amber-400/90" />
-                  Create with AI
-                </h2>
-                <p className="text-xs text-white/50 mt-1">
-                  Describe what you want to manifest; AI will write a short affirmation.
-                </p>
+
+              {/* Header */}
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center shrink-0">
+                  <Sparkles className="h-4 w-4 text-amber-400" />
+                </div>
+                <div>
+                  <h2 className="font-tiempos text-lg font-semibold text-white leading-tight">Generate with AI</h2>
+                  <p className="text-[11px] text-white/35 mt-0.5">Describe your intention, receive an affirmation</p>
+                </div>
               </div>
+
               {defaultTemplates.length > 0 && (
                 <TemplateSelect
                   label="Optional: start from template"
@@ -1224,75 +1318,74 @@ function DashboardContent() {
                   variant="ai"
                 />
               )}
-              <div>
-                <label className="text-sm font-medium text-white/90 block mb-1.5">
-                  What do you want to manifest (attract?)
-                </label>
+
+              {/* Intention input + inline generate */}
+              <div className="relative">
                 <input
                   value={manifestInput}
                   onChange={(e) => setManifestInput(e.target.value)}
-                  placeholder="e.g. More abundance, a loving relationship, inner peace"
-                  className="w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2.5 text-sm placeholder:text-white/30 focus:outline-none focus:border-amber-400/30"
+                  onKeyDown={(e) => e.key === "Enter" && !generatingAffirmation && manifestInput.trim() && generateAffirmationWithAI()}
+                  placeholder="What do you want to manifest?"
+                  className="w-full rounded-xl bg-black/40 border border-amber-400/15 px-4 py-3.5 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-amber-400/40 focus:bg-black/50 transition-all pr-28"
                 />
+                <button
+                  type="button"
+                  onClick={generateAffirmationWithAI}
+                  disabled={generatingAffirmation || !manifestInput.trim()}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:bg-amber-500/25 disabled:text-black/40 disabled:cursor-not-allowed text-black font-semibold text-xs px-3 py-1.5 transition-all"
+                >
+                  {generatingAffirmation ? "…" : "Generate"}
+                </button>
               </div>
-              {manifestInput.trim() && (
-                <div className="rounded-lg bg-black/40 border border-white/10 p-2.5">
-                  <p className="text-[11px] text-white/50 uppercase tracking-wider mb-1.5">User prompt (read-only – this is what we send)</p>
-                  <p className="text-xs font-mono text-white/70 whitespace-pre-wrap">
-                    What I want to manifest: {manifestInput.trim()}
-                    {USER_PROMPT_SUFFIX}
-                  </p>
-                </div>
-              )}
-              <div>
-                <label className="text-sm font-medium text-white/90 block mb-1.5">
-                  System prompt (instructions to the AI) – editable
-                </label>
-                <p className="text-xs text-white/50 mb-1.5">
-                  This sets the AI’s role and rules. You can edit the full text below.
-                </p>
+
+              {/* Advanced toggle */}
+              <button
+                type="button"
+                onClick={() => setShowSystemPrompt((v) => !v)}
+                className="flex items-center gap-1.5 text-[11px] text-white/25 hover:text-white/45 transition-colors"
+              >
+                <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${showSystemPrompt ? "rotate-180" : ""}`} />
+                Advanced: edit AI instructions
+              </button>
+
+              {showSystemPrompt && (
                 <textarea
                   value={systemPrompt}
                   onChange={(e) => setSystemPrompt(e.target.value)}
-                  rows={8}
-                  className="w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2.5 text-xs font-mono text-white/90 placeholder:text-white/30 focus:outline-none focus:border-amber-400/30 resize-y"
+                  rows={6}
+                  className="w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2.5 text-xs font-mono text-white/60 focus:outline-none focus:border-amber-400/25 resize-y"
                 />
-              </div>
-              <button
-                type="button"
-                onClick={generateAffirmationWithAI}
-                disabled={generatingAffirmation}
-                className="w-full rounded-xl bg-amber-500/20 border border-amber-400/30 text-amber-200 px-3 py-2.5 text-sm font-medium hover:bg-amber-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {generatingAffirmation ? "Generating…" : "Generate affirmation"}
-              </button>
+              )}
+
+              {/* AI result card — appears after generation */}
               {aiGenerated && (
-                <div className="space-y-3 pt-2 border-t border-white/10">
-                  {aiGenerated.prompt && (
-                    <div className="rounded-lg bg-black/40 border border-white/10 p-2.5">
-                      <p className="text-[11px] text-white/50 uppercase tracking-wider mb-1">Prompt sent to AI</p>
-                      <p className="text-sm text-white/70 whitespace-pre-wrap">{aiGenerated.prompt}</p>
+                <motion.div
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.35 }}
+                  className="rounded-xl border border-amber-400/25 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent p-4 space-y-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Sparkles className="h-3 w-3 text-amber-400/70" />
+                      <span className="text-[10px] uppercase tracking-[0.18em] text-amber-400/60 font-medium">AI Result</span>
                     </div>
-                  )}
-                  <p className="text-xs text-white/50">Review and save</p>
+                    <span className="text-[10px] text-white/25">Edit if needed, then save</span>
+                  </div>
                   <textarea
                     value={aiGenerated.content}
-                    onChange={(e) =>
-                      setAiGenerated((s) => (s ? { ...s, content: e.target.value } : null))
-                    }
+                    onChange={(e) => setAiGenerated((s) => (s ? { ...s, content: e.target.value } : null))}
                     rows={3}
-                    className="w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2.5 text-sm placeholder:text-white/30 focus:outline-none focus:border-amber-400/30 resize-none"
+                    className="w-full rounded-lg bg-black/30 border border-amber-400/15 px-3 py-2.5 text-sm text-white/95 italic font-medium focus:outline-none focus:border-amber-400/35 resize-none placeholder:text-white/20"
                   />
                   <input
                     value={aiGenerated.category}
-                    onChange={(e) =>
-                      setAiGenerated((s) => (s ? { ...s, category: e.target.value } : null))
-                    }
-                    placeholder="Category"
-                    className="w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2.5 text-sm placeholder:text-white/30 focus:outline-none focus:border-amber-400/30"
+                    onChange={(e) => setAiGenerated((s) => (s ? { ...s, category: e.target.value } : null))}
+                    placeholder="Category (e.g. Abundance)"
+                    className="w-full rounded-lg bg-black/30 border border-amber-400/15 px-3 py-2 text-xs text-white/70 placeholder:text-white/20 focus:outline-none focus:border-amber-400/30"
                   />
                   <div
-                    className={`rounded-xl border border-amber-400/20 bg-amber-500/5 p-4 transition-colors ${isDragOverAiImages ? "border-amber-400/50 bg-amber-500/15" : ""}`}
+                    className={`rounded-xl border border-dashed p-3 transition-colors ${isDragOverAiImages ? "border-amber-400/45 bg-amber-500/8" : "border-amber-400/18 bg-black/20"}`}
                     onDragOver={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -1311,36 +1404,30 @@ function DashboardContent() {
                       if (files.length) handleAiAffirmationImageSelect(files, true);
                     }}
                   >
-                    <p className="text-sm text-white/90 font-medium inline-flex items-center gap-2 mb-1">
-                      <ImagePlus className="h-4 w-4 text-amber-400/80" />
-                      Vision images (optional)
-                    </p>
-                    <p className="text-xs text-white/50 mb-3">
-                      Add one or more images (drag & drop, paste URL, or Ctrl+V).
-                    </p>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          aiNextImageAppendRef.current = false;
-                          aiAffirmationImageInputRef.current?.click();
-                        }}
-                        className="rounded-lg border border-white/20 px-3 py-1.5 text-xs hover:bg-white/10"
-                      >
-                        {aiAffirmationFiles.length ? "Replace all" : "Add images"}
-                      </button>
-                      {aiAffirmationFiles.length > 0 && (
+                    {/* Header row */}
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[11px] text-white/35 inline-flex items-center gap-1.5">
+                        <ImagePlus className="h-3.5 w-3.5 text-amber-400/50" />
+                        Vision images <span className="text-white/20 ml-0.5">(optional)</span>
+                      </span>
+                      <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          onClick={() => {
-                            aiNextImageAppendRef.current = true;
-                            aiAffirmationImageInputRef.current?.click();
-                          }}
-                          className="rounded-lg border border-white/20 px-3 py-1.5 text-xs hover:bg-white/10"
+                          onClick={() => { aiNextImageAppendRef.current = false; aiAffirmationImageInputRef.current?.click(); }}
+                          className="text-[11px] text-amber-400/60 hover:text-amber-400 transition-colors"
                         >
-                          Add more
+                          {aiAffirmationFiles.length ? "Replace" : "Upload"}
                         </button>
-                      )}
+                        {aiAffirmationFiles.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => { aiNextImageAppendRef.current = true; aiAffirmationImageInputRef.current?.click(); }}
+                            className="text-[11px] text-white/25 hover:text-white/55 transition-colors"
+                          >
+                            + More
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <input
                       ref={aiAffirmationImageInputRef}
@@ -1355,32 +1442,34 @@ function DashboardContent() {
                         e.target.value = "";
                       }}
                     />
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <span className="text-[11px] text-white/50">Or paste image URL (e.g. Pinterest):</span>
+
+                    {/* URL paste row */}
+                    <div className="flex items-center gap-1.5">
                       <input
                         type="url"
                         value={pastedImageUrl}
                         onChange={(e) => { setPastedImageUrl(e.target.value); setImageUrlError(""); }}
                         onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addImageFromUrlToAi())}
-                        placeholder="https://..."
-                        className="flex-1 min-w-[160px] rounded-lg bg-black/30 border border-white/10 px-2.5 py-1.5 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-amber-400/30"
+                        placeholder="Paste image URL…"
+                        className="flex-1 rounded-lg bg-black/30 border border-white/8 px-2.5 py-1.5 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-amber-400/30"
                       />
                       <button
                         type="button"
                         onClick={addImageFromUrlToAi}
                         disabled={imageUrlLoading}
-                        className="rounded-lg border border-white/20 px-2.5 py-1.5 text-xs hover:bg-white/10 disabled:opacity-50"
+                        className="rounded-lg bg-amber-500/12 border border-amber-400/18 px-2.5 py-1.5 text-xs text-amber-300/75 hover:bg-amber-500/22 disabled:opacity-40 transition-colors shrink-0"
                       >
-                        {imageUrlLoading ? "Loading…" : "Add"}
+                        {imageUrlLoading ? "…" : "Add"}
                       </button>
                     </div>
+
                     {imageUrlError && aiGenerated && (
-                      <p className="mt-1.5 text-[11px] text-red-400">{imageUrlError}</p>
+                      <p className="mt-1 text-[11px] text-red-400">{imageUrlError}</p>
                     )}
-                    {aiAffirmationImagePreviews.length > 0 && (
-                      <div className="mt-3">
-                        <p className="text-[11px] text-white/50 mb-1">{aiAffirmationImagePreviews.length} image(s)</p>
-                        <div className="grid grid-cols-3 gap-2">
+
+                    {aiAffirmationImagePreviews.length > 0 ? (
+                      <div className="mt-2.5">
+                        <div className="grid grid-cols-4 gap-1.5">
                           {aiAffirmationImagePreviews.map((preview, index) => (
                             <div
                               key={`ai-${preview}-${index}`}
@@ -1395,7 +1484,7 @@ function DashboardContent() {
                               <button
                                 type="button"
                                 onClick={() => removeOneAiAffirmationImage(index)}
-                                className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/70 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-500/90 transition-opacity"
+                                className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/70 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-500/85 transition-opacity"
                                 aria-label="Remove image"
                               >
                                 ×
@@ -1406,11 +1495,13 @@ function DashboardContent() {
                         <button
                           type="button"
                           onClick={() => handleAiAffirmationImageSelect([])}
-                          className="mt-2 text-xs text-red-400 hover:text-red-300"
+                          className="mt-1.5 text-[11px] text-white/20 hover:text-red-400 transition-colors"
                         >
-                          Remove all images
+                          Clear all
                         </button>
                       </div>
+                    ) : (
+                      <p className="mt-2 text-center text-[11px] text-white/18">Drop files here or Ctrl+V to paste</p>
                     )}
                   </div>
                   <div className="flex gap-2">
@@ -1435,31 +1526,36 @@ function DashboardContent() {
                       Clear
                     </button>
                   </div>
-                </div>
+                </motion.div>
               )}
             </div>
           </aside>
 
-          <div className="rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Affirmation Library</h2>
-              <span className="text-xs text-white/50">{affirmations.length} total</span>
+          <div className="rounded-2xl p-4 md:p-5">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h2 className="font-tiempos text-xl font-semibold text-white">Affirmation Library</h2>
+                <p className="text-xs text-white/35 mt-0.5">Your personal collection of manifestations</p>
+              </div>
+              <span className="text-xs text-purple-300/60 bg-purple-500/10 border border-purple-500/20 rounded-full px-3 py-1 font-medium">{affirmations.length} total</span>
             </div>
 
             {affirmations.length === 0 && (
-              <div className="rounded-xl border border-white/10 bg-black/20 p-6 text-center">
-                <p className="text-sm text-white/60">No affirmations yet. Create your first one on the left.</p>
+              <div className="rounded-xl border border-dashed border-purple-500/20 bg-purple-500/5 p-10 text-center">
+                <Sparkles className="h-8 w-8 text-purple-400/30 mx-auto mb-3" />
+                <p className="text-sm text-white/50 font-medium">Your library is empty</p>
+                <p className="text-xs text-white/30 mt-1">Write your first affirmation using the panel on the left.</p>
               </div>
             )}
 
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {affirmations.map((item) => (
                 <article
                   key={item.docId}
-                  className="rounded-xl border border-white/10 bg-black/30 p-4 hover:bg-black/40 transition-colors"
+                  className={`rounded-xl bg-white/[0.03] overflow-hidden hover:bg-white/[0.05] transition-all duration-300 group ${editingAffirmationDocId === item.docId ? "sm:col-span-2" : ""}`}
                 >
                   {editingAffirmationDocId === item.docId ? (
-                    <div className="space-y-3">
+                    <div className="p-4 space-y-3">
                       <textarea
                         value={editingContent}
                         onChange={(e) => setEditingContent(e.target.value)}
@@ -1605,7 +1701,7 @@ function DashboardContent() {
                         <button
                           onClick={saveEditAffirmation}
                           disabled={saving}
-                          className="rounded-md bg-white text-black px-3 py-1.5 text-xs font-medium hover:bg-white/90 disabled:opacity-50"
+                          className="rounded-md bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-400 hover:to-indigo-400 text-white px-3 py-1.5 text-xs font-semibold disabled:opacity-50 transition-all"
                         >
                           {saving ? "Saving…" : "Save"}
                         </button>
@@ -1619,86 +1715,67 @@ function DashboardContent() {
                     </div>
                   ) : (
                     <>
-                      {(item.imageUrls?.length || item.imageUrl) ? (
-                        <div className="mb-3 flex gap-1.5 flex-wrap">
-                          {(item.imageUrls?.length ? item.imageUrls : [item.imageUrl]).slice(0, 4).map((url, i) => (
-                            <div
-                              key={i}
-                              className="rounded-lg overflow-hidden border border-white/10 aspect-[9/16] w-full max-w-[80px] bg-black/30 flex-shrink-0"
-                            >
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={url}
-                                alt=""
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="mb-3 rounded-lg border border-white/10 border-dashed bg-black/20 flex items-center justify-center gap-2 py-6 px-4 min-h-[80px]">
-                          <Sparkles className="w-5 h-5 text-white/20" />
-                          <span className="text-[11px] text-white/40">No image</span>
-                        </div>
-                      )}
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-sm leading-relaxed">{item.content}</p>
-                          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-white/50">
-                            <span className="rounded-full bg-white/10 px-2 py-0.5">
-                              {item.category || "No category"}
-                            </span>
-                            <span className="rounded-full bg-white/10 px-2 py-0.5">
-                              {item.affirmCount} affirms
-                            </span>
-                            {item.cloudImagePaths?.length > 0 && (
-                              <span className="rounded-full bg-white/10 px-2 py-0.5">
-                                {item.cloudImagePaths.length} image(s)
-                              </span>
-                            )}
-                            {item.isFavorite && (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-yellow-500/20 text-yellow-300 px-2 py-0.5">
-                                <Star className="h-3 w-3" />
-                                Favorite
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
+                      {/* Image grid — same style as home carousel */}
+                      {(() => {
+                        const imgUrls = item.imageUrls?.length ? item.imageUrls : (item.imageUrl ? [item.imageUrl] : []);
+                        return imgUrls.length > 0 ? <AffirmationImageGrid urls={imgUrls} /> : null;
+                      })()}
 
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <Link
-                          href={`/dashboard/preview/${item.docId}?from=affirmations`}
-                          className="rounded-md border border-white/20 px-2.5 py-1.5 text-xs hover:bg-white/10 inline-flex items-center gap-1"
-                        >
-                          <Eye className="h-3 w-3" />
-                          Preview
-                        </Link>
-                        <button
-                          onClick={() => startEditingAffirmation(item)}
-                          className="rounded-md border border-white/20 px-2.5 py-1.5 text-xs hover:bg-white/10 inline-flex items-center gap-1"
-                        >
-                          <Pencil className="h-3 w-3" />
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => incrementAffirmCount(item)}
-                          className="rounded-md border border-white/20 px-2.5 py-1.5 text-xs hover:bg-white/10"
-                        >
-                          +1 Affirm
-                        </button>
-                        <button
-                          onClick={() => toggleFavorite(item)}
-                          className="rounded-md border border-white/20 px-2.5 py-1.5 text-xs hover:bg-white/10"
-                        >
-                          {item.isFavorite ? "Unfavorite" : "Favorite"}
-                        </button>
-                        <button
-                          onClick={() => removeAffirmation(item.docId)}
-                          className="rounded-md border border-red-500/30 text-red-400 px-2.5 py-1.5 text-xs hover:bg-red-500/10"
-                        >
-                          Delete
-                        </button>
+                      {/* Content */}
+                      <div className="p-4">
+                        <div className="flex items-start justify-between gap-2 mb-3">
+                          <blockquote className="font-tiempos text-xl italic leading-relaxed text-white/85 flex-1">
+                            &ldquo;{item.content}&rdquo;
+                          </blockquote>
+                          <button
+                            onClick={() => toggleFavorite(item)}
+                            className={`shrink-0 p-1 rounded-md mt-0.5 transition-colors ${item.isFavorite ? "text-yellow-400" : "text-white/15 hover:text-yellow-400/50"}`}
+                            title={item.isFavorite ? "Remove from favorites" : "Add to favorites"}
+                          >
+                            <Star className={`h-4 w-4 ${item.isFavorite ? "fill-yellow-400" : ""}`} />
+                          </button>
+                        </div>
+
+                        {/* Category + meta row */}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {item.category && (
+                            <span className="text-[10px] tracking-[0.12em] uppercase font-medium text-purple-300/65 bg-purple-500/10 rounded-full px-2.5 py-0.5">
+                              {item.category}
+                            </span>
+                          )}
+                          <span className="text-[11px] text-white/25 ml-auto">{item.affirmCount} affirms</span>
+                        </div>
+
+                        {/* Action row */}
+                        <div className="mt-3 pt-3 border-t border-white/5 flex items-center gap-0.5">
+                          <Link
+                            href={`/dashboard/preview/${item.docId}?from=affirmations`}
+                            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-white/35 hover:text-white/75 hover:bg-white/6 transition-all"
+                          >
+                            <Eye className="h-3 w-3" />
+                            Preview
+                          </Link>
+                          <button
+                            onClick={() => startEditingAffirmation(item)}
+                            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-white/35 hover:text-white/75 hover:bg-white/6 transition-all"
+                          >
+                            <Pencil className="h-3 w-3" />
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => incrementAffirmCount(item)}
+                            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-purple-300/55 hover:text-purple-300 hover:bg-purple-500/10 transition-all"
+                          >
+                            +1 Affirm
+                          </button>
+                          <button
+                            onClick={() => removeAffirmation(item.docId)}
+                            className="ml-auto inline-flex items-center rounded-lg p-1.5 text-white/15 hover:text-red-400 hover:bg-red-500/8 transition-all"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </div>
                     </>
                   )}
@@ -1710,74 +1787,89 @@ function DashboardContent() {
       )}
 
       {activeTab === "gallery" && (
-        <section className="rounded-xl bg-white/5 border border-white/10 p-4">
-          <h2 className="text-lg font-semibold">Gallery</h2>
-          <div className="mt-4 grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <section>
+          {/* Count badge */}
+          <div className="flex justify-end mb-4">
+            <span className="text-xs text-indigo-300/60 bg-indigo-500/10 border border-indigo-500/20 rounded-full px-3 py-1 font-medium">
+              {affirmationsWithImages.length} with images
+            </span>
+          </div>
+
+          {affirmationsWithImages.length === 0 && (
+            <div className="rounded-xl border border-dashed border-indigo-500/20 bg-indigo-500/5 p-16 text-center">
+              <GalleryHorizontalEnd className="h-10 w-10 text-indigo-400/30 mx-auto mb-3" />
+              <p className="text-sm text-white/50 font-medium">No vision images yet</p>
+              <p className="text-xs text-white/30 mt-1">Add images to your affirmations to see them here.</p>
+            </div>
+          )}
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {affirmationsWithImages.map((item) => {
               const urls = item.imageUrls?.length ? item.imageUrls : item.imageUrl ? [item.imageUrl] : [];
               const displayUrls = urls.slice(0, 4);
               const n = displayUrls.length;
-              const getCellStyle = (i) => {
-                if (n === 1) return { span: "col-span-2" };
-                if (n === 3 && i === 1) return { span: "row-span-2" };
-                return { span: "" };
+              const hiddenCount = urls.length - n;
+              const lastIndex = n - 1;
+              const getCellSpan = (i) => {
+                if (n === 1) return "col-span-2";
+                if (n === 3 && i === 1) return "row-span-2";
+                return "";
               };
-              const imageAreaAspect = "aspect-square";
-              const gridColsClass = "grid-cols-2";
-              const gridRowsClass =
-                n === 0 ? "grid-rows-1" : n === 1 ? "grid-rows-1" : n === 2 ? "grid-rows-1" : "grid-rows-2";
+              const gridRowsClass = n <= 2 ? "grid-rows-1" : "grid-rows-2";
 
               return (
-                <article key={item.docId} className="rounded-xl overflow-hidden border border-white/10 flex flex-col">
-                  <div className="rounded-t-xl overflow-hidden flex flex-col w-full shrink-0">
-                    <div
-                      className={`grid gap-1.5 shrink-0 w-full overflow-hidden ${imageAreaAspect} ${gridColsClass} ${gridRowsClass}`}
-                    >
-                      {n > 0 ? (
-                        displayUrls.map((url, i) => {
-                          const { span } = getCellStyle(i);
-                          return (
-                            <div
-                              key={`${item.docId}-img-${i}`}
-                              className={`relative group rounded-lg overflow-hidden border border-white/20 min-h-0 min-w-0 w-full h-full ${span}`}
-                            >
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={url} alt="" className="relative z-0 w-full h-full object-cover object-center pointer-events-none" />
-                              <Link
-                                href={`/dashboard/preview/${item.docId}?from=gallery`}
-                                className="absolute inset-0 z-[1]"
-                                aria-label="Open affirmation preview"
-                              >
-                                <span className="sr-only">Open preview</span>
-                              </Link>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  deleteImageFromGallery(item, i);
-                                }}
-                                className="absolute top-1 right-1 w-7 h-7 rounded-full bg-black/70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-500/90 transition-opacity z-[2]"
-                                aria-label="Delete image"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                <article key={item.docId} className="rounded-2xl overflow-hidden bg-white/[0.03] hover:bg-white/[0.05] transition-all duration-300 group">
+                  {/* Image mosaic */}
+                  <div className={`grid grid-cols-2 gap-0.5 w-full overflow-hidden aspect-square ${gridRowsClass}`}>
+                    {n > 0 ? (
+                      displayUrls.map((url, i) => (
+                        <div
+                          key={`${item.docId}-img-${i}`}
+                          className={`relative min-h-0 min-w-0 w-full h-full overflow-hidden ${getCellSpan(i)}`}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={url} alt="" className="w-full h-full object-cover object-center" />
+                          {i === lastIndex && hiddenCount > 0 && (
+                            <div className="absolute inset-0 bg-black/55 flex items-center justify-center">
+                              <span className="text-white font-semibold text-xl">+{hiddenCount}</span>
                             </div>
-                          );
-                        })
-                      ) : (
-                        <div className="col-span-2 flex flex-col items-center justify-center gap-1.5 rounded-lg border border-white/10 border-dashed w-full h-full min-h-0">
-                          <Sparkles className="w-8 h-8 text-white/25" />
-                          <span className="text-[11px] text-white/40">No image</span>
+                          )}
+                          <Link
+                            href={`/dashboard/preview/${item.docId}?from=gallery`}
+                            className="absolute inset-0 z-[1]"
+                            aria-label="Open affirmation preview"
+                          />
+                          <button
+                            type="button"
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteImageFromGallery(item, i); }}
+                            className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-black/70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-500/90 transition-opacity z-[2]"
+                            aria-label="Delete image"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
-                      )}
-                    </div>
+                      ))
+                    ) : (
+                      <div className="col-span-2 flex flex-col items-center justify-center gap-2 border border-dashed border-white/10 m-3 rounded-xl">
+                        <Sparkles className="w-8 h-8 text-white/20" />
+                        <span className="text-xs text-white/30">No image</span>
+                      </div>
+                    )}
                   </div>
-                  <div className="p-3 bg-black/30 flex-1 flex flex-col min-h-0">
-                    <p className="text-sm line-clamp-2">{item.content}</p>
-                    <p className="mt-1 text-[11px] text-white/40">
-                      {item.cloudImagePaths?.length || n || 1} image(s)
-                    </p>
+
+                  {/* Caption */}
+                  <div className="px-4 py-3.5">
+                    <p className="font-tiempos text-xl italic leading-relaxed text-white/85 line-clamp-2">&ldquo;{item.content}&rdquo;</p>
+                    <div className="mt-2.5 flex items-center gap-2">
+                      {item.category && (
+                        <span className="text-[10px] tracking-[0.12em] uppercase font-medium text-indigo-300/65 bg-indigo-500/10 rounded-full px-2.5 py-0.5">
+                          {item.category}
+                        </span>
+                      )}
+                      <span className="text-[11px] text-white/25 ml-auto">
+                        {urls.length} image{urls.length !== 1 ? "s" : ""}
+                      </span>
+                    </div>
                   </div>
                 </article>
               );
@@ -1791,12 +1883,20 @@ function DashboardContent() {
   );
 }
 
-function StatCard({ label, value, icon }) {
+const STAT_ACCENTS = {
+  purple: { card: "bg-gradient-to-br from-purple-500/15 to-purple-500/5 border border-purple-500/25", icon: "text-purple-400" },
+  yellow: { card: "bg-gradient-to-br from-yellow-500/15 to-yellow-500/5 border border-yellow-500/25", icon: "text-yellow-400" },
+  indigo: { card: "bg-gradient-to-br from-indigo-500/15 to-indigo-500/5 border border-indigo-500/25", icon: "text-indigo-400" },
+  pink:   { card: "bg-gradient-to-br from-pink-500/15 to-pink-500/5 border border-pink-500/25",   icon: "text-pink-400"   },
+};
+
+function StatCard({ label, value, icon, accent = "purple" }) {
+  const styles = STAT_ACCENTS[accent] || STAT_ACCENTS.purple;
   return (
-    <article className="rounded-xl border border-white/10 p-4">
-      <div className="text-white/70">{icon}</div>
+    <article className={`rounded-xl p-4 ${styles.card}`}>
+      <div className={styles.icon}>{icon}</div>
       <p className="mt-2 text-xs uppercase tracking-wider text-white/50">{label}</p>
-      <p className="mt-1 text-2xl font-semibold">{value}</p>
+      <p className="mt-1 text-2xl font-semibold text-white">{value}</p>
     </article>
   );
 }
@@ -1819,9 +1919,9 @@ export default function DashboardPage() {
 
 function MiniStat({ label, value }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-black/30 p-3">
-      <p className="text-white/50 text-xs uppercase tracking-wider">{label}</p>
-      <p className="text-xl font-semibold mt-1">{value}</p>
+    <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-center">
+      <p className="text-2xl font-bold text-white">{value}</p>
+      <p className="text-white/45 text-xs uppercase tracking-wider mt-1">{label}</p>
     </div>
   );
 }

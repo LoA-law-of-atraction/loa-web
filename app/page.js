@@ -40,14 +40,27 @@ export default function Home() {
 
         <div className="relative z-20 max-w-6xl mx-auto px-4 py-20">
           <div className="text-center mb-16">
-            {/* Simple title */}
+            {/* Announcement badge */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1, duration: 0.6 }}
+              className="flex justify-center mb-6"
+            >
+              <span className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-1.5 text-sm text-white/90">
+                <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-pulse"></span>
+                Law of Attraction · Digital Wellness
+              </span>
+            </motion.div>
+
+            {/* Main title */}
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3, duration: 0.8 }}
               className="mb-8"
             >
-              <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-4 leading-tight">
+              <h1 className="font-tiempos text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-4 leading-tight tracking-tight">
                 Attract What You
                 <br />
                 <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-indigo-400 bg-clip-text text-transparent">
@@ -56,12 +69,12 @@ export default function Home() {
               </h1>
             </motion.div>
 
-            {/* Simple description */}
+            {/* Description */}
             <motion.p
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5, duration: 0.8 }}
-              className="text-lg md:text-xl text-white/80 max-w-2xl mx-auto mb-12 leading-relaxed"
+              className="text-lg md:text-xl text-white/70 max-w-xl mx-auto mb-12 leading-relaxed"
             >
               Transform every phone interaction into a moment of conscious
               awareness with personalized affirmations.
@@ -133,24 +146,27 @@ export default function Home() {
         whileInView={{ opacity: 1 }}
         viewport={{ once: true }}
         transition={{ duration: 0.8 }}
-        className="relative z-10 py-20 bg-gradient-to-r from-gray-50 to-purple-50"
+        className="relative z-10 py-20 bg-[#050508]"
       >
+        {/* Subtle top divider glow */}
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-purple-500/40 to-transparent" />
+
         <div className="max-w-4xl mx-auto px-4 text-center">
           <motion.h2
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.8 }}
-            className="text-4xl md:text-5xl font-bold mb-8 text-black"
+            className="font-tiempos text-4xl md:text-5xl font-bold mb-8 text-white leading-tight"
           >
-            &quot;You attract what you think and feel&quot;
+            &ldquo;You attract what you think and feel&rdquo;
           </motion.h2>
           <motion.p
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: 0.2, duration: 0.8 }}
-            className="text-xl text-gray/90 leading-relaxed mb-12"
+            className="text-xl text-white/70 leading-relaxed mb-12"
           >
             The Law of Attraction teaches us that our thoughts, emotions, and
             focus shape our reality. When you align your energy with gratitude,
@@ -159,18 +175,19 @@ export default function Home() {
             digital life.
           </motion.p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-left">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
             <motion.div
               initial={{ opacity: 0, x: -30 }}
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}
               transition={{ delay: 0.4, duration: 0.8 }}
-              className="p-6 bg-white rounded-xl shadow-lg"
+              className="p-6 bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl"
             >
-              <h3 className="text-xl font-semibold mb-3 text-indigo-900">
-                Before: Unconscious Scrolling
+              <div className="text-xs font-medium tracking-widest text-white/40 uppercase mb-3">Before</div>
+              <h3 className="text-xl font-semibold mb-3 text-white/80">
+                Unconscious Scrolling
               </h3>
-              <p className="text-gray-700">
+              <p className="text-white/50 leading-relaxed">
                 Mindless phone use scattered your attention, feeding energy into
                 distraction, anxiety, and endless comparison.
               </p>
@@ -180,12 +197,13 @@ export default function Home() {
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}
               transition={{ delay: 0.6, duration: 0.8 }}
-              className="p-6 bg-gradient-to-br from-purple-100 to-indigo-100 rounded-xl shadow-lg"
+              className="p-6 bg-gradient-to-br from-purple-500/20 to-indigo-500/20 border border-purple-400/30 rounded-xl"
             >
-              <h3 className="text-xl font-semibold mb-3 text-purple-900">
-                After: Conscious Alignment
+              <div className="text-xs font-medium tracking-widest text-purple-400/70 uppercase mb-3">After</div>
+              <h3 className="text-xl font-semibold mb-3 text-white">
+                Conscious Alignment
               </h3>
-              <p className="text-gray-800">
+              <p className="text-white/80 leading-relaxed">
                 Every digital interaction becomes an opportunity to affirm your
                 intentions and redirect energy toward your highest good.
               </p>

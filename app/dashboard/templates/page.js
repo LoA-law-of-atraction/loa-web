@@ -279,25 +279,22 @@ export default function AffirmationTemplatesPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-white/70" />
+        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-purple-400/70" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black">
-      <nav className="fixed top-0 left-0 right-0 h-16 bg-black/80 backdrop-blur-lg border-b border-white/10 z-50">
+    <div className="min-h-screen bg-black bg-[radial-gradient(ellipse_at_top,_rgba(88,28,135,0.10)_0%,_transparent_55%)] text-white">
+
+      {/* Nav — matches dashboard */}
+      <nav className="fixed top-0 left-0 right-0 h-16 bg-black/85 backdrop-blur-md border-b border-white/8 z-50">
         <div className="h-full max-w-7xl mx-auto px-4 flex items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-2">
-            <Image
-              src="/app_logo.svg"
-              alt="LoA"
-              width={28}
-              height={28}
-              className="rounded-lg"
-            />
+            <Image src="/app_logo.svg" alt="LoA" width={28} height={28} className="rounded-lg" />
             <span className="text-white font-bold text-lg hidden sm:block">LoA</span>
           </Link>
+
           <div className="hidden md:flex items-center gap-1">
             {dashboardTabs.map((tab) => {
               const Icon = tab.icon;
@@ -308,8 +305,8 @@ export default function AffirmationTemplatesPage() {
                   href={tab.href}
                   className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors ${
                     active
-                      ? "bg-white/10 text-white border border-white/20"
-                      : "text-white/70 hover:text-white hover:bg-white/10"
+                      ? "bg-purple-500/15 text-white border border-purple-500/30"
+                      : "text-white/55 hover:text-white hover:bg-white/8"
                   }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -318,30 +315,29 @@ export default function AffirmationTemplatesPage() {
               );
             })}
           </div>
+
           <div className="flex items-center gap-2">
-            <span className="rounded-full px-3 py-1.5 text-xs bg-white/5 border border-white/10 text-white/80">
+            <span className="rounded-full px-3 py-1.5 text-xs bg-white/5 border border-white/10 text-white/60">
               {userLabel}
             </span>
-            <button
-              onClick={handleLogout}
-              className="text-white/70 hover:text-red-400 transition-colors p-2"
-              title="Sign Out"
-            >
-              <LogOut className="w-5 h-5" />
+            <button onClick={handleLogout} className="text-white/40 hover:text-red-400 transition-colors p-2" title="Sign Out">
+              <LogOut className="w-4 h-4" />
             </button>
           </div>
         </div>
-        <div className="md:hidden flex flex-wrap gap-2 px-4 pb-3">
+
+        {/* Mobile tabs */}
+        <div className="md:hidden flex gap-1.5 px-4 pb-3 overflow-x-auto">
           {dashboardTabs.map((tab) => {
             const active = tab.active;
             return (
               <Link
                 key={tab.id}
                 href={tab.href}
-                className={`rounded-lg border px-3 py-2 text-sm ${
+                className={`rounded-lg px-3 py-1.5 text-sm shrink-0 transition-colors ${
                   active
-                    ? "bg-white/10 border-white/20 text-white"
-                    : "bg-white/5 border-white/10 text-white/80"
+                    ? "bg-purple-500/15 border border-purple-500/30 text-white"
+                    : "bg-white/5 border border-white/8 text-white/60"
                 }`}
               >
                 {tab.label}
@@ -351,130 +347,142 @@ export default function AffirmationTemplatesPage() {
         </div>
       </nav>
 
-      <div className="max-w-7xl mx-auto px-4 py-8 pt-24 text-white">
-        <section className="mb-6">
-          <p className="inline-flex items-center gap-2 text-white/50 text-xs uppercase tracking-wider">
-            <Cloud className="h-3.5 w-3.5" />
+      <div className="max-w-7xl mx-auto px-4 pt-24 pb-12">
+
+        {/* Page header */}
+        <section className="mb-8">
+          <p className="inline-flex items-center gap-1.5 text-purple-400/70 text-xs uppercase tracking-[0.15em] font-medium">
+            <Cloud className="h-3 w-3" />
             Dashboard
           </p>
-          <h1 className="text-3xl font-bold mt-2">Affirmation Templates</h1>
-          <p className="text-white/60 mt-1">
-            Create and manage reusable affirmation templates. Use them as starting points when writing affirmations.
+          <h1 className="font-tiempos text-3xl font-bold text-white mt-1.5">Affirmation Templates</h1>
+          <p className="text-sm text-white/45 mt-1">
+            Reusable starting points for your affirmation practice.
           </p>
           {error && (
-            <p className="mt-4 text-sm text-red-400 inline-flex items-center gap-2">
-              <AlertCircle className="h-4 w-4" /> {error}
+            <p className="mt-3 text-sm text-red-400 inline-flex items-center gap-2 bg-red-400/8 border border-red-400/20 rounded-lg px-3 py-2">
+              <AlertCircle className="h-4 w-4 shrink-0" /> {error}
             </p>
           )}
         </section>
 
         <div className="grid lg:grid-cols-[360px_1fr] gap-6">
-          {/* Create / Edit form */}
-          <aside className="rounded-2xl bg-gradient-to-b from-white/10 to-white/[0.03] border border-white/15 p-5 space-y-4 h-fit lg:sticky lg:top-24">
-            <h2 className="text-lg font-semibold">
-              {editingDefaultId ? "Edit default template" : editingId ? "Edit template" : "New template"}
-            </h2>
-            <form
-              onSubmit={editingDefaultId ? saveDefaultTemplate : editingId ? handleUpdate : handleCreate}
-              className="space-y-3"
-            >
-              <input
-                value={form.name}
-                onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
-                placeholder="Template name (e.g. Abundance)"
-                className="w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2.5 text-sm placeholder:text-white/30 focus:outline-none focus:border-white/30"
-              />
-              <textarea
-                value={form.content}
-                onChange={(e) => setForm((s) => ({ ...s, content: e.target.value }))}
-                placeholder="Affirmation text..."
-                rows={4}
-                className="w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2.5 text-sm placeholder:text-white/30 focus:outline-none focus:border-white/30 resize-none"
-                required
-              />
-              <input
-                value={form.category}
-                onChange={(e) => setForm((s) => ({ ...s, category: e.target.value }))}
-                placeholder="Category (e.g. Abundance)"
-                className="w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2.5 text-sm placeholder:text-white/30 focus:outline-none focus:border-white/30"
-              />
-              <div className="flex gap-2">
-                {editingDefaultId ? (
-                  <>
-                    <button
-                      type="submit"
-                      disabled={saving}
-                      className="flex-1 rounded-xl bg-white text-black px-3 py-2.5 text-sm font-medium disabled:opacity-50"
-                    >
-                      {saving ? "Saving..." : "Save"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setEditingDefaultId(null); setForm(emptyTemplate); }}
-                      className="rounded-xl border border-white/20 px-3 py-2.5 text-sm text-white/70 hover:bg-white/10"
-                    >
-                      Cancel
-                    </button>
-                  </>
-                ) : editingId ? (
-                  <>
-                    <button
-                      type="submit"
-                      disabled={saving}
-                      className="flex-1 rounded-xl bg-white text-black px-3 py-2.5 text-sm font-medium disabled:opacity-50"
-                    >
-                      {saving ? "Saving..." : "Save"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={cancelEdit}
-                      className="rounded-xl border border-white/20 px-3 py-2.5 text-sm text-white/70 hover:bg-white/10"
-                    >
-                      Cancel
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="w-full rounded-xl bg-white text-black px-3 py-2.5 text-sm font-medium disabled:opacity-50"
-                  >
-                    {saving ? "Creating..." : "Create template"}
-                  </button>
-                )}
+
+          {/* ——— Create / Edit panel ——— */}
+          <aside className="h-fit lg:sticky lg:top-24 space-y-0">
+            <div className="rounded-2xl bg-gradient-to-b from-purple-500/10 to-purple-500/[0.02] border border-purple-500/20 p-5 space-y-4">
+
+              {/* Panel header */}
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center shrink-0">
+                  <FileText className="h-4 w-4 text-purple-400" />
+                </div>
+                <div>
+                  <h2 className="font-tiempos text-lg font-semibold text-white leading-tight">
+                    {editingDefaultId ? "Edit default" : editingId ? "Edit template" : "New template"}
+                  </h2>
+                  <p className="text-[11px] text-white/35 mt-0.5">
+                    {editingId || editingDefaultId ? "Update the template below" : "Write a reusable affirmation pattern"}
+                  </p>
+                </div>
               </div>
-            </form>
+
+              <form
+                onSubmit={editingDefaultId ? saveDefaultTemplate : editingId ? handleUpdate : handleCreate}
+                className="space-y-3"
+              >
+                <input
+                  value={form.name}
+                  onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
+                  placeholder="Template name (e.g. Abundance)"
+                  className="w-full rounded-xl bg-black/40 border border-purple-400/15 px-4 py-3 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20 transition-all"
+                />
+                <textarea
+                  value={form.content}
+                  onChange={(e) => setForm((s) => ({ ...s, content: e.target.value }))}
+                  placeholder="Affirmation text... use ______ for fill-in-the-blank"
+                  rows={4}
+                  className="w-full rounded-xl bg-black/40 border border-purple-400/15 px-4 py-3 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20 transition-all resize-none"
+                  required
+                />
+                <input
+                  value={form.category}
+                  onChange={(e) => setForm((s) => ({ ...s, category: e.target.value }))}
+                  placeholder="Category (e.g. Abundance)"
+                  className="w-full rounded-xl bg-black/40 border border-purple-400/15 px-4 py-3 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20 transition-all"
+                />
+                <div className="flex gap-2 pt-1">
+                  {editingId || editingDefaultId ? (
+                    <>
+                      <button
+                        type="submit"
+                        disabled={saving}
+                        className="flex-1 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-400 hover:to-indigo-400 text-white px-3 py-2.5 text-sm font-semibold disabled:opacity-50 transition-all shadow-lg shadow-purple-500/20"
+                      >
+                        {saving ? "Saving..." : "Save changes"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { cancelEdit(); setEditingDefaultId(null); setForm(emptyTemplate); }}
+                        className="rounded-xl border border-white/15 px-3 py-2.5 text-sm text-white/55 hover:bg-white/8 transition-all"
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      className="w-full rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-400 hover:to-indigo-400 text-white px-3 py-2.5 text-sm font-semibold disabled:opacity-50 transition-all shadow-lg shadow-purple-500/20"
+                    >
+                      {saving ? "Creating..." : "Create template"}
+                    </button>
+                  )}
+                </div>
+              </form>
+            </div>
           </aside>
 
-          {/* List: Default templates + My templates */}
-          <div className="rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5 space-y-6">
+          {/* ——— Template lists ——— */}
+          <div className="space-y-8">
+
             {/* Default templates */}
             {defaultTemplates.length > 0 && (
               <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-lg font-semibold">Default templates</h2>
-                  <span className="text-xs text-white/50">{defaultTemplates.length} total</span>
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 className="font-tiempos text-xl font-semibold text-white">Default templates</h2>
+                    <p className="text-xs text-white/35 mt-0.5">Click &ldquo;Use&rdquo; to copy into your collection</p>
+                  </div>
+                  <span className="text-xs text-purple-300/60 bg-purple-500/10 border border-purple-500/20 rounded-full px-3 py-1 font-medium">
+                    {defaultTemplates.length} total
+                  </span>
                 </div>
-                <p className="text-xs text-white/50 mb-3">
-                  Add any template to your list to edit and use. Fill in the blank (______) when creating an affirmation.
-                </p>
-                <div className="space-y-4">
+
+                <div className="space-y-5">
                   {Object.entries(defaultByCategory).map(([category, items]) => (
                     <div key={category}>
-                      <h3 className="text-sm font-medium text-white/80 mb-2">{category}</h3>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-[10px] tracking-[0.14em] uppercase font-medium text-purple-300/60 bg-purple-500/10 rounded-full px-2.5 py-0.5">
+                          {category}
+                        </span>
+                        <div className="h-px flex-1 bg-white/5" />
+                      </div>
                       <div className="space-y-2">
                         {items.map((t) => (
                           <article
                             key={t.id}
-                            className="rounded-xl border border-white/10 bg-black/20 p-3 flex flex-col gap-2"
+                            className="rounded-xl bg-white/[0.03] hover:bg-white/[0.05] p-4 flex flex-col gap-2 transition-colors group"
                           >
-                            <div className="flex items-center justify-between gap-3">
-                              <p className="text-sm text-white/80 line-clamp-1 flex-1 min-w-0">{t.content}</p>
-                              <div className="flex items-center gap-1 shrink-0">
+                            <div className="flex items-start justify-between gap-3">
+                              <p className="font-tiempos text-xl italic text-white/90 leading-relaxed flex-1 min-w-0 line-clamp-2">
+                                &ldquo;{t.content}&rdquo;
+                              </p>
+                              <div className="flex items-center gap-1 shrink-0 opacity-60 group-hover:opacity-100 transition-opacity">
                                 <button
                                   type="button"
                                   onClick={() => startEditDefault(t)}
-                                  className="rounded-lg border border-white/20 p-2 text-white/70 hover:bg-white/10 hover:text-white"
+                                  className="rounded-lg p-1.5 text-white/50 hover:bg-white/8 hover:text-white transition-all"
                                   title="Edit"
                                 >
                                   <Pencil className="h-3.5 w-3.5" />
@@ -482,7 +490,7 @@ export default function AffirmationTemplatesPage() {
                                 <button
                                   type="button"
                                   onClick={() => setDeleteDefaultConfirmId(t.id)}
-                                  className="rounded-lg border border-red-500/30 p-2 text-red-400 hover:bg-red-500/10"
+                                  className="rounded-lg p-1.5 text-white/30 hover:text-red-400 hover:bg-red-500/8 transition-all"
                                   title="Remove"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
@@ -491,11 +499,11 @@ export default function AffirmationTemplatesPage() {
                                   type="button"
                                   onClick={() => addDefaultTemplate(t)}
                                   disabled={saving || usingDefaultId !== null}
-                                  className="rounded-lg border border-white/20 px-2.5 py-1.5 text-xs font-medium hover:bg-white/10 disabled:opacity-50 inline-flex items-center gap-1"
+                                  className="rounded-lg bg-purple-500/15 border border-purple-500/25 px-2.5 py-1.5 text-xs font-medium text-purple-300/80 hover:bg-purple-500/25 hover:text-purple-200 disabled:opacity-40 inline-flex items-center gap-1 transition-all"
                                 >
-                                  {usingDefaultId === t.id ? "Adding…" : (
+                                  {usingDefaultId === t.id ? "Adding..." : (
                                     <>
-                                      <Copy className="h-3.5 w-3.5" />
+                                      <Copy className="h-3 w-3" />
                                       Use
                                     </>
                                   )}
@@ -503,20 +511,20 @@ export default function AffirmationTemplatesPage() {
                               </div>
                             </div>
                             {deleteDefaultConfirmId === t.id && (
-                              <div className="pt-2 border-t border-white/10 flex items-center gap-2">
-                                <span className="text-xs text-white/50">Remove this default template?</span>
+                              <div className="pt-2 border-t border-white/8 flex items-center gap-2">
+                                <span className="text-xs text-white/40">Remove this template?</span>
                                 <button
                                   type="button"
                                   onClick={() => removeDefaultTemplate(t.id)}
                                   disabled={saving}
-                                  className="rounded-lg bg-red-500/20 text-red-400 px-2.5 py-1.5 text-xs font-medium hover:bg-red-500/30 disabled:opacity-50"
+                                  className="rounded-lg bg-red-500/15 text-red-400 px-2.5 py-1 text-xs font-medium hover:bg-red-500/25 disabled:opacity-50"
                                 >
                                   Yes, remove
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => setDeleteDefaultConfirmId(null)}
-                                  className="rounded-lg border border-white/20 px-2.5 py-1.5 text-xs text-white/70 hover:bg-white/10"
+                                  className="rounded-lg border border-white/15 px-2.5 py-1 text-xs text-white/50 hover:bg-white/8"
                                 >
                                   Cancel
                                 </button>
@@ -534,82 +542,95 @@ export default function AffirmationTemplatesPage() {
             {/* My templates */}
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold">My templates</h2>
-                <span className="text-xs text-white/50">{templates.length} total</span>
+                <div>
+                  <h2 className="font-tiempos text-xl font-semibold text-white">My templates</h2>
+                  <p className="text-xs text-white/35 mt-0.5">Your personal collection</p>
+                </div>
+                <span className="text-xs text-purple-300/60 bg-purple-500/10 border border-purple-500/20 rounded-full px-3 py-1 font-medium">
+                  {templates.length} total
+                </span>
               </div>
 
-            {templates.length === 0 && (
-              <div className="rounded-xl border border-white/10 bg-black/20 p-8 text-center">
-                <FileText className="h-10 w-10 text-white/30 mx-auto mb-2" />
-                <p className="text-sm text-white/60">No templates yet.</p>
-                <p className="text-xs text-white/40 mt-1">
-                  {defaultTemplates.length > 0
-                    ? "Click “Use” on a default template above to add it here, or create one with the form on the left."
-                    : "Create one using the form on the left, or run the seed to load default templates."}
-                </p>
-              </div>
-            )}
+              {templates.length === 0 && (
+                <div className="rounded-xl border border-dashed border-purple-500/20 bg-purple-500/5 p-10 text-center">
+                  <FileText className="h-8 w-8 text-purple-400/30 mx-auto mb-3" />
+                  <p className="text-sm text-white/50 font-medium">No templates yet</p>
+                  <p className="text-xs text-white/30 mt-1">
+                    {defaultTemplates.length > 0
+                      ? "Click \"Use\" on a default template above, or create one on the left."
+                      : "Create one using the form on the left."}
+                  </p>
+                </div>
+              )}
 
-            <div className="space-y-3">
-              {templates.map((t) => (
-                <article
-                  key={t.id}
-                  className="rounded-xl border border-white/10 bg-black/30 p-4 hover:bg-black/40 transition-colors"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-white/90">{t.name || "Untitled"}</p>
-                      <p className="text-sm text-white/70 mt-1 line-clamp-2">{t.content}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {templates.map((t) => (
+                  <article
+                    key={t.id}
+                    className="rounded-xl bg-white/[0.03] hover:bg-white/[0.05] overflow-hidden transition-colors group"
+                  >
+                    <div className="p-4">
+                      <div className="flex items-start justify-between gap-2 mb-3">
+                        <div className="min-w-0 flex-1">
+                          {t.name && (
+                            <p className="text-xs text-white/40 font-medium uppercase tracking-[0.12em] mb-1">{t.name}</p>
+                          )}
+                          <blockquote className="font-tiempos text-xl italic leading-relaxed text-white/90">
+                            &ldquo;{t.content}&rdquo;
+                          </blockquote>
+                        </div>
+                        <div className="flex items-center gap-0.5 shrink-0 opacity-50 group-hover:opacity-100 transition-opacity">
+                          <button
+                            type="button"
+                            onClick={() => startEdit(t)}
+                            className="rounded-lg p-1.5 text-white/50 hover:bg-white/8 hover:text-white transition-all"
+                            title="Edit"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeleteConfirmId(t.id)}
+                            className="rounded-lg p-1.5 text-white/30 hover:text-red-400 hover:bg-red-500/8 transition-all"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
                       {t.category && (
-                        <span className="inline-block mt-2 rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-white/50">
+                        <span className="text-[10px] tracking-[0.12em] uppercase font-medium text-purple-300/65 bg-purple-500/10 rounded-full px-2.5 py-0.5">
                           {t.category}
                         </span>
                       )}
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => startEdit(t)}
-                        className="rounded-lg border border-white/20 p-2 text-white/70 hover:bg-white/10 hover:text-white"
-                        title="Edit"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDeleteConfirmId(t.id)}
-                        className="rounded-lg border border-red-500/30 p-2 text-red-400 hover:bg-red-500/10"
-                        title="Delete"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
 
-                  {deleteConfirmId === t.id && (
-                    <div className="mt-3 pt-3 border-t border-white/10 flex items-center gap-2">
-                      <span className="text-xs text-white/50">Delete this template?</span>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(t.id)}
-                        disabled={saving}
-                        className="rounded-lg bg-red-500/20 text-red-400 px-2.5 py-1.5 text-xs font-medium hover:bg-red-500/30 disabled:opacity-50"
-                      >
-                        Yes, delete
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDeleteConfirmId(null)}
-                        className="rounded-lg border border-white/20 px-2.5 py-1.5 text-xs text-white/70 hover:bg-white/10"
-                      >
-                        Cancel
-                      </button>
+                      {deleteConfirmId === t.id && (
+                        <div className="mt-3 pt-3 border-t border-white/8 flex items-center gap-2">
+                          <span className="text-xs text-white/40">Delete this template?</span>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(t.id)}
+                            disabled={saving}
+                            className="rounded-lg bg-red-500/15 text-red-400 px-2.5 py-1 text-xs font-medium hover:bg-red-500/25 disabled:opacity-50"
+                          >
+                            Yes, delete
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeleteConfirmId(null)}
+                            className="rounded-lg border border-white/15 px-2.5 py-1 text-xs text-white/50 hover:bg-white/8"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </article>
-              ))}
+                  </article>
+                ))}
+              </div>
             </div>
-            </div>
+
           </div>
         </div>
       </div>

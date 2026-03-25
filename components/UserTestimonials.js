@@ -55,12 +55,12 @@ const UserTestimonials = () => {
       className="relative z-10 w-full bg-transparent py-16 overflow-hidden"
     >
       <div className="container mx-auto p-4 px-5 md:px-[5%] 2xl:px-0 max-w-[1200px]">
-        <div className="text-center mb-12 bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-6 shadow-2xl">
+        <div className="text-center mb-12">
           <motion.h2
             initial={{ opacity: 0, y: 50 }}
             whileInView={{ opacity: 1, y: 0, transition: { duration: 0.8 } }}
             viewport={{ once: true }}
-            className="text-3xl md:text-4xl font-bold mb-3 bg-gradient-to-r from-indigo-900 to-purple-900 bg-clip-text text-transparent"
+            className="text-3xl md:text-4xl font-bold mb-4 text-white"
           >
             What Our Conscious Community Is Saying
           </motion.h2>
@@ -72,7 +72,7 @@ const UserTestimonials = () => {
               transition: { duration: 0.8, delay: 0.2 },
             }}
             viewport={{ once: true }}
-            className="text-base text-gray-600 max-w-2xl mx-auto"
+            className="text-base text-white/60 max-w-2xl mx-auto"
           >
             Join thousands of manifestors who are using LoA to align their
             digital habits with their highest intentions and attract more of
