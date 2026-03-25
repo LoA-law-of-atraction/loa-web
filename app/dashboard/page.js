@@ -4,29 +4,23 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { onAuthStateChanged, signInAnonymously, signOut } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 import { motion } from "framer-motion";
 import Autoplay from "embla-carousel-autoplay";
 import EmblaCarousel from "embla-carousel-react";
 import {
   AlertCircle,
-  Bug,
   Cloud,
   GalleryHorizontalEnd,
-  House,
   ImagePlus,
-  Lock,
-  LogOut,
   Sparkles,
   Star,
   TrendingUp,
-  FileText,
   ChevronDown,
   Check,
   Pencil,
   Trash2,
   Eye,
-  X,
 } from "lucide-react";
 import { auth } from "@/utils/firebase";
 import {
@@ -39,13 +33,6 @@ import {
   uploadAffirmationImages,
   deleteAffirmationImage,
 } from "@/utils/loaCloudSync";
-
-const tabs = [
-  { id: "home", label: "Overview", icon: House },
-  { id: "affirmations", label: "Affirmations", icon: Sparkles },
-  { id: "templates", label: "Templates", icon: FileText, href: "/dashboard/templates" },
-  { id: "gallery", label: "Gallery", icon: GalleryHorizontalEnd },
-];
 
 const tabMeta = {
   home: {
@@ -220,7 +207,6 @@ function DashboardContent() {
   const initialTab = validTabIds.includes(tabFromUrl) ? tabFromUrl : "home";
   const [activeTab, setActiveTab] = useState(initialTab);
   const [uid, setUid] = useState("");
-  const [userLabel, setUserLabel] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -268,18 +254,7 @@ function DashboardContent() {
   const nextImageAppendRef = useRef(false);
   const activeMeta = tabMeta[activeTab] || tabMeta.home;
 
-  const [debugMenuOpen, setDebugMenuOpen] = useState(false);
-  const [showPaywallDemo, setShowPaywallDemo] = useState(false);
   const [showSystemPrompt, setShowSystemPrompt] = useState(false);
-  const debugMenuRef = useRef(null);
-
-  useEffect(() => {
-    const onOutside = (e) => {
-      if (debugMenuRef.current && !debugMenuRef.current.contains(e.target)) setDebugMenuOpen(false);
-    };
-    if (debugMenuOpen) document.addEventListener("click", onOutside);
-    return () => document.removeEventListener("click", onOutside);
-  }, [debugMenuOpen]);
 
   const [emblaRef, emblaApi] = EmblaCarousel(
     {
@@ -307,9 +282,13 @@ function DashboardContent() {
       try {
         setLoading(true);
         setError("");
-        const activeUser = user || (await signInAnonymously(auth)).user;
+        if (!user || user.isAnonymous) {
+          setUid("");
+          router.replace("/login");
+          return;
+        }
+        const activeUser = user;
         setUid(activeUser.uid);
-        setUserLabel(activeUser.email || `anon:${activeUser.uid.slice(0, 8)}`);
 
         await ensureStreakDoc(activeUser.uid);
         const cloud = await fetchLoACloudData(activeUser.uid);
@@ -334,7 +313,7 @@ function DashboardContent() {
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [router]);
 
   // Realtime affirmation sync (same contract as mobile: live Firestore + updated_at / is_deleted).
   useEffect(() => {
@@ -713,24 +692,6 @@ function DashboardContent() {
     });
   };
 
-  const deleteImageFromGallery = async (item, imageIndex) => {
-    const path = item.cloudImagePaths?.[imageIndex];
-    if (!path || !uid) return;
-    if (!window.confirm("Delete this image permanently? It will be removed from storage and this affirmation.")) return;
-    await withSaving(async () => {
-      await deleteAffirmationImage(uid, item.docId, path, item.cloudImagePaths || []);
-      setAffirmations((prev) =>
-        prev.map((a) => {
-          if (a.docId !== item.docId) return a;
-          const newPaths = (a.cloudImagePaths || []).filter((_, i) => i !== imageIndex);
-          const newUrls = (a.imageUrls || []).filter((_, i) => i !== imageIndex);
-          return { ...a, cloudImagePaths: newPaths, imageUrls: newUrls, imageUrl: newUrls[0] || "" };
-        })
-      );
-      await refreshCloud();
-    });
-  };
-
   const handleEditingNewImages = (files, append = false) => {
     const selected = Array.from(files || [])
       .filter(Boolean)
@@ -800,11 +761,6 @@ function DashboardContent() {
     });
   };
 
-  const handleLogout = async () => {
-    await signOut(auth);
-    router.replace("/login");
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -814,137 +770,8 @@ function DashboardContent() {
   }
 
   return (
-    <div className="min-h-screen bg-black bg-[radial-gradient(ellipse_at_top,_rgba(88,28,135,0.10)_0%,_transparent_55%)]">
-      <nav className="fixed top-0 left-0 right-0 h-16 bg-black/85 backdrop-blur-md border-b border-white/8 z-50">
-        <div className="h-full max-w-7xl mx-auto px-4 flex items-center justify-between">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <Image
-              src="/app_logo.svg"
-              alt="LoA"
-              width={28}
-              height={28}
-              className="rounded-lg"
-            />
-            <span className="text-white font-bold text-lg hidden sm:block">LoA</span>
-          </Link>
-          <div className="hidden md:flex items-center gap-1">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              const active = activeTab === tab.id;
-              const className = `inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors ${
-                active
-                  ? "bg-purple-500/15 text-white border border-purple-500/30"
-                  : "text-white/60 hover:text-white hover:bg-white/8"
-              }`;
-              if (tab.href) {
-                return (
-                  <Link key={tab.id} href={tab.href} className={className}>
-                    <Icon className="w-4 h-4" />
-                    <span>{tab.label}</span>
-                  </Link>
-                );
-              }
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTabAndUrl(tab.id)}
-                  className={className}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="relative" ref={debugMenuRef}>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); setDebugMenuOpen((v) => !v); }}
-                className="rounded-lg p-2 text-white/50 hover:text-white/80 hover:bg-white/10 transition-colors"
-                title="Debug menu"
-                aria-label="Debug menu"
-                aria-expanded={debugMenuOpen}
-              >
-                <Bug className="h-5 w-5" />
-              </button>
-              {debugMenuOpen && (
-                <div className="absolute right-0 top-full mt-1.5 w-48 rounded-xl border border-white/10 bg-black/95 backdrop-blur py-1 shadow-xl z-50">
-                  <button
-                    type="button"
-                    onClick={() => { setShowPaywallDemo(true); setDebugMenuOpen(false); }}
-                    className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-left text-white/90 hover:bg-white/10 transition-colors"
-                  >
-                    <Lock className="h-4 w-4 text-amber-400/80" />
-                    Paywall demo view
-                  </button>
-                </div>
-              )}
-            </div>
-            <span className="rounded-full px-3 py-1.5 text-xs bg-white/5 border border-white/10 text-white/80">
-              {userLabel}
-            </span>
-            <Link
-              href="/account-deletion"
-              className="rounded-lg border border-red-500/30 px-3 py-1.5 text-xs text-red-300 hover:bg-red-500/10 transition-colors"
-            >
-              Delete account
-            </Link>
-            <button
-              onClick={handleLogout}
-              className="text-white/70 hover:text-red-400 transition-colors p-2"
-              title="Sign Out"
-            >
-              <LogOut className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-      </nav>
-
-      {showPaywallDemo && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
-          onClick={() => setShowPaywallDemo(false)}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Paywall demo"
-        >
-          <div
-            className="bg-gradient-to-b from-slate-900 to-black border border-white/10 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-6 text-center">
-              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-amber-500/20 text-amber-400 mb-4">
-                <Lock className="h-7 w-7" />
-              </div>
-              <h2 className="text-xl font-semibold text-white mb-2">Premium feature</h2>
-              <p className="text-white/70 text-sm mb-6">
-                This is how the paywall appears in the app. Upgrade to LoA Premium to unlock advanced manifestation tools and unlimited affirmations.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <Link
-                  href="/pricing"
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-semibold px-5 py-2.5 text-sm transition-colors"
-                >
-                  View Premium
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => setShowPaywallDemo(false)}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/20 text-white/90 hover:bg-white/10 px-5 py-2.5 text-sm transition-colors"
-                >
-                  <X className="h-4 w-4" />
-                  Close demo
-                </button>
-              </div>
-            </div>
-            <p className="px-6 pb-4 text-center text-[10px] text-white/40">Debug: Paywall demo view</p>
-          </div>
-        </div>
-      )}
-
-      <div className="max-w-7xl mx-auto px-4 py-8 pt-24 text-white">
-      <section className="mb-6">
+      <div className="max-w-7xl mx-auto px-4 py-8 pt-20 md:pt-24 text-white">
+      <section className="mb-6 max-w-2xl mx-auto">
             <p className="inline-flex items-center gap-2 text-purple-400/70 text-xs uppercase tracking-widest font-medium">
               <Cloud className="h-3.5 w-3.5" />
               LoA Dashboard
@@ -953,32 +780,6 @@ function DashboardContent() {
             <p className="text-white/50 mt-1">
               {activeMeta.description}
             </p>
-        <div className="mt-4 grid grid-cols-2 gap-2 md:hidden">
-          {tabs.map((tab) => {
-            const active = activeTab === tab.id;
-            const className = `rounded-lg border px-3 py-2 text-sm text-left ${
-              active
-                ? "bg-purple-500/15 border-purple-500/30 text-white"
-                : "bg-white/5 border-white/10 text-white/70"
-            }`;
-            if (tab.href) {
-              return (
-                <Link key={tab.id} href={tab.href} className={className}>
-                  {tab.label}
-                </Link>
-              );
-            }
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTabAndUrl(tab.id)}
-                className={className}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
         {error && (
           <p className="mt-4 text-sm text-red-400 inline-flex items-center gap-2">
             <AlertCircle className="h-4 w-4" /> {error}
@@ -987,111 +788,60 @@ function DashboardContent() {
       </section>
 
       {activeTab === "home" && (
-        <section className="space-y-3">
+        <section className="space-y-3 max-w-2xl mx-auto">
 
-          {/* ── Bento grid ── */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-
-            {/* Hero: Affirmations — 2 cols wide on lg */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-              className="col-span-2 rounded-2xl bg-gradient-to-br from-purple-500/20 via-purple-900/10 to-transparent border border-purple-500/25 p-6 flex flex-col justify-between min-h-[150px]"
-            >
-              <div className="flex items-center justify-between">
-                <Sparkles className="h-4 w-4 text-purple-400/60" />
-                <span className="text-[10px] uppercase tracking-[0.2em] text-purple-400/50 font-medium">Affirmations</span>
-              </div>
-              <div className="mt-3">
-                <p className="font-tiempos text-7xl font-bold text-white leading-none">{affirmations.length}</p>
-                <p className="text-xs text-purple-300/45 mt-2 tracking-wide">manifestations crafted</p>
-              </div>
-            </motion.div>
-
-            {/* Favorites */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.08 }}
-              className="rounded-2xl bg-gradient-to-br from-yellow-500/15 to-yellow-900/5 border border-yellow-500/20 p-5 flex flex-col justify-between min-h-[150px]"
-            >
-              <Star className="h-4 w-4 text-yellow-400/70" />
-              <div>
-                <p className="font-tiempos text-5xl font-bold text-white leading-none">{favoriteCount}</p>
-                <p className="text-[10px] text-yellow-300/45 mt-1.5 uppercase tracking-[0.15em]">Favorites</p>
-              </div>
-            </motion.div>
-
-            {/* Gallery */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.13 }}
-              className="rounded-2xl bg-gradient-to-br from-indigo-500/15 to-indigo-900/5 border border-indigo-500/20 p-5 flex flex-col justify-between min-h-[150px]"
-            >
-              <GalleryHorizontalEnd className="h-4 w-4 text-indigo-400/70" />
-              <div>
-                <p className="font-tiempos text-5xl font-bold text-white leading-none">{affirmationsWithImages.length}</p>
-                <p className="text-[10px] text-indigo-300/45 mt-1.5 uppercase tracking-[0.15em]">Gallery</p>
-              </div>
-            </motion.div>
-
-          </div>
-
-          {/* Total Affirms — thin horizontal banner */}
+          {/* ── Stats ── */}
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.18 }}
-            className="rounded-xl border border-pink-500/20 bg-gradient-to-r from-pink-500/8 via-pink-500/4 to-transparent px-5 py-3.5 flex items-center justify-between"
+            transition={{ duration: 0.4 }}
+            className="flex flex-wrap gap-x-8 gap-y-4 py-2"
           >
-            <div className="flex items-center gap-2.5">
-              <TrendingUp className="h-4 w-4 text-pink-400" />
-              <span className="text-sm text-white/55">Total times affirmed</span>
-            </div>
-            <span className="font-tiempos text-2xl font-bold text-white">{totalAffirmCount}</span>
+            {[
+              { label: "Affirmations", value: affirmations.length },
+              { label: "Favorites", value: favoriteCount },
+              { label: "Gallery", value: affirmationsWithImages.length },
+              { label: "Total affirmed", value: totalAffirmCount },
+              { label: "🔥 Streak", value: streak?.currentStreak ?? 0 },
+            ].map(({ label, value }) => (
+              <div key={label} className="flex items-baseline gap-2">
+                <span className="font-tiempos text-xl text-white">{value}</span>
+                <span className="text-xs text-white/35">{label}</span>
+              </div>
+            ))}
           </motion.div>
 
-          {/* Streak — staggered number hierarchy */}
-          <motion.article
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.23 }}
-            className="rounded-2xl border border-orange-500/20 bg-gradient-to-br from-orange-500/10 via-orange-500/4 to-transparent p-5"
-          >
-            <p className="text-[10px] uppercase tracking-[0.2em] text-orange-400/60 font-medium mb-5">🔥 Streak</p>
-            <div className="flex items-end gap-8">
-              <div>
-                <p className="font-tiempos text-6xl font-bold text-white leading-none">{streak?.currentStreak ?? 0}</p>
-                <p className="text-xs text-white/35 uppercase tracking-widest mt-2">Current</p>
-              </div>
-              <div className="pb-0.5">
-                <p className="font-tiempos text-4xl font-bold text-white/55 leading-none">{streak?.longestStreak ?? 0}</p>
-                <p className="text-xs text-white/30 uppercase tracking-widest mt-2">Longest</p>
-              </div>
-              <div className="pb-0.5">
-                <p className="font-tiempos text-4xl font-bold text-white/55 leading-none">{streak?.totalDaysCompleted ?? 0}</p>
-                <p className="text-xs text-white/30 uppercase tracking-widest mt-2">Total Days</p>
-              </div>
-            </div>
-          </motion.article>
-
           {affirmations.length > 0 && (
-            <article className="rounded-xl p-4 max-w-xl">
-              <h2 className="text-lg font-semibold mb-2 text-white inline-flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-purple-400" />
-                Affirmation Carousel
-              </h2>
-              <div className="embla overflow-hidden" ref={emblaRef}>
-                <div className="embla__container flex gap-4">
+            <article className="pt-4 w-full">
+              {/* Mobile: vertical cards */}
+              <div className="sm:hidden space-y-3">
+                {affirmations.map((item) => {
+                  const urls = item.imageUrls?.length ? item.imageUrls : (item.imageUrl ? [item.imageUrl] : []);
+                  return (
+                    <Link
+                      key={item.docId}
+                      href={`/dashboard/preview/${item.docId}?from=home`}
+                      className="block rounded-xl overflow-hidden w-full"
+                    >
+                      <AffirmationImageGrid urls={urls} />
+                      <div className="p-3">
+                        <p className="font-tiempos text-xl italic leading-relaxed text-white/85 line-clamp-3">&ldquo;{item.content}&rdquo;</p>
+                        {item.category && (
+                          <p className="mt-1.5 text-[11px] text-white/50">{item.category}</p>
+                        )}
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+
+              {/* Desktop: horizontal carousel */}
+              <div className="hidden sm:block embla overflow-hidden max-w-2xl mx-auto" ref={emblaRef}>
+                <div className="embla__container flex gap-3">
                   {affirmations.map((item) => {
                     const urls = item.imageUrls?.length ? item.imageUrls : (item.imageUrl ? [item.imageUrl] : []);
                     return (
-                      <div
-                        key={item.docId}
-                        className="embla__slide flex-[0_0_48%] min-w-0 pl-0 w-full max-w-[240px]"
-                      >
+                      <div key={item.docId} className="embla__slide flex-[0_0_44%] md:flex-[0_0_32%] min-w-0">
                         <Link
                           href={`/dashboard/preview/${item.docId}?from=home`}
                           className="block rounded-xl overflow-hidden flex flex-col w-full cursor-pointer"
@@ -1839,14 +1589,6 @@ function DashboardContent() {
                             className="absolute inset-0 z-[1]"
                             aria-label="Open affirmation preview"
                           />
-                          <button
-                            type="button"
-                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteImageFromGallery(item, i); }}
-                            className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-black/70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-500/90 transition-opacity z-[2]"
-                            aria-label="Delete image"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
                         </div>
                       ))
                     ) : (
@@ -1879,7 +1621,6 @@ function DashboardContent() {
       )}
 
       </div>
-    </div>
   );
 }
 

@@ -1,18 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
-import { onAuthStateChanged, signInAnonymously, signOut } from "firebase/auth";
+import { useRouter } from "next/navigation";
+import { onAuthStateChanged } from "firebase/auth";
 import {
   AlertCircle,
   Cloud,
   FileText,
-  GalleryHorizontalEnd,
-  House,
-  LogOut,
-  Sparkles,
   Pencil,
   Trash2,
   Copy,
@@ -25,19 +20,11 @@ import {
   updateAffirmationTemplate,
 } from "@/utils/loaCloudSync";
 
-const dashboardTabs = [
-  { id: "home", label: "Overview", icon: House, href: "/dashboard?tab=home" },
-  { id: "affirmations", label: "Affirmations", icon: Sparkles, href: "/dashboard?tab=affirmations" },
-  { id: "templates", label: "Templates", icon: FileText, href: "/dashboard/templates", active: true },
-  { id: "gallery", label: "Gallery", icon: GalleryHorizontalEnd, href: "/dashboard?tab=gallery" },
-];
-
 const emptyTemplate = { name: "", content: "", category: "" };
 
 export default function AffirmationTemplatesPage() {
   const router = useRouter();
   const [uid, setUid] = useState("");
-  const [userLabel, setUserLabel] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -81,9 +68,13 @@ export default function AffirmationTemplatesPage() {
         setLoading(true);
         setError("");
         console.log("[Templates] Auth state changed, user:", user?.uid ?? "none");
-        const activeUser = user || (await signInAnonymously(auth)).user;
+        if (!user || user.isAnonymous) {
+          setUid("");
+          router.replace("/login");
+          return;
+        }
+        const activeUser = user;
         setUid(activeUser.uid);
-        setUserLabel(activeUser.email || `anon:${activeUser.uid.slice(0, 8)}`);
         await loadTemplates(activeUser.uid);
         console.log("[Templates] About to load default templates");
         await loadDefaultTemplates();
@@ -95,7 +86,7 @@ export default function AffirmationTemplatesPage() {
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [router]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -271,11 +262,6 @@ export default function AffirmationTemplatesPage() {
     console.log("[Templates] defaultTemplates state updated, length:", defaultTemplates.length);
   }, [defaultTemplates]);
 
-  const handleLogout = async () => {
-    await signOut(auth);
-    router.replace("/login");
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -285,68 +271,7 @@ export default function AffirmationTemplatesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black bg-[radial-gradient(ellipse_at_top,_rgba(88,28,135,0.10)_0%,_transparent_55%)] text-white">
-
-      {/* Nav — matches dashboard */}
-      <nav className="fixed top-0 left-0 right-0 h-16 bg-black/85 backdrop-blur-md border-b border-white/8 z-50">
-        <div className="h-full max-w-7xl mx-auto px-4 flex items-center justify-between">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <Image src="/app_logo.svg" alt="LoA" width={28} height={28} className="rounded-lg" />
-            <span className="text-white font-bold text-lg hidden sm:block">LoA</span>
-          </Link>
-
-          <div className="hidden md:flex items-center gap-1">
-            {dashboardTabs.map((tab) => {
-              const Icon = tab.icon;
-              const active = tab.active;
-              return (
-                <Link
-                  key={tab.id}
-                  href={tab.href}
-                  className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors ${
-                    active
-                      ? "bg-purple-500/15 text-white border border-purple-500/30"
-                      : "text-white/55 hover:text-white hover:bg-white/8"
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span>{tab.label}</span>
-                </Link>
-              );
-            })}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="rounded-full px-3 py-1.5 text-xs bg-white/5 border border-white/10 text-white/60">
-              {userLabel}
-            </span>
-            <button onClick={handleLogout} className="text-white/40 hover:text-red-400 transition-colors p-2" title="Sign Out">
-              <LogOut className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile tabs */}
-        <div className="md:hidden flex gap-1.5 px-4 pb-3 overflow-x-auto">
-          {dashboardTabs.map((tab) => {
-            const active = tab.active;
-            return (
-              <Link
-                key={tab.id}
-                href={tab.href}
-                className={`rounded-lg px-3 py-1.5 text-sm shrink-0 transition-colors ${
-                  active
-                    ? "bg-purple-500/15 border border-purple-500/30 text-white"
-                    : "bg-white/5 border border-white/8 text-white/60"
-                }`}
-              >
-                {tab.label}
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
-
+    <div className="text-white">
       <div className="max-w-7xl mx-auto px-4 pt-24 pb-12">
 
         {/* Page header */}
