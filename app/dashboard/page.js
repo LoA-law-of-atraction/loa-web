@@ -839,6 +839,12 @@ function DashboardContent() {
             <span className="rounded-full px-3 py-1.5 text-xs bg-white/5 border border-white/10 text-white/80">
               {userLabel}
             </span>
+            <Link
+              href="/account-deletion"
+              className="rounded-lg border border-red-500/30 px-3 py-1.5 text-xs text-red-300 hover:bg-red-500/10 transition-colors"
+            >
+              Delete account
+            </Link>
             <button
               onClick={handleLogout}
               className="text-white/70 hover:text-red-400 transition-colors p-2"
