@@ -51,13 +51,16 @@ function DashboardShellInner({ children }) {
     const unsub = onAuthStateChanged(auth, (user) => {
       if (!user || user.isAnonymous) {
         setUserLabel("");
-        router.replace("/login");
+        const query = searchParams?.toString();
+        const currentPath = pathname || "/dashboard";
+        const redirectTarget = query ? `${currentPath}?${query}` : currentPath;
+        router.replace(`/login?redirect=${encodeURIComponent(redirectTarget)}`);
         return;
       }
       setUserLabel(user.email || `user:${user.uid.slice(0, 8)}`);
     });
     return () => unsub();
-  }, [router]);
+  }, [pathname, router, searchParams]);
 
   useEffect(() => {
     const onOutside = (e) => {
