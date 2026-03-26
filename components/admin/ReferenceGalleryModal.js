@@ -5,7 +5,7 @@ import { Info } from "lucide-react";
 
 /**
  * Modal to choose a reference image from the project's history.
- * Supports delete (removes from Firestore + Storage). Used in Quote Videos Step 2.
+ * Used in Quote Videos Step 2.
  */
 export default function ReferenceGalleryModal({
   open,
@@ -13,10 +13,7 @@ export default function ReferenceGalleryModal({
   history = [],
   currentReferenceUrl,
   onSelect,
-  projectId,
-  onDeleted,
 }) {
-  const [deletingUrl, setDeletingUrl] = useState(null);
   const [infoEntry, setInfoEntry] = useState(null);
 
   if (!open) return null;
@@ -29,33 +26,6 @@ export default function ReferenceGalleryModal({
       : hasCurrent
         ? [{ url: currentReferenceUrl.trim() }]
         : [];
-
-  const handleDelete = async (e, url) => {
-    e.stopPropagation();
-    if (!projectId || !url) return;
-    if (!confirm("Remove this image from the gallery and delete it from storage?")) return;
-    setDeletingUrl(url);
-    try {
-      const res = await fetch("/api/quote-videos/delete-reference-image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project_id: projectId, url }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        onDeleted?.();
-        if (data.reference_image_url !== undefined && currentReferenceUrl === url) {
-          onSelect?.(data.reference_image_url || "");
-        }
-      } else {
-        alert(data.error || "Failed to delete");
-      }
-    } catch (err) {
-      alert(err.message || "Failed to delete");
-    } finally {
-      setDeletingUrl(null);
-    }
-  };
 
   return (
     <div
@@ -93,8 +63,6 @@ export default function ReferenceGalleryModal({
               {entries.map((entry, idx) => {
                 const url = typeof entry === "string" ? entry : entry?.url;
                 if (!url) return null;
-                const canDelete = !!projectId && (fromHistory.length > 0 ? fromHistory.some((e) => (typeof e === "string" ? e : e?.url) === url) : false);
-                const isDeleting = deletingUrl === url;
                 const imagePrompt = typeof entry === "object" && entry?.image_prompt != null ? entry.image_prompt : null;
                 const createdAt = typeof entry === "object" && entry?.created_at != null ? entry.created_at : null;
                 return (
@@ -129,23 +97,6 @@ export default function ReferenceGalleryModal({
                     >
                       <Info className="w-4 h-4" />
                     </button>
-                    {canDelete && (
-                      <button
-                        type="button"
-                        onClick={(e) => handleDelete(e, url)}
-                        disabled={isDeleting}
-                        className="absolute top-2 right-2 p-1.5 rounded-lg bg-red-500/90 hover:bg-red-600 text-white shadow-lg disabled:opacity-50"
-                        aria-label="Delete from gallery"
-                      >
-                        {isDeleting ? (
-                          <span className="w-4 h-4 block border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        )}
-                      </button>
-                    )}
                   </div>
                 );
               })}

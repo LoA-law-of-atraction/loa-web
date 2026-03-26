@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Info, Trash2, Maximize2 } from "lucide-react";
+import { Info, Maximize2 } from "lucide-react";
 
 /**
  * Modal to choose a generated image for a scene from the project's generated_images history.
@@ -13,37 +13,10 @@ export default function SceneImageGalleryModal({
   images = [],
   currentSelectedUrl,
   onSelect,
-  onDeleted,
-  projectId,
   title = "Select from gallery",
 }) {
   const [infoEntry, setInfoEntry] = useState(null);
-  const [deletingUrl, setDeletingUrl] = useState(null);
   const [expandedPreviewUrl, setExpandedPreviewUrl] = useState(null);
-
-  const handleDelete = async (e, url, sceneId) => {
-    e.stopPropagation();
-    if (!projectId || !url) return;
-    if (!confirm("Remove this image from the gallery and delete it from storage?")) return;
-    setDeletingUrl(url);
-    try {
-      const res = await fetch("/api/quote-videos/delete-background-image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project_id: projectId, url, scene_id: sceneId || undefined }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        onDeleted?.();
-      } else {
-        alert(data.error || "Failed to delete");
-      }
-    } catch (err) {
-      alert(err?.message || "Failed to delete");
-    } finally {
-      setDeletingUrl(null);
-    }
-  };
 
   if (!open) return null;
 
@@ -89,8 +62,6 @@ export default function SceneImageGalleryModal({
                 const isSelected = url === selectedUrl;
                 const createdAt = typeof entry === "object" && entry?.created_at != null ? entry.created_at : null;
                 const promptSent = typeof entry === "object" && entry?.prompt_sent_to_model != null ? entry.prompt_sent_to_model : null;
-                const sceneId = typeof entry === "object" && entry?.scene_id != null ? entry.scene_id : null;
-                const isDeleting = deletingUrl === url;
                 return (
                   <div
                     key={(entry?.id || entry?.url) + "-" + url}
@@ -144,24 +115,6 @@ export default function SceneImageGalleryModal({
                       >
                         <Info className="w-4 h-4" />
                       </button>
-                    </div>
-                    <div className="absolute top-2 right-2 flex flex-col gap-1">
-                      {projectId && (
-                        <button
-                          type="button"
-                          onClick={(e) => handleDelete(e, url, sceneId)}
-                          disabled={isDeleting}
-                          className="p-1.5 rounded-lg bg-red-500/90 hover:bg-red-600 text-white shadow-lg disabled:opacity-50"
-                          aria-label="Delete from gallery"
-                          title="Delete"
-                        >
-                          {isDeleting ? (
-                            <span className="w-4 h-4 block border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          ) : (
-                            <Trash2 className="w-4 h-4" />
-                          )}
-                        </button>
-                      )}
                     </div>
                   </div>
                 );
