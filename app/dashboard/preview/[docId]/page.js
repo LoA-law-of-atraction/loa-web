@@ -42,6 +42,8 @@ function AffirmationPreviewContent() {
   const [transitionIntervalMs, setTransitionIntervalMs] = useState(3000);
   const activeImageRef = useRef(null);
   const hasLoadedCachedSettingsRef = useRef(false);
+  /** Prevents persist effect from running once with stale state before hydrate-from-localStorage applies. */
+  const skipFirstPersistAfterLoadRef = useRef(true);
   const transitionInFlightRef = useRef(false);
   const logFade = (...args) => {
     if (process.env.NODE_ENV !== "production") {
@@ -97,6 +99,10 @@ function AffirmationPreviewContent() {
 
   useEffect(() => {
     if (!hasLoadedCachedSettingsRef.current) return;
+    if (skipFirstPersistAfterLoadRef.current) {
+      skipFirstPersistAfterLoadRef.current = false;
+      return;
+    }
 
     const payload = {
       previewMode,

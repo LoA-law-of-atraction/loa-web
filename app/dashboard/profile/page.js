@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/utils/firebase";
+import { RevenueCatProvider } from "@/contexts/RevenueCatContext";
+import { MembershipStatusLink } from "@/components/SubscriptionPanel";
 
 export default function DashboardProfilePage() {
   const router = useRouter();
@@ -47,42 +49,47 @@ export default function DashboardProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <div className="max-w-lg mx-auto px-6 pt-28 pb-16">
+    <RevenueCatProvider>
+      <div className="min-h-screen bg-black text-white">
+        <div className="max-w-6xl mx-auto px-6 pt-28 pb-16">
 
-        {/* Avatar + identity */}
-        <div className="flex items-center gap-4 mb-10">
-          {user?.photoURL ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={user.photoURL}
-              alt={displayName}
-              className="h-12 w-12 rounded-full object-cover"
-            />
-          ) : (
-            <div className="h-12 w-12 rounded-full bg-white/8 flex items-center justify-center text-base font-medium text-white/60">
-              {avatarFallback}
-            </div>
-          )}
-          <div className="min-w-0">
-            <p className="text-base font-medium leading-tight break-all">{displayName}</p>
-            {user?.email && (
-              <p className="text-sm text-white/40 break-all mt-0.5">{user.email}</p>
+          {/* Avatar + identity */}
+          <div className="flex items-center gap-4 max-w-2xl mb-10">
+            {user?.photoURL ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={user.photoURL}
+                alt={displayName}
+                className="h-12 w-12 rounded-full object-cover"
+              />
+            ) : (
+              <div className="h-12 w-12 rounded-full bg-white/8 flex items-center justify-center text-base font-medium text-white/60">
+                {avatarFallback}
+              </div>
             )}
+            <div className="min-w-0">
+              <p className="text-base font-medium leading-tight break-all">{displayName}</p>
+              {user?.email && (
+                <p className="text-sm text-white/40 break-all mt-0.5">{user.email}</p>
+              )}
+            </div>
           </div>
-        </div>
 
-        {/* Danger zone */}
-        <div className="mt-10">
-          <Link
-            href="/dashboard/account-deletion"
-            className="text-xs text-white/30 underline decoration-white/15 underline-offset-4 hover:text-white/50 transition-colors"
-          >
-            Delete account
-          </Link>
-        </div>
+          {/* Membership + danger zone — shared width for alignment */}
+          <div className="max-w-lg space-y-6">
+            <MembershipStatusLink />
+            <div>
+              <Link
+                href="/dashboard/account-deletion"
+                className="text-xs text-white/30 underline decoration-white/15 underline-offset-4 hover:text-white/50 transition-colors"
+              >
+                Delete account
+              </Link>
+            </div>
+          </div>
 
+        </div>
       </div>
-    </div>
+    </RevenueCatProvider>
   );
 }

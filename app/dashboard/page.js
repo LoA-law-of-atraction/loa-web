@@ -11,8 +11,9 @@ import EmblaCarousel from "embla-carousel-react";
 import {
   AlertCircle,
   Cloud,
-  Crown,
+  FileText,
   GalleryHorizontalEnd,
+  House,
   ImagePlus,
   Sparkles,
   Star,
@@ -38,7 +39,6 @@ import {
 const tabs = [
   { id: "home", label: "Overview", icon: House },
   { id: "affirmations", label: "Affirmations", icon: Sparkles },
-  { id: "subscription", label: "Subscription", icon: Crown, href: "/dashboard/subscription" },
   { id: "templates", label: "Templates", icon: FileText, href: "/dashboard/templates" },
   { id: "gallery", label: "Gallery", icon: GalleryHorizontalEnd },
 ];
