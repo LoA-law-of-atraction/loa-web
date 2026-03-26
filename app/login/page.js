@@ -28,7 +28,7 @@ function LoginContent() {
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
-      if (user) router.replace(redirectTo);
+      if (user && !user.isAnonymous) router.replace(redirectTo);
     });
     return () => unsub();
   }, [redirectTo, router]);

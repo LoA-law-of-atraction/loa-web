@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { privacyPolicy } from "@/components/data/legal";
 import LegalDocs from "@/components/LegalDocs";
@@ -41,6 +42,13 @@ const PrivacyClient = () => {
             <p className="text-center mt-6 text-white/90">
               By using our app and services, you acknowledge that you have read,
               understood, and agree to be bound by this Privacy Policy.
+            </p>
+            <p className="text-center text-white/80 text-sm">
+              Need to remove your account? Visit{" "}
+              <Link href="/account-deletion" className="underline hover:text-white">
+                Account Deletion
+              </Link>
+              .
             </p>
           </article>
         </div>

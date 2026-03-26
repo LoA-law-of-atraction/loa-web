@@ -1,10 +1,10 @@
 "use client";
 
 import { Suspense, useEffect, useRef, useState } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { onAuthStateChanged, signInAnonymously, signOut } from "firebase/auth";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 import { ArrowLeft, LogOut, Sparkles, ChevronLeft, ChevronRight } from "lucide-react";
 import { auth } from "@/utils/firebase";
 import { fetchAffirmationById } from "@/utils/loaCloudSync";
@@ -13,6 +13,7 @@ const PREVIEW_SETTINGS_CACHE_KEY = "loa.preview.settings.v1";
 
 function AffirmationPreviewContent() {
   const params = useParams();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const docId = params?.docId ?? null;
   const from = searchParams?.get?.("from") || "home";
@@ -109,16 +110,24 @@ function AffirmationPreviewContent() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       try {
-        const activeUser = user || (await signInAnonymously(auth)).user;
+        if (!user || user.isAnonymous) {
+          setUid("");
+          router.replace("/login");
+          return;
+        }
+        const activeUser = user;
         setUid(activeUser.uid);
       } catch (err) {
         setError(err?.message || "Failed to sign in.");
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [router]);
 
-  const handleLogout = () => signOut(auth);
+  const handleLogout = async () => {
+    await signOut(auth);
+    router.replace("/");
+  };
 
   useEffect(() => {
     if (!uid || !docId) {
