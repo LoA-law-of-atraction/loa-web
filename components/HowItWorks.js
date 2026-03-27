@@ -12,13 +12,13 @@ const steps = [
     number: "02",
     title: "Choose Your Apps",
     description:
-      "Select which apps to monitor - social media, games, or any app that tends to distract from your goals.",
+      "Select the apps where you want an intentional pause before opening, especially the ones that pull you away from your goals.",
   },
   {
     number: "03",
     title: "Pause & Reflect",
     description:
-      "When you tap a monitored app, LoA pauses your impulse with a beautiful affirmation screen.",
+      "When you tap one of your selected apps, LoA interrupts autopilot with a beautiful affirmation screen.",
   },
   {
     number: "04",
@@ -30,7 +30,7 @@ const steps = [
     number: "05",
     title: "Build Awareness",
     description:
-      "Track your digital energy patterns and celebrate your journey toward conscious living.",
+      "Strengthen mindful habits and celebrate your journey toward conscious living.",
   },
 ];
 

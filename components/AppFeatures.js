@@ -32,19 +32,19 @@ const features = [
     icon: <Clock className="w-8 h-8" />,
     title: "Awareness Insights",
     description:
-      "Track your digital energy patterns and see how conscious technology use aligns with your manifestation practice.",
+      "Notice your mindset shifts over time and stay aligned with your manifestation practice through intentional check-ins.",
   },
   {
     icon: <Smartphone className="w-8 h-8" />,
-    title: "Selective Monitoring",
+    title: "Intentional App Selection",
     description:
-      "Choose which apps serve your highest good and which ones need conscious boundaries for optimal energy flow.",
+      "Choose where you want mindful interruption so your attention stays with what serves your highest good.",
   },
   {
     icon: <BarChart3 className="w-8 h-8" />,
-    title: "Vibration Tracking",
+    title: "Aligned Momentum",
     description:
-      "Visualize how your digital habits affect your energetic state and alignment with your manifestation goals.",
+      "Build consistency with small daily moments of presence that reinforce your manifestation goals.",
   },
 ];
 
@@ -84,27 +84,31 @@ const AppFeatures = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {features.map((feature, index) => (
-            <motion.div
+            <div
               key={index}
-              initial={{ opacity: 0, y: 50 }}
-              whileInView={{
-                opacity: 1,
-                y: 0,
-                transition: { duration: 0.6, delay: index * 0.1 },
-              }}
-              viewport={{ once: true }}
-              className="bg-white/5 backdrop-blur-md p-6 rounded-xl border border-white/10 hover:border-purple-400/40 hover:bg-white/8 transition-all duration-300"
+              className="bg-white/5 backdrop-blur-md rounded-xl border border-white/10 hover:border-purple-400/40 hover:bg-white/8 transition-all duration-300"
             >
-              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-600/20 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-4">
-                {feature.icon}
-              </div>
-              <h3 className="text-xl font-semibold text-white mb-3">
-                {feature.title}
-              </h3>
-              <p className="text-white/60 leading-relaxed">
-                {feature.description}
-              </p>
-            </motion.div>
+              <motion.div
+                initial={{ opacity: 0, y: 50 }}
+                whileInView={{
+                  opacity: 1,
+                  y: 0,
+                  transition: { duration: 0.6, delay: index * 0.1 },
+                }}
+                viewport={{ once: true }}
+                className="p-6"
+              >
+                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-600/20 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-4">
+                  {feature.icon}
+                </div>
+                <h3 className="text-xl font-semibold text-white mb-3">
+                  {feature.title}
+                </h3>
+                <p className="text-white/60 leading-relaxed">
+                  {feature.description}
+                </p>
+              </motion.div>
+            </div>
           ))}
         </div>
       </div>
