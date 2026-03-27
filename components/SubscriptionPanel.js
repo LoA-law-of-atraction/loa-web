@@ -518,7 +518,7 @@ export function MembershipStatusLink() {
 
   return (
     <Link
-      href="/dashboard/subscription"
+      href="/dashboard/profile#subscription"
       className="group flex w-full items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-left transition-colors hover:border-purple-500/30 hover:bg-white/[0.06] focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/40"
     >
       <span className="flex items-center gap-3 min-w-0">

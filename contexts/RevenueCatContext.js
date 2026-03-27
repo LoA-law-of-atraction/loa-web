@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 import { Purchases } from "@revenuecat/purchases-js";
 import { auth } from "@/utils/firebase";
 import { REVENUECAT_ENTITLEMENT_ID } from "@/lib/revenuecat-config";
@@ -36,13 +36,9 @@ export function RevenueCatProvider({ children, entitlementId = REVENUECAT_ENTITL
 
   useEffect(() => {
     let mounted = true;
-    const unsub = onAuthStateChanged(auth, async (user) => {
-      try {
-        const activeUser = user || (await signInAnonymously(auth)).user;
-        if (mounted) setUid(activeUser?.uid || "");
-      } catch {
-        if (mounted) setUid("");
-      }
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (!mounted) return;
+      setUid(user?.isAnonymous ? "" : user?.uid || "");
     });
     return () => {
       mounted = false;
@@ -81,8 +77,9 @@ export function RevenueCatProvider({ children, entitlementId = REVENUECAT_ENTITL
     }
     if (!uid) {
       setCustomerInfo(null);
+      instanceRef.current = null;
       setSdkReady(false);
-      setLoading(true);
+      setLoading(false);
       return;
     }
 

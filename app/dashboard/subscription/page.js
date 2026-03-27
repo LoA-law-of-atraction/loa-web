@@ -1,13 +1,18 @@
 "use client";
 
-import SubscriptionPanel from "@/components/SubscriptionPanel";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function SubscriptionPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace("/dashboard/profile#subscription");
+  }, [router]);
+
   return (
-    <div className="min-h-screen bg-black text-white">
-      <div className="max-w-6xl mx-auto px-4 pt-20 md:pt-24 pb-16">
-        <SubscriptionPanel />
-      </div>
+    <div className="max-w-2xl mx-auto px-4 py-12 text-white/60 text-sm">
+      Redirecting to profile...
     </div>
   );
 }
