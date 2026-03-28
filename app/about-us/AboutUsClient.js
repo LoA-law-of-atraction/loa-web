@@ -10,6 +10,7 @@ import Legacy from "@/components/Legacy";
 import Testimonial from "@/components/Testimonial";
 import FaqsWhite from "@/components/FaqsWhite";
 import CoreValues from "@/components/CoreValue";
+import FounderTeam from "@/components/FounderTeam";
 import AppStoreDownloadButton from "@/components/AppStoreDownloadButton";
 import GooglePlayDownloadButton from "@/components/GooglePlayDownloadButton";
 
@@ -198,6 +199,7 @@ export default function AboutUsClient() {
             partnerships, or business questions, reach out—we read every message
             from users and partners.
           </p>
+          <FounderTeam />
           <Link
             href="/contact-us"
             className="mt-8 inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors"

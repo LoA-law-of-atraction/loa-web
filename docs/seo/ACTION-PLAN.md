@@ -352,7 +352,7 @@ Add a team section with:
 
 This is the single highest-leverage E-E-A-T improvement and requires no technical complexity.
 
-**Status:** ⚠️ **Partial (2026-03-28).** “Who builds LoA” + trust copy (pricing/privacy transparency, contact) added in `AboutUsClient.js`. **Still open:** named founders, photos, LinkedIn, founding year—add when assets are ready.
+**Status:** ⚠️ **Partial (2026-03-28).** “Who builds LoA” + trust copy (pricing/privacy transparency, contact) added in `AboutUsClient.js`. **Env-driven founder cards** (`components/FounderTeam.js` + `NEXT_PUBLIC_FOUNDER_*` in `.env.example`) render when `NEXT_PUBLIC_FOUNDER_1_NAME` is set—add names, bios, LinkedIn, optional `/public` or HTTPS headshots, and optional `NEXT_PUBLIC_FOUNDING_YEAR`.
 
 ---
 
@@ -390,7 +390,7 @@ The competitor analysis returned only podcast platforms and irrelevant sites bec
 
 Use results to identify true competitors and inform content strategy.
 
-**Status:** ⚠️ **Partial (2026-03-28).** Keyword Overview / difficulty / intent captured in [**DATAFORSEO-KEYWORD-RESEARCH-2026-03-28.md**](DATAFORSEO-KEYWORD-RESEARCH-2026-03-28.md). **Live organic SERP** (top URLs) **not** pulled—**retry** `serp_organic_live_advanced` or competitors endpoint when DataForSEO credits/billing are active.
+**Status:** ⚠️ **Partial (2026-03-28).** Keyword Overview / difficulty / intent captured in [**DATAFORSEO-KEYWORD-RESEARCH-2026-03-28.md**](DATAFORSEO-KEYWORD-RESEARCH-2026-03-28.md). **Live organic SERP** (top URLs) **not** pulled—retries (including 2026-03-28) returned HTTP **402**—**retry** `serp_organic_live_advanced` when DataForSEO credits/billing are active.
 
 ---
 
@@ -674,7 +674,7 @@ MEDIUM (this month)
 [x] M9 - Fix double hero padding in ClientLayout
 [x] M10 - Render FAQ answers server-side
 [x] M11 - Add WebSite schema with SearchAction
-[~] M12 - Contact legal block + env vars; set address in prod for full E-E-A-T
+[~] M12 - Contact legal block + env vars; set address in prod for full E-E-A-T (see `.env.example`; `ContactClient.js` already renders block when `NEXT_PUBLIC_COMPANY_*` set)
 [x] M13 - @anthropic-ai/sdk server-only (all under app/api)
 [x] M14 - /resources 500+ words + FAQ (with C6)
 [~] M15 - Re-run competitor analysis after more rankings / GSC data (scheduled; needs DataForSEO + traction)
@@ -682,3 +682,9 @@ MEDIUM (this month)
 LOW (backlog L1–L10)
 [x] L1–L10 — see table above (all shipped 2026-03-28)
 ```
+
+### Production rollout (manual — 2026-03-28)
+
+1. **Vercel / hosting env:** Copy the SEO block from `.env.prod` (or `.env.example`) into project settings: `NEXT_PUBLIC_COMPANY_*`, `NEXT_PUBLIC_FOUNDER_*`, `NEXT_PUBLIC_FOUNDING_YEAR`, `INDEXNOW_KEY` / `INDEXNOW_SUBMIT_SECRET`. Fill **legal name, registered address, and registration number** for M12; fill **founder fields** for H11 when ready.
+2. **IndexNow:** `INDEXNOW_KEY` must match the key file under `public/` (see H12).
+3. **DataForSEO (H14 / M15):** Add account credits; re-run live SERP and ranked-keywords/competitor endpoints — retries still returned HTTP **402** as of 2026-03-28.

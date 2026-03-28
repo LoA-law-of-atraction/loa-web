@@ -22,6 +22,10 @@
 - `dataforseo_labs_google_related_keywords` — HTTP **402**
 - `kw_data_google_ads_search_volume` (long-tail batch) — HTTP **402**
 
+**Retry (2026-03-28, MCP `serp_organic_live_advanced`, keyword `law of attraction app`, US / en / mobile):** HTTP **402** — credits still required.
+
+**Retry (same day, MCP `dataforseo_labs_google_ranked_keywords`, target `loa-lawofattraction.co`):** HTTP **402** — same billing constraint.
+
 **Action:** Re-run SERP and related-keyword endpoints after confirming **billing / credits** on the DataForSEO account.
 
 ---
