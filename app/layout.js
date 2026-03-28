@@ -1,7 +1,10 @@
 import { Inter, Ubuntu } from "next/font/google";
+import { GoogleAnalytics } from "@next/third-parties/google";
 import "./globals.css";
 import ClientLayout from "@/components/ClientLayout";
 import StructuredData from "@/components/StructuredData";
+
+const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 
 const inter = Inter({
   subsets: ["latin"],
@@ -100,6 +103,9 @@ export default function Layout({ children }) {
         suppressHydrationWarning
       >
         <StructuredData />
+        {gaMeasurementId ? (
+          <GoogleAnalytics gaId={gaMeasurementId} />
+        ) : null}
         <ClientLayout>{children}</ClientLayout>
       </body>
     </html>
