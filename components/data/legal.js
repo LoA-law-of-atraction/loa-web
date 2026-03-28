@@ -5,19 +5,18 @@ export const privacyPolicy = [
     id: uuid(),
     title: "Information We Collect",
     text: "Loa is designed with privacy in mind. We do not collect any personal information unless you explicitly choose to provide it. Depending on how you use the app, we may collect the following minimal information:",
-    subtext: "a. App Usage Data (Optional & Anonymous)",
+    subtext: "a. Product & Diagnostics Data (Optional & Anonymous)",
     subtext2:
       "To improve the app's performance and user experience, we may collect limited, anonymized data such as:",
     list: [
-      "App open and close times",
-      "Which features are used most often",
+      "Which features are used most often within LoA",
       "Crash reports and diagnostic logs (via Firebase Crashlytics or Google Play Services)",
     ],
     addition:
       "This data does not contain any personal identifiers (such as name, email, or precise location).",
     subtext3: "b. Permissions",
     subtext4:
-      "Loa may request permission to detect when certain apps are opened — only to display mindful prompts before launching them. We do not read or track your app content, messages, or browsing history.",
+      "Loa may request permissions needed for notifications, storage, or other in-app features. We do not use your usage of other apps as part of the core product experience, and we do not read or track your app content, messages, or browsing history.",
     subtext5: "c. Optional Cloud Sync (if enabled)",
     subtext6:
       "If future updates allow syncing affirmations or user preferences via cloud backup, we may temporarily store this data under your account. You will be clearly informed and able to opt out at any time.",

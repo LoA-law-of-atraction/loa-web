@@ -90,16 +90,34 @@ export function RevenueCatProvider({ children, entitlementId = REVENUECAT_ENTITL
 
     (async () => {
       try {
+        let purchases = null;
         if (typeof Purchases.isConfigured === "function" && Purchases.isConfigured()) {
           try {
             const existing = Purchases.getSharedInstance();
-            if (existing?.close) existing.close();
-          } catch {}
+            const existingAppUserId =
+              typeof existing?.getAppUserId === "function" ? await existing.getAppUserId() : null;
+            // Reuse existing instance for same user to avoid tearing down active checkout elements.
+            if (!existingAppUserId || existingAppUserId === uid) {
+              purchases = existing;
+            } else {
+              if (existing?.close) existing.close();
+              purchases = Purchases.configure({
+                apiKey,
+                appUserId: uid,
+              });
+            }
+          } catch {
+            purchases = Purchases.configure({
+              apiKey,
+              appUserId: uid,
+            });
+          }
+        } else {
+          purchases = Purchases.configure({
+            apiKey,
+            appUserId: uid,
+          });
         }
-        const purchases = Purchases.configure({
-          apiKey,
-          appUserId: uid,
-        });
         instanceRef.current = purchases;
         if (mounted) {
           setSdkReady(true);

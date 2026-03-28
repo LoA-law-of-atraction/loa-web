@@ -19,19 +19,19 @@ const values = [
   {
     id: 1,
     title: "Conscious Digital Living",
-    desc: "We believe technology should serve your highest good, not scatter your energy. LoA creates intentional pauses that help you align your digital interactions with your manifestation practice and conscious awareness.",
+    desc: "We believe technology should serve your highest good, not scatter your energy. LoA helps you build intentional pauses into your day so you can align your attention with your manifestation practice and conscious awareness.",
     icon: <RiSecurePaymentFill className="w-8 h-8 text-[#505050]" />,
   },
   {
     id: 2,
     title: "Manifestation Through Action",
-    desc: "Every affirmation screen is an opportunity to align your actions with your aspirations. By practicing the Law of Attraction before digital distractions, you transform routine interactions into moments of conscious manifestation.",
+    desc: "Every affirmation screen is an opportunity to align your actions with your aspirations. By practicing the Law of Attraction as you move through your day, you turn ordinary moments into conscious manifestation.",
     icon: <MdOutlineWifiFind className="w-8 h-8 text-[#505050]" />,
   },
   {
     id: 3,
     title: "Privacy-First Approach",
-    desc: "Your manifestation journey and personal affirmations are yours alone. LoA keeps all data on your device, ensuring your path toward conscious digital living remains completely private and secure.",
+    desc: "Your manifestation journey and personal affirmations are yours alone. LoA is local-first by default, with optional secure sync when you use LoA across devices—so your practice stays private and under your control.",
     icon: <TbClockRecord className="w-8 h-8 text-[#505050]" />,
   },
 ];
@@ -57,7 +57,7 @@ export default function About() {
               transition={{ delay: 0.5, duration: 0.5 }}
               className="text-white text-h2 md:max-w-[70%] lg:mt-12 font-bold text-center"
             >
-              Transforming Digital Distractions Into Manifestation Moments
+              Transforming Intention Into Manifestation Moments
             </motion.h1>
             <motion.p
               initial={{ opacity: 0, scale: 1.25 }}
@@ -66,9 +66,9 @@ export default function About() {
               className="my-4 mb-6 text-white w-[80%] md:w-[60%] md:leading-8 text-center"
             >
               We believe technology should serve your highest good, not scatter
-              your energy. LoA helps you create conscious moments between
-              impulse and action, transforming digital distractions into
-              opportunities for manifestation and alignment.
+              your energy. LoA is a space for manifestation on your terms—so time
+              with your phone can become opportunity for alignment instead of
+              autopilot.
             </motion.p>
 
             <div className="mt-8 flex space-x-4">
@@ -96,10 +96,10 @@ export default function About() {
                 📱 Conscious Digital Alignment
               </h3>
               <p>
-                No judgment, just awareness. LoA tracks your digital energy
-                patterns and creates gentle interruptions that help you pause
-                and align with your manifestation goals before diving into
-                potentially energy-draining applications.
+                No judgment, just awareness. LoA does not monitor other apps or
+                interrupt them. Your practice lives inside LoA—affirmations,
+                streaks, and reflection—so you can pause and align with your
+                goals on your own terms.
               </p>
             </div>
             <div>
@@ -107,19 +107,21 @@ export default function About() {
                 🧘 Mindfulness Meets Manifestation
               </h3>
               <p>
-                Transform every digital interaction into an opportunity for
-                conscious growth. Our affirmation screens help you practice the
-                Law of Attraction and mindfulness, turning routine app opens
-                into moments of manifestation and energetic alignment.
+                Transform time with your phone into an opportunity for conscious
+                growth. Our affirmation screens help you practice the Law of
+                Attraction and mindfulness whenever you open LoA—moments of
+                manifestation and energetic alignment, without surveilling other
+                apps.
               </p>
             </div>
             <div>
               <h3 className="text-xl font-bold">📊 Insights Without Shame</h3>
               <p>
                 Knowledge is power, but only when it&apos;s used with
-                compassion. LoA provides clear insights into your digital energy
-                patterns without judgment, helping you make conscious decisions
-                about your digital alignment and manifestation practice.
+                compassion. LoA surfaces streaks, progress, and reflection
+                inside the app—without tracking how you use other
+                applications—so you can steer your manifestation practice with
+                clarity, not shame.
               </p>
               <p className="mt-2 font-semibold">
                 Because awareness is the first step toward conscious

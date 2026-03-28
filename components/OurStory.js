@@ -5,11 +5,11 @@ const story = [
   "Most apps are built to capture your attention and keep you scrolling.",
   "We built LoA to help you reclaim your digital energy — for your highest good.",
   "In a world where we're constantly distracted, what's often missing is conscious intention in our digital interactions.",
-  "We saw how people's energy was being scattered across endless notifications, mindless scrolling, and unconscious app usage — with no pause for reflection.",
+  "We saw how people's energy was being scattered across endless notifications, mindless scrolling, and unconscious phone habits — with no pause for reflection.",
   "So we built a new kind of digital companion. Consciousness by design. Energetically aligned.",
-  "A gentle guardian that creates sacred pauses between impulse and action, transforming digital distractions into manifestation moments.",
-  "With personalized affirmations and Law of Attraction principles, each phone interaction becomes an opportunity to align with your highest self and attract your desires.",
-  "LoA is where your digital habits serve your spiritual growth — not distract from it.",
+  "A gentle space for sacred pauses you choose—open LoA, breathe, and return to your affirmations without other apps being monitored or interrupted.",
+  "With personalized affirmations and Law of Attraction principles, time in LoA becomes an opportunity to align with your highest self and attract your desires.",
+  "LoA is where your practice serves your spiritual growth — not distraction from it.",
 ];
 
 const OurStory = () => {

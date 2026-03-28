@@ -5,7 +5,7 @@ const values = [
   {
     id: "01",
     title: "Consciousness Over Convenience",
-    desc: `Every digital interaction should serve your highest good, not scatter your energy. LoA creates intentional pauses that help you choose awareness over autopilot, transforming mindless habits into moments of conscious choice.<br /><span class="italic text-black/60">💡 Your attention is your most valuable resource — invest it wisely.</span>`,
+    desc: `Every moment with your phone can serve your highest good, not scatter your energy. LoA helps you build intentional pauses—inside the app—so you choose awareness over autopilot, without monitoring other applications.<br /><span class="italic text-black/60">💡 Your attention is your most valuable resource — invest it wisely.</span>`,
   },
   {
     id: "02",

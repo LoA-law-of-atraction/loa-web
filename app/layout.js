@@ -5,7 +5,7 @@ import StructuredData from "@/components/StructuredData";
 export const metadata = {
   title: "LoA - Law of Attraction for the Digital Age",
   description:
-    "LoA transforms your phone into a tool for conscious living. Practice the Law of Attraction with affirmation screens, digital mindfulness, and intentional awareness in every interaction.",
+    "LoA transforms your phone into a tool for conscious living. Practice the Law of Attraction with personalized affirmations, streaks, and reflection—your practice lives in LoA, without monitoring other apps.",
   metadataBase: new URL("https://www.loa-lawofattraction.co"),
   alternates: {
     canonical: "/",
@@ -39,7 +39,7 @@ export const metadata = {
   openGraph: {
     title: "LoA - Law of Attraction for the Digital Age",
     description:
-      "Transform digital distractions into moments of conscious awareness. Align your technology use with the Law of Attraction.",
+      "Build a daily Law of Attraction practice with affirmations and intention—inside LoA, on your terms.",
     url: "https://www.loa-lawofattraction.co",
     siteName: "LoA App",
     images: [
@@ -55,7 +55,7 @@ export const metadata = {
     site: "@LoAApp",
     title: "LoA - Law of Attraction for the Digital Age",
     description:
-      "Transform digital distractions into moments of conscious awareness. Align your technology use with the Law of Attraction.",
+      "Build a daily Law of Attraction practice with affirmations and intention—inside LoA, on your terms.",
     images: ["https://www.loa-lawofattraction.co/og.png"],
   },
   robots: {

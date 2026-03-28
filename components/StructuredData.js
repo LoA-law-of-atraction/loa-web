@@ -12,7 +12,7 @@ export default function StructuredData() {
             url: "https://loa-web-landing.vercel.app",
             logo: "https://loa-web-landing.vercel.app/app_logo.svg",
             description:
-              "LoA transforms your phone into a tool for conscious living. Practice the Law of Attraction with affirmation screens, digital mindfulness, and intentional awareness in every interaction.",
+              "LoA transforms your phone into a tool for conscious living. Practice the Law of Attraction with personalized affirmations and reflection—your practice lives in LoA, without monitoring other apps.",
             sameAs: ["https://twitter.com/LoAApp"],
           }),
         }}
@@ -37,7 +37,7 @@ export default function StructuredData() {
               ratingCount: "1000",
             },
             description:
-              "Transform digital distractions into moments of conscious awareness. Align your technology use with the Law of Attraction.",
+              "Build a daily Law of Attraction practice with affirmations and intention—inside LoA, on your terms.",
           }),
         }}
       />

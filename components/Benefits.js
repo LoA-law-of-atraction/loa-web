@@ -4,28 +4,28 @@ import { motion } from "framer-motion";
 export const features = [
   {
     id: "01",
-    title: "Conscious App Interruption",
-    desc: "Transform mindless scrolling into mindful moments. LoA gently interrupts app usage with personalized affirmations and manifestation reminders to keep you aligned with your highest self.",
+    title: "Affirmation-First Practice",
+    desc: "Build mindful moments on your terms. LoA delivers personalized affirmations and manifestation reminders inside the app—without monitoring or interrupting other apps.",
   },
   {
     id: "02",
     title: "Personalized Affirmation Screens",
-    desc: "Receive customized Law of Attraction affirmations based on your goals, energy patterns, and manifestation intentions. Each screen is designed to elevate your vibration and attract abundance.",
+    desc: "Receive customized Law of Attraction affirmations based on your goals and manifestation intentions. Each screen is designed to elevate your vibration and attract abundance.",
   },
   {
     id: "03",
-    title: "Digital Energy Tracking",
-    desc: "Monitor your digital energy patterns and see how your phone usage affects your manifestation practice. Gain insights into when you're most aligned and when you need energetic realignment.",
+    title: "Momentum & Streaks",
+    desc: "Stay consistent with streaks and progress you can see in LoA. Reflect on your practice over time—without tracking how you use other applications.",
   },
   {
     id: "04",
     title: "Manifestation Goal Integration",
-    desc: "Connect your digital habits with your manifestation goals. LoA helps you stay focused on attracting your desires by creating conscious pauses before potentially energy-draining activities.",
+    desc: "Connect your affirmations with your life goals. Use reminders and widgets to return to LoA when you want a conscious reset.",
   },
   {
     id: "05",
     title: "Visualization & Vision Board Tools",
-    desc: "Access powerful visualization exercises and digital vision boards during app interruptions. Turn every digital interaction into an opportunity to visualize and attract your dream life.",
+    desc: "Access visualization exercises and digital vision boards within your LoA sessions. Visualize and attract your dream life with tools you open on purpose.",
   },
   {
     id: "06",
@@ -68,10 +68,9 @@ const Benefits = () => {
               !
             </h3>
             <p className="mt-5 text-justify md:max-w-[60%] md:text-center">
-              Every digital interaction becomes an opportunity for conscious
-              growth. LoA transforms mindless scrolling into mindful
-              manifestation moments, helping you align your technology use with
-              your spiritual journey and attract your desires.
+              Every session in LoA is an opportunity for conscious growth. Build a
+              mindful manifestation practice you choose to open—aligned with your
+              spiritual journey and the life you want to attract.
             </p>
           </article>
         </div>

@@ -5,6 +5,9 @@ import Image from "next/image";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePathname } from "next/navigation";
+import { onAuthStateChanged } from "firebase/auth";
+import { CircleUserRound } from "lucide-react";
+import { auth } from "@/utils/firebase";
 
 const NAV_LINKS = [
   { href: "/features", label: "Features" },
@@ -16,6 +19,8 @@ const NAV_LINKS = [
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [userLabel, setUserLabel] = useState("");
+  const [userPhotoUrl, setUserPhotoUrl] = useState("");
   const pathname = usePathname();
 
   // Lock body scroll when drawer is open
@@ -24,10 +29,19 @@ const Navbar = () => {
     return () => { document.body.style.overflow = ""; };
   }, [isOpen]);
 
-  const isActive = (path) =>
-    pathname === path
-      ? "bg-gradient-to-r from-[#3949AB] to-[#6A1B9A] bg-clip-text text-transparent font-semibold"
-      : "text-white/80";
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (!user || user.isAnonymous) {
+        setUserLabel("");
+        setUserPhotoUrl("");
+        return;
+      }
+      const label = user.displayName || user.email || `user:${user.uid.slice(0, 8)}`;
+      setUserLabel(label);
+      setUserPhotoUrl(user.photoURL || "");
+    });
+    return () => unsub();
+  }, []);
 
   const navbarVariants = {
     hidden: { opacity: 0, y: -50 },
@@ -71,12 +85,32 @@ const Navbar = () => {
                 </li>
               ))}
             </ul>
-            <Link
-              href="/login"
-              className="rounded-lg px-4 py-2 font-medium transition-colors bg-white text-black hover:bg-gray-100"
-            >
-              Sign in
-            </Link>
+            {userLabel ? (
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center gap-2 rounded-lg px-3 py-2 border border-white/15 bg-white/5 text-white/90 hover:bg-white/10 transition-colors max-w-[240px]"
+                title={userLabel}
+              >
+                {userPhotoUrl ? (
+                  <img
+                    src={userPhotoUrl}
+                    alt={userLabel}
+                    className="w-5 h-5 rounded-full shrink-0 object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <CircleUserRound className="w-4 h-4 shrink-0 text-white/80" />
+                )}
+                <span className="text-sm truncate">{userLabel}</span>
+              </Link>
+            ) : (
+              <Link
+                href="/login"
+                className="rounded-lg px-4 py-2 font-medium transition-colors bg-white text-black hover:bg-gray-100"
+              >
+                Sign in
+              </Link>
+            )}
           </div>
 
           {/* Mobile hamburger */}
@@ -190,18 +224,39 @@ const Navbar = () => {
 
               {/* CTA */}
               <div className="px-6 pt-3 pb-10">
-                <Link
-                  href="/login"
-                  onClick={() => setIsOpen(false)}
-                  className="block w-full text-center py-[14px] rounded-2xl font-semibold text-[15px] text-white transition-opacity hover:opacity-90 active:scale-[0.98]"
-                  style={{
-                    background:
-                      "linear-gradient(135deg, #3949AB 0%, #6A1B9A 100%)",
-                    boxShadow: "0 4px 24px rgba(57, 73, 171, 0.35)",
-                  }}
-                >
-                  Sign in
-                </Link>
+                {userLabel ? (
+                  <Link
+                    href="/dashboard"
+                    onClick={() => setIsOpen(false)}
+                    className="w-full rounded-2xl border border-white/15 bg-white/5 px-4 py-3.5 text-white/90 hover:bg-white/10 transition-colors inline-flex items-center justify-center gap-2"
+                    title={userLabel}
+                  >
+                    {userPhotoUrl ? (
+                      <img
+                        src={userPhotoUrl}
+                        alt={userLabel}
+                        className="w-[18px] h-[18px] rounded-full shrink-0 object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <CircleUserRound className="w-4 h-4 shrink-0 text-white/80" />
+                    )}
+                    <span className="truncate">{userLabel}</span>
+                  </Link>
+                ) : (
+                  <Link
+                    href="/login"
+                    onClick={() => setIsOpen(false)}
+                    className="block w-full text-center py-[14px] rounded-2xl font-semibold text-[15px] text-white transition-opacity hover:opacity-90 active:scale-[0.98]"
+                    style={{
+                      background:
+                        "linear-gradient(135deg, #3949AB 0%, #6A1B9A 100%)",
+                      boxShadow: "0 4px 24px rgba(57, 73, 171, 0.35)",
+                    }}
+                  >
+                    Sign in
+                  </Link>
+                )}
               </div>
             </motion.div>
           </>

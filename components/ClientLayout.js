@@ -16,6 +16,7 @@ export default function ClientLayout({ children }) {
   const pathname = usePathname();
   const isAdminPage = pathname?.startsWith("/admin");
   const isDashboardPage = pathname?.startsWith("/dashboard");
+  const isPricingPage = pathname === "/pricing";
 
   const pageVariants = {
     initial: { opacity: 0, x: -100 },
@@ -48,7 +49,7 @@ export default function ClientLayout({ children }) {
       </header>
 
       <motion.main
-        className="w-full mx-auto py-8 relative z-10"
+        className={`w-full mx-auto relative z-10 ${isPricingPage ? "bg-black" : "py-8"}`}
         variants={pageVariants}
         initial="initial"
         animate="animate"

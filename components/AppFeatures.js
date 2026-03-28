@@ -18,9 +18,9 @@ const features = [
   },
   {
     icon: <Target className="w-8 h-8" />,
-    title: "Conscious Interruption",
+    title: "Intentional Check-Ins",
     description:
-      "Transform digital impulses into moments of awareness. Pause, breathe, and align with your highest intentions.",
+      "Transform impulse into awareness on your terms. Open LoA, pause, breathe, and align with your highest intentions.",
   },
   {
     icon: <Brain className="w-8 h-8" />,
@@ -36,9 +36,9 @@ const features = [
   },
   {
     icon: <Smartphone className="w-8 h-8" />,
-    title: "Intentional App Selection",
+    title: "Your Practice, Your Rhythm",
     description:
-      "Choose where you want mindful interruption so your attention stays with what serves your highest good.",
+      "Set reminders and keep LoA within reach—without surveillance of other apps—so your attention returns to what serves your highest good.",
   },
   {
     icon: <BarChart3 className="w-8 h-8" />,

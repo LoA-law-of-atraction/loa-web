@@ -15,7 +15,7 @@ const testimonials = [
     role: "Life Coach & Author",
     avatar: "/avatars/marcus.jpg",
     rating: 5,
-    text: "This app perfectly bridges ancient wisdom with modern technology. The affirmation interruptions have helped me become so much more conscious of my energy. I'm attracting better opportunities because I'm more aligned with my desires.",
+    text: "This app perfectly bridges ancient wisdom with modern technology. The affirmation moments in LoA have helped me become so much more conscious of my energy. I'm attracting better opportunities because I'm more aligned with my desires.",
   },
   {
     name: "Emma Thompson",

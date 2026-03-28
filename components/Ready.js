@@ -3,12 +3,12 @@ import { motion } from "framer-motion";
 import AppStoreDownloadButton from "./AppStoreDownloadButton";
 import GooglePlayDownloadButton from "./GooglePlayDownloadButton";
 
-const ReadyToStart = () => {
+const ReadyToStart = ({ dark = false }) => {
   return (
     <motion.section
       initial={{ opacity: 0 }}
       animate={{ opacity: 1, transition: { duration: 0.8 } }}
-      className="relative z-10 w-full bg-white text-gray-900"
+      className={`relative z-10 w-full ${dark ? "bg-black text-white" : "bg-white text-gray-900"}`}
     >
       <article className="container mx-auto pb-14 md:pb-32 p-4 px-5 md:px-[5%] 2xl:px-0 max-w-[1200px] flex flex-col md:flex-row items-start justify-between gap-12">
         <div className="flex flex-col gap-8 items-start justify-center">

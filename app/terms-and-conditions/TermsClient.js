@@ -43,11 +43,11 @@ const TermsClient = () => {
             <h2 className="text-lg font-bold mt-6">1. Overview</h2>
             <p className="text-base">
               LoA is a Law of Attraction and conscious digital living tool that
-              helps users transform digital distractions into manifestation
-              moments. The app interrupts potentially energy-draining app usage
-              with personalized affirmations, breathing exercises, and
-              mindfulness prompts to promote conscious awareness and intentional
-              living.
+              helps users practice personalized affirmations, build streaks, and
+              reflect on their goals. LoA does not monitor other apps or
+              interrupt them; your practice takes place inside the app with
+              optional reminders or shortcuts you choose, plus mindfulness
+              prompts that support intentional living.
             </p>
 
             <h2 className="text-lg font-bold mt-6">2. Eligibility</h2>
@@ -78,11 +78,12 @@ const TermsClient = () => {
 
             <h2 className="text-lg font-bold mt-6">4. Permissions</h2>
             <p className="text-base">
-              LoA may request specific system permissions (such as Usage Access
-              or Overlay permissions) to detect when you open certain apps and
-              display mindful prompts. These permissions are used only to show
-              affirmations or pause screens — LoA does not access or read your
-              personal data, messages, or browsing history.
+              LoA may request permissions needed for core features—for example,
+              notifications for reminders, or storage for your content. LoA does
+              not require access to detect or monitor other apps in order to
+              deliver affirmations. Any permission is used only as described in
+              the app and in our Privacy Policy; LoA does not read your
+              messages or browsing history.
             </p>
 
             <h2 className="text-lg font-bold mt-6">

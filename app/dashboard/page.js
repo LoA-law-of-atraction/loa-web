@@ -35,6 +35,7 @@ import {
   uploadAffirmationImages,
   deleteAffirmationImage,
 } from "@/utils/loaCloudSync";
+import { useRevenueCat } from "@/contexts/RevenueCatContext";
 
 const tabs = [
   { id: "home", label: "Overview", icon: House },
@@ -209,6 +210,7 @@ function TemplateSelect({ value, onChange, defaultTemplates, label, variant = "m
 }
 
 function DashboardContent() {
+  const { isPro } = useRevenueCat();
   const router = useRouter();
   const searchParams = useSearchParams();
   const tabFromUrl = searchParams.get("tab");
@@ -348,6 +350,34 @@ function DashboardContent() {
     [affirmations],
   );
 
+  const totalImageCount = useMemo(
+    () =>
+      affirmations.reduce((sum, item) => {
+        if (Array.isArray(item.imageUrls) && item.imageUrls.length > 0) return sum + item.imageUrls.length;
+        if (item.imageUrl) return sum + 1;
+        return sum;
+      }, 0),
+    [affirmations],
+  );
+
+  const isFreeWebUser = !isPro;
+  const freeWebAffirmationLimitReached = isFreeWebUser && affirmations.length >= 1;
+  const freeWebImageLimitReached = isFreeWebUser && totalImageCount >= 1;
+  const freeWebLimits = isFreeWebUser ? { maxAffirmations: 1, maxImages: 1 } : {};
+
+  const getFreeWebLimitError = ({ affirmationDelta = 0, imageDelta = 0, currentEditingImageCount = 0 } = {}) => {
+    if (!isFreeWebUser) return "";
+    if (affirmations.length + affirmationDelta > 1) {
+      return "Free web plan allows only 1 affirmation. Upgrade to create more.";
+    }
+    if (imageDelta <= 0) return "";
+    const effectiveImageCount = totalImageCount - currentEditingImageCount;
+    if (effectiveImageCount + imageDelta > 1) {
+      return "Free web plan allows only 1 image total. Remove the current image or upgrade to add more.";
+    }
+    return "";
+  };
+
   const refreshCloud = async () => {
     if (!uid) return;
     const cloud = await fetchLoACloudData(uid);
@@ -376,6 +406,14 @@ function DashboardContent() {
   const addAffirmation = async () => {
     const content = newAffirmation.content.trim();
     if (!content || !uid) return;
+    const limitError = getFreeWebLimitError({
+      affirmationDelta: 1,
+      imageDelta: newAffirmation.files.length,
+    });
+    if (limitError) {
+      setError(limitError);
+      return;
+    }
     await withSaving(async () => {
       await createAffirmation(uid, {
         content,
@@ -383,7 +421,7 @@ function DashboardContent() {
         isFavorite: newAffirmation.isFavorite,
         affirmCount: 0,
         files: newAffirmation.files,
-      });
+      }, freeWebLimits);
       setNewAffirmation({ content: "", category: "", isFavorite: false, files: [] });
       newAffirmationImagePreviews.forEach((url) => URL.revokeObjectURL(url));
       setNewAffirmationImagePreviews([]);
@@ -392,6 +430,10 @@ function DashboardContent() {
   };
 
   const generateAffirmationWithAI = async () => {
+    if (isFreeWebUser) {
+      setError("AI affirmation generation is available on paid plans only.");
+      return;
+    }
     const intention = manifestInput.trim();
     if (!intention) {
       setError("Enter what you want to manifest first.");
@@ -422,6 +464,14 @@ function DashboardContent() {
 
   const saveAiAffirmation = async () => {
     if (!aiGenerated?.content?.trim() || !uid) return;
+    const limitError = getFreeWebLimitError({
+      affirmationDelta: 1,
+      imageDelta: aiAffirmationFiles.length,
+    });
+    if (limitError) {
+      setError(limitError);
+      return;
+    }
     await withSaving(async () => {
       await createAffirmation(uid, {
         content: aiGenerated.content.trim(),
@@ -429,7 +479,7 @@ function DashboardContent() {
         isFavorite: false,
         affirmCount: 0,
         files: aiAffirmationFiles,
-      });
+      }, freeWebLimits);
       aiAffirmationImagePreviews.forEach((url) => URL.revokeObjectURL(url));
       setAiGenerated(null);
       setAiAffirmationFiles([]);
@@ -464,9 +514,21 @@ function DashboardContent() {
   };
 
   const handleAffirmationImageSelect = (files, append = false) => {
-    const selected = Array.from(files || [])
+    let selected = Array.from(files || [])
       .filter(Boolean)
       .filter((f) => f.type?.startsWith?.("image/"));
+    if (isFreeWebUser) {
+      const currentDraftCount = append ? newAffirmation.files.length : 0;
+      const remainingSlots = Math.max(0, 1 - totalImageCount - currentDraftCount);
+      if (remainingSlots <= 0 && selected.length > 0) {
+        setError("Free web plan allows only 1 image total. Upgrade to add more.");
+        return;
+      }
+      if (selected.length > remainingSlots) {
+        selected = selected.slice(0, remainingSlots);
+        setError("Free web plan allows only 1 image total on web.");
+      }
+    }
     if (!selected.length) {
       if (!append) {
         newAffirmationImagePreviews.forEach((url) => URL.revokeObjectURL(url));
@@ -496,6 +558,10 @@ function DashboardContent() {
   };
 
   const handleAiAffirmationImageSelect = (files, append = false) => {
+    if (isFreeWebUser) {
+      setError("AI affirmation generation is available on paid plans only.");
+      return;
+    }
     const selected = Array.from(files || [])
       .filter(Boolean)
       .filter((f) => f.type?.startsWith?.("image/"));
@@ -702,9 +768,22 @@ function DashboardContent() {
   };
 
   const handleEditingNewImages = (files, append = false) => {
-    const selected = Array.from(files || [])
+    let selected = Array.from(files || [])
       .filter(Boolean)
       .filter((f) => f.type?.startsWith?.("image/"));
+    if (isFreeWebUser) {
+      const currentEditingCount = editingImageUrls.length;
+      const currentNewCount = append ? editingNewFiles.length : 0;
+      const remainingSlots = Math.max(0, 1 - (totalImageCount - currentEditingCount) - currentNewCount);
+      if (remainingSlots <= 0 && selected.length > 0) {
+        setError("Free web plan allows only 1 image total. Remove the current image or upgrade to add more.");
+        return;
+      }
+      if (selected.length > remainingSlots) {
+        selected = selected.slice(0, remainingSlots);
+        setError("Free web plan allows only 1 image total on web.");
+      }
+    }
     if (!selected.length) {
       if (!append) {
         setEditingNewPreviews((prev) => {
@@ -736,6 +815,14 @@ function DashboardContent() {
 
   const saveEditAffirmation = async () => {
     if (!editingAffirmationDocId || !uid) return;
+    const limitError = getFreeWebLimitError({
+      imageDelta: editingNewFiles.length,
+      currentEditingImageCount: editingImageUrls.length,
+    });
+    if (limitError) {
+      setError(limitError);
+      return;
+    }
     await withSaving(async () => {
       const keptPaths = [...editingCloudImagePaths];
       let finalPaths = [...keptPaths];
@@ -744,7 +831,8 @@ function DashboardContent() {
           uid,
           editingAffirmationDocId,
           editingNewFiles,
-          finalPaths.length
+          finalPaths.length,
+          freeWebLimits
         );
         finalPaths = [...finalPaths, ...newPaths];
       }
@@ -752,7 +840,7 @@ function DashboardContent() {
         content: editingContent.trim() || "",
         category: editingCategory.trim() || "",
         cloudImagePaths: finalPaths,
-      });
+      }, freeWebLimits);
       setAffirmations((prev) =>
         prev.map((a) => {
           if (a.docId !== editingAffirmationDocId) return a;
@@ -895,6 +983,11 @@ function DashboardContent() {
                 />
               )}
               <div className="space-y-3">
+                {isFreeWebUser && (
+                  <div className="rounded-xl border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200/85">
+                    Free web users can create 1 affirmation with 1 image total. Upgrade for more.
+                  </div>
+                )}
                 <textarea
                   value={newAffirmation.content}
                   onChange={(e) => setNewAffirmation((s) => ({ ...s, content: e.target.value }))}
@@ -935,7 +1028,9 @@ function DashboardContent() {
                         Vision Images
                       </p>
                       <p className="text-[11px] text-white/40 mt-1">
-                        Add multiple images (drag & drop, select files, paste URL, or Ctrl+V).
+                        {isFreeWebUser
+                          ? "Free web: 1 image total."
+                          : "Add multiple images (drag & drop, select files, paste URL, or Ctrl+V)."}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -967,7 +1062,7 @@ function DashboardContent() {
                     ref={newAffirmationImageInputRef}
                     type="file"
                     accept="image/*"
-                    multiple
+                    multiple={!isFreeWebUser}
                     className="hidden"
                     onChange={(e) => {
                       const list = e.target.files;
@@ -1047,10 +1142,10 @@ function DashboardContent() {
               </div>
               <button
                 onClick={addAffirmation}
-                disabled={saving}
+                disabled={saving || freeWebAffirmationLimitReached}
                 className="w-full rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-400 hover:to-indigo-400 text-white px-3 py-2.5 text-sm font-semibold disabled:opacity-50 transition-all shadow-lg shadow-purple-500/20"
               >
-                {saving ? "Saving..." : "Create Affirmation"}
+                {saving ? "Saving..." : freeWebAffirmationLimitReached ? "Free limit reached" : "Create Affirmation"}
               </button>
             </div>
 
@@ -1064,7 +1159,9 @@ function DashboardContent() {
                 </div>
                 <div>
                   <h2 className="font-tiempos text-lg font-semibold text-white leading-tight">Generate with AI</h2>
-                  <p className="text-[11px] text-white/35 mt-0.5">Describe your intention, receive an affirmation</p>
+                  <p className="text-[11px] text-white/35 mt-0.5">
+                    {isFreeWebUser ? "Paid plans only on web" : "Describe your intention, receive an affirmation"}
+                  </p>
                 </div>
               </div>
 
@@ -1086,11 +1183,12 @@ function DashboardContent() {
                   onKeyDown={(e) => e.key === "Enter" && !generatingAffirmation && manifestInput.trim() && generateAffirmationWithAI()}
                   placeholder="What do you want to manifest?"
                   className="w-full rounded-xl bg-black/40 border border-amber-400/15 px-4 py-3.5 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-amber-400/40 focus:bg-black/50 transition-all pr-28"
+                  disabled={isFreeWebUser}
                 />
                 <button
                   type="button"
                   onClick={generateAffirmationWithAI}
-                  disabled={generatingAffirmation || !manifestInput.trim()}
+                  disabled={generatingAffirmation || !manifestInput.trim() || isFreeWebUser}
                   className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:bg-amber-500/25 disabled:text-black/40 disabled:cursor-not-allowed text-black font-semibold text-xs px-3 py-1.5 transition-all"
                 >
                   {generatingAffirmation ? "…" : "Generate"}

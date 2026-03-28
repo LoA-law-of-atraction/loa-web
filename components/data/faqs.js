@@ -1,44 +1,54 @@
 const faqs = [
   {
     question: "What is LoA and how does it work?",
-    answer: "LoA (Law of Attraction) is an app that brings ancient manifestation principles into your digital life. When you try to open distracting apps, LoA pauses the action and shows you a personalized affirmation screen. This creates a moment of conscious awareness where you can align with your intentions before proceeding, transforming mindless scrolling into mindful manifestation practice."
+    answer:
+      "LoA (Law of Attraction) is an app that brings ancient manifestation principles into your digital life. You create personalized affirmations, build streaks, and return to LoA when you want alignment—using reminders and home screen shortcuts where your device supports them. LoA does not monitor other apps or interrupt them; your practice happens inside the app, on your terms.",
   },
   {
-    question: "How does the Law of Attraction apply to phone usage?",
-    answer: "The Law of Attraction teaches that our thoughts and energy shape our reality. Most phone usage is unconscious and scatters our energy toward things we don't actually want more of (anxiety, comparison, distraction). LoA helps you redirect that energy consciously toward what you DO want to attract - abundance, peace, focus, and intentional living."
+    question: "How does the Law of Attraction apply to phone habits?",
+    answer:
+      "The Law of Attraction teaches that our thoughts and energy shape our reality. Unconscious phone habits can scatter our energy toward what we do not want (anxiety, comparison, distraction). LoA helps you redirect that energy consciously—through affirmations and reflection—toward abundance, peace, focus, and intentional living.",
   },
   {
-    question: "What apps can LoA monitor and intercept?",
-    answer: "You can choose which apps to monitor based on your personal goals. Most users select social media apps (Instagram, TikTok, Facebook), entertainment apps (YouTube, Netflix), and games that tend to create mindless scrolling. LoA gives you full control over which apps get the affirmation treatment."
+    question: "Does LoA monitor or block other apps?",
+    answer:
+      "No. LoA does not track which apps you use, show overlays before other apps open, or block access. Your affirmations and practice live inside LoA. You can use reminders or shortcuts to make returning to your practice easy—without surveillance of the rest of your phone.",
   },
   {
     question: "Can I customize my affirmations?",
-    answer: "Absolutely! This is where LoA becomes truly powerful. You can create personalized affirmations that align with your specific manifestation goals - whether that's attracting love, abundance, career success, or inner peace. The app shows these affirmations at the perfect moment when you're about to engage with potentially distracting content."
+    answer:
+      "Absolutely. You can create personalized affirmations that align with your manifestation goals—love, abundance, career success, inner peace, and more. They appear when you engage with LoA, so you can realign with your intentions whenever you choose to open the app.",
   },
   {
     question: "Is my data and personal affirmations private?",
-    answer: "Yes, completely. Your manifestation journey is deeply personal, so LoA keeps all data on your device. Your affirmations, app usage patterns, and insights never leave your phone. This isn't just about privacy - it's about maintaining the sacred nature of your personal growth work."
+    answer:
+      "Yes, completely. Your manifestation journey is deeply personal. LoA is local-first by default; plans that include cloud backup and cross-device sync store your affirmations securely so your devices can stay aligned. LoA does not use your usage of other apps as part of how the product works. This is not just about privacy—it is about keeping your growth work sacred.",
   },
   {
-    question: "Will LoA completely block my apps?",
-    answer: "No, LoA doesn't block apps - it creates conscious choice. After viewing your affirmation, you can choose to continue with the app or redirect your energy elsewhere. The goal isn't restriction but awareness. Many users find that after seeing their affirmation, they naturally choose more aligned activities."
+    question: "Will LoA stop me from using certain apps?",
+    answer:
+      "No. LoA is not an app blocker. It is a space for affirmations and conscious practice. You stay in control of when you open LoA and how you use the rest of your phone.",
   },
   {
     question: "How quickly will I see results with manifestation?",
-    answer: "The Law of Attraction works through consistency and belief. Some users notice shifts in their energy and awareness immediately, while manifestation of specific desires varies. The key is that each affirmation moment builds your manifestation 'muscle' and keeps you aligned with your intentions throughout the day."
+    answer:
+      "The Law of Attraction works through consistency and belief. Some users notice shifts in awareness quickly, while specific desires unfold on their own timeline. Each session in LoA strengthens your alignment and keeps your intentions present.",
   },
   {
     question: "Do I need to believe in the Law of Attraction for this to work?",
-    answer: "While belief amplifies results, even skeptics benefit from LoA's core function: creating pauses for conscious decision-making. At minimum, you'll develop more intentional phone habits. At maximum, you'll transform your relationship with technology into a daily manifestation practice."
+    answer:
+      "While belief amplifies results, even skeptics benefit from pausing for conscious choice and clear intentions. At minimum, you can build a more intentional relationship with your attention. At best, you turn LoA into a daily manifestation practice.",
   },
   {
     question: "Can I use LoA for goals beyond reducing screen time?",
-    answer: "Absolutely! LoA is designed for manifestation, not just screen time management. Users create affirmations for attracting relationships, career opportunities, health, abundance, and personal growth. Every time you see your affirmation, you're programming your subconscious and aligning your energy with your desires."
+    answer:
+      "Yes. LoA is for manifestation, not only screen-time management. Users create affirmations for relationships, career, health, abundance, and growth. Every time you open LoA, you can reinforce what you want to attract.",
   },
   {
-    question: "Is there a premium version with additional features?",
-    answer: "Yes, LoA Premium includes advanced manifestation tools like guided visualization sessions, manifestation tracking, multiple affirmation sets for different life areas, detailed energy insights, and exclusive content on Law of Attraction principles and practices."
-  }
+    question: "Are there paid plans with additional features?",
+    answer:
+      "Yes. Paid tiers add features such as AI-assisted affirmations (monthly limits vary by plan), cloud backup, cross-device sync, advanced templates, and expanded insights—see the Pricing page and in-app details for current offerings.",
+  },
 ];
 
 export default faqs;

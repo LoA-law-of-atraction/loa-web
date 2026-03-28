@@ -7,6 +7,8 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import {
   Bug,
+  CircleUserRound,
+  Crown,
   FileText,
   GalleryHorizontalEnd,
   House,
@@ -14,15 +16,22 @@ import {
   LogOut,
   Menu,
   Sparkles,
+  UserPen,
   X,
 } from "lucide-react";
 import { auth } from "@/utils/firebase";
+import { debugLoaAuth } from "@/utils/debugLoaAuth";
 
 const tabs = [
   { id: "home", label: "Overview", icon: House, href: "/dashboard?tab=home" },
   { id: "affirmations", label: "Affirmations", icon: Sparkles, href: "/dashboard?tab=affirmations" },
   { id: "templates", label: "Templates", icon: FileText, href: "/dashboard/templates" },
   { id: "gallery", label: "Gallery", icon: GalleryHorizontalEnd, href: "/dashboard?tab=gallery" },
+];
+
+const accountMenuLinks = [
+  { href: "/dashboard/profile", label: "Edit account", icon: UserPen },
+  { href: "/dashboard/subscription", label: "Subscription", icon: Crown },
 ];
 
 function tabIsActive(pathname, searchParams, tab) {
@@ -40,38 +49,95 @@ function DashboardShellInner({ children }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [userLabel, setUserLabel] = useState("");
+  const [userPhotoUrl, setUserPhotoUrl] = useState("");
   const [debugMenuOpen, setDebugMenuOpen] = useState(false);
   const [showPaywallDemo, setShowPaywallDemo] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const debugMenuRef = useRef(null);
+  const accountMenuRef = useRef(null);
 
   const isPreviewRoute = pathname?.startsWith("/dashboard/preview");
 
+  /**
+   * Firebase can report user=null briefly before persisted session restores. Without waiting for
+   * authStateReady(), we incorrectly send signed-in users to /login (breaks pricing → subscription).
+   */
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => {
-      if (!user || user.isAnonymous) {
-        setUserLabel("");
-        const query = searchParams?.toString();
-        const currentPath = pathname || "/dashboard";
-        const redirectTarget = query ? `${currentPath}?${query}` : currentPath;
-        router.replace(`/login?redirect=${encodeURIComponent(redirectTarget)}`);
-        return;
+    let cancelled = false;
+    let unsub = () => {};
+
+    (async () => {
+      debugLoaAuth("dashboard-shell", "auth effect start", {
+        pathname,
+        search: searchParams?.toString?.() ?? "",
+      });
+      if (typeof auth.authStateReady === "function") {
+        await auth.authStateReady();
       }
-      setUserLabel(user.email || `user:${user.uid.slice(0, 8)}`);
-    });
-    return () => unsub();
+      if (cancelled) return;
+
+      debugLoaAuth("dashboard-shell", "authStateReady resolved", {
+        currentUser: auth.currentUser
+          ? {
+              uid: auth.currentUser.uid,
+              isAnonymous: auth.currentUser.isAnonymous,
+              email: auth.currentUser.email,
+            }
+          : null,
+      });
+
+      const applyUser = (user) => {
+        if (cancelled) return;
+        debugLoaAuth("dashboard-shell", "applyUser", {
+          hasUser: !!user,
+          isAnonymous: user?.isAnonymous ?? null,
+          uid: user?.uid ?? null,
+        });
+        if (!user || user.isAnonymous) {
+          setUserLabel("");
+          setUserPhotoUrl("");
+          const query = searchParams?.toString();
+          const currentPath = pathname || "/dashboard";
+          const redirectTarget = query ? `${currentPath}?${query}` : currentPath;
+          const loginUrl = `/login?redirect=${encodeURIComponent(redirectTarget)}`;
+          debugLoaAuth("dashboard-shell", "redirect → login (no user or anonymous)", {
+            redirectTarget,
+            loginUrl,
+          });
+          router.replace(loginUrl);
+          return;
+        }
+        setUserLabel(user.email || `user:${user.uid.slice(0, 8)}`);
+        setUserPhotoUrl(user.photoURL || "");
+        debugLoaAuth("dashboard-shell", "session ok, staying on dashboard", {
+          uid: user.uid,
+        });
+      };
+
+      applyUser(auth.currentUser);
+      if (cancelled) return;
+      unsub = onAuthStateChanged(auth, applyUser);
+    })();
+
+    return () => {
+      cancelled = true;
+      unsub();
+    };
   }, [pathname, router, searchParams]);
 
   useEffect(() => {
     const onOutside = (e) => {
       if (debugMenuRef.current && !debugMenuRef.current.contains(e.target)) setDebugMenuOpen(false);
+      if (accountMenuRef.current && !accountMenuRef.current.contains(e.target)) setAccountMenuOpen(false);
     };
-    if (debugMenuOpen) document.addEventListener("click", onOutside);
+    if (debugMenuOpen || accountMenuOpen) document.addEventListener("click", onOutside);
     return () => document.removeEventListener("click", onOutside);
-  }, [debugMenuOpen]);
+  }, [accountMenuOpen, debugMenuOpen]);
 
   useEffect(() => {
     setMobileMenuOpen(false);
+    setAccountMenuOpen(false);
   }, [pathname, searchParams]);
 
   const handleLogout = async () => {
@@ -89,7 +155,7 @@ function DashboardShellInner({ children }) {
     <div className="min-h-screen bg-black bg-[radial-gradient(ellipse_at_top,_rgba(88,28,135,0.10)_0%,_transparent_55%)]">
       <nav className="fixed top-0 left-0 right-0 z-50 bg-black/85 backdrop-blur-md border-b border-white/8">
         <div className="h-14 md:h-16 max-w-7xl mx-auto px-3 md:px-4 flex items-center justify-between gap-2">
-          <Link href="/dashboard" className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-2">
             <Image src="/app_logo.svg" alt="LoA" width={28} height={28} className="rounded-lg" />
             <span className="text-white font-bold text-lg hidden sm:block">LoA</span>
           </Link>
@@ -152,15 +218,44 @@ function DashboardShellInner({ children }) {
                 </div>
               )}
             </div>
-            <Link
-              href="/dashboard/profile"
-              className={`hidden sm:block rounded-full px-2.5 md:px-3 py-1.5 text-xs bg-white/5 border border-white/10 text-white/70 hover:text-white/90 hover:bg-white/10 transition-colors min-w-0 max-w-[42vw] sm:max-w-[220px] truncate ${
-                onProfile ? "ring-1 ring-purple-500/40" : ""
-              }`}
-              title="Account settings"
-            >
-              {userLabel}
-            </Link>
+            <div className="relative hidden sm:block" ref={accountMenuRef}>
+              <button
+                type="button"
+                onClick={() => setAccountMenuOpen((v) => !v)}
+                className={`inline-flex items-center gap-2 rounded-full px-2.5 md:px-3 py-1.5 text-xs bg-white/5 border border-white/10 text-white/70 hover:text-white/90 hover:bg-white/10 transition-colors min-w-0 max-w-[42vw] sm:max-w-[220px] ${
+                  onProfile ? "ring-1 ring-purple-500/40" : ""
+                }`}
+                title="Account settings"
+                aria-expanded={accountMenuOpen}
+                aria-haspopup="menu"
+              >
+                {userPhotoUrl ? (
+                  <img
+                    src={userPhotoUrl}
+                    alt={userLabel}
+                    className="w-4 h-4 rounded-full shrink-0 object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <CircleUserRound className="w-4 h-4 shrink-0 text-white/60" />
+                )}
+                <span className="truncate">{userLabel}</span>
+              </button>
+              {accountMenuOpen && (
+                <div className="absolute right-0 top-full mt-1.5 w-52 rounded-xl border border-white/10 bg-black/95 backdrop-blur py-1 shadow-xl z-50">
+                  {accountMenuLinks.map(({ href, label, icon: Icon }) => (
+                    <Link
+                      key={href}
+                      href={href}
+                      className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-left text-white/90 hover:bg-white/10 transition-colors"
+                    >
+                      <Icon className="h-4 w-4 text-white/60" />
+                      {label}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
             <button
               onClick={handleLogout}
               className="text-white/70 hover:text-red-400 transition-colors p-1.5 md:p-2 shrink-0"
@@ -201,8 +296,20 @@ function DashboardShellInner({ children }) {
                     : "text-white/75 hover:text-white hover:bg-white/8"
                 }`}
               >
-                <span>Account settings</span>
-                <span className="text-xs text-white/45 truncate max-w-[55vw]">{userLabel}</span>
+                <span className="inline-flex items-center gap-2 min-w-0">
+                  {userPhotoUrl ? (
+                    <img
+                      src={userPhotoUrl}
+                      alt={userLabel}
+                      className="w-4 h-4 rounded-full shrink-0 object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <CircleUserRound className="w-4 h-4 shrink-0 text-white/60" />
+                  )}
+                  <span>Account settings</span>
+                </span>
+                <span className="text-xs text-white/45 truncate max-w-[50vw]">{userLabel}</span>
               </Link>
             </div>
           </div>

@@ -4,7 +4,7 @@ import "../globals.css";
 import { useEffect } from "react";
 import { motion } from "framer-motion";
 import Testimonial from "@/components/Testimonial";
-import FaqsWhite from "@/components/FaqsWhite";
+import Faqs from "@/components/Faqs";
 import Feature from "@/components/Features";
 import ReadyToStart from "@/components/Ready";
 import SolarSystemBackground from "@/components/SolarSystemBackground";
@@ -21,9 +21,9 @@ export default function Features() {
 
       <div className="pt-20">
         <Feature />
-        <ReadyToStart />
+        <ReadyToStart dark />
         <Testimonial />
-        <FaqsWhite />
+        <Faqs />
       </div>
     </>
   );

@@ -298,9 +298,9 @@ function AffirmationPreviewContent() {
           <span className="sm:hidden">Back</span>
         </Link>
         <div className="flex-1 flex justify-center">
-          <Link href="/dashboard" className="flex items-center gap-2">
+          <a href="/" className="flex items-center gap-2" title="LoA home">
             <Image src="/app_logo.svg" alt="LoA" width={24} height={24} className="rounded-md opacity-80" />
-          </Link>
+          </a>
         </div>
         {urls.length > 0 && (
           <div className="hidden sm:inline-flex items-center rounded-lg border border-white/[0.12] bg-white/[0.03] p-0.5">

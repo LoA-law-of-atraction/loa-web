@@ -14,6 +14,7 @@ import {
 import { ArrowRight } from "lucide-react";
 import { FcGoogle } from "react-icons/fc";
 import { auth } from "@/utils/firebase";
+import { debugLoaAuth } from "@/utils/debugLoaAuth";
 
 function LoginContent() {
   const router = useRouter();
@@ -27,7 +28,16 @@ function LoginContent() {
   const [googleLoading, setGoogleLoading] = useState(false);
 
   useEffect(() => {
+    debugLoaAuth("login", "page mount", { redirectTo, fullUrl: typeof window !== "undefined" ? window.location.href : "" });
+  }, [redirectTo]);
+
+  useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
+      debugLoaAuth("login", "onAuthStateChanged", {
+        hasUser: !!user,
+        isAnonymous: user?.isAnonymous ?? null,
+        willReplaceTo: user && !user.isAnonymous ? redirectTo : "(stay on login)",
+      });
       if (user && !user.isAnonymous) router.replace(redirectTo);
     });
     return () => unsub();

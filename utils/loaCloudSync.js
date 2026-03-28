@@ -84,6 +84,36 @@ function getDefaultStreak() {
   };
 }
 
+async function listActiveAffirmationDocs(uid) {
+  const affirmationsRef = collection(db, `users/${uid}/affirmations`);
+  const affirmationsQ = query(affirmationsRef, orderBy("createdAt", "desc"));
+  const snap = await getDocs(affirmationsQ);
+  return snap.docs.filter((item) => !isAffirmationDeleted(item.data()));
+}
+
+function countImagesFromRawAffirmation(raw) {
+  if (Array.isArray(raw.cloudImagePaths)) return raw.cloudImagePaths.filter(Boolean).length;
+  if (raw.cloudImagePath) return 1;
+  return 0;
+}
+
+async function enforceAffirmationLimits(uid, { maxAffirmations, maxImages, nextImageCount = 0, excludeDocId = null } = {}) {
+  if (maxAffirmations == null && maxImages == null) return;
+  const activeDocs = await listActiveAffirmationDocs(uid);
+  const filteredDocs = excludeDocId ? activeDocs.filter((docSnap) => docSnap.id !== excludeDocId) : activeDocs;
+
+  if (maxAffirmations != null && filteredDocs.length >= maxAffirmations) {
+    throw new Error(`Free web limit reached: maximum ${maxAffirmations} affirmation allowed.`);
+  }
+
+  if (maxImages != null) {
+    const existingImageCount = filteredDocs.reduce((sum, docSnap) => sum + countImagesFromRawAffirmation(docSnap.data()), 0);
+    if (existingImageCount + nextImageCount > maxImages) {
+      throw new Error(`Free web limit reached: maximum ${maxImages} image allowed.`);
+    }
+  }
+}
+
 async function resolveStorageUrl(cloudImagePath) {
   if (!cloudImagePath) return "";
   try {
@@ -220,7 +250,7 @@ export async function ensureStreakDoc(uid) {
   }
 }
 
-export async function createAffirmation(uid, payload) {
+export async function createAffirmation(uid, payload, limits = {}) {
   const createdAtMs = payload.createdAtMs || Date.now();
   const docId = buildAffirmationDocId(payload.content, createdAtMs);
   const files = Array.isArray(payload.files)
@@ -228,6 +258,11 @@ export async function createAffirmation(uid, payload) {
     : payload.file
       ? [payload.file]
       : [];
+  await enforceAffirmationLimits(uid, {
+    maxAffirmations: limits.maxAffirmations,
+    maxImages: limits.maxImages,
+    nextImageCount: files.length,
+  });
   const cloudImagePaths = [];
 
   for (let i = 0; i < files.length; i += 1) {
@@ -259,8 +294,15 @@ export async function createAffirmation(uid, payload) {
   return docId;
 }
 
-export async function updateAffirmation(uid, docId, patch) {
+export async function updateAffirmation(uid, docId, patch, limits = {}) {
   const allowed = {};
+  if (Array.isArray(patch.cloudImagePaths)) {
+    await enforceAffirmationLimits(uid, {
+      maxImages: limits.maxImages,
+      nextImageCount: patch.cloudImagePaths.filter(Boolean).length,
+      excludeDocId: docId,
+    });
+  }
   if (typeof patch.content === "string") allowed.content = patch.content;
   if (typeof patch.category === "string") allowed.category = patch.category;
   if (typeof patch.isFavorite === "boolean") allowed.isFavorite = patch.isFavorite;
@@ -276,8 +318,13 @@ export async function updateAffirmation(uid, docId, patch) {
 }
 
 /** Upload additional image files to an existing affirmation. Returns the new storage paths. */
-export async function uploadAffirmationImages(uid, docId, files, startIndex = 0) {
+export async function uploadAffirmationImages(uid, docId, files, startIndex = 0, limits = {}) {
   const fileList = Array.isArray(files) ? files.filter(Boolean) : [];
+  await enforceAffirmationLimits(uid, {
+    maxImages: limits.maxImages,
+    nextImageCount: fileList.length + startIndex,
+    excludeDocId: docId,
+  });
   const newPaths = [];
   for (let i = 0; i < fileList.length; i += 1) {
     const file = fileList[i];

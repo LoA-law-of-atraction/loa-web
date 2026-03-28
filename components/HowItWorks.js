@@ -10,15 +10,15 @@ const steps = [
   },
   {
     number: "02",
-    title: "Choose Your Apps",
+    title: "Make LoA Easy to Reach",
     description:
-      "Select the apps where you want an intentional pause before opening, especially the ones that pull you away from your goals.",
+      "Use reminders, widgets, and shortcuts so your affirmations stay one tap away—LoA does not monitor or interrupt other apps.",
   },
   {
     number: "03",
     title: "Pause & Reflect",
     description:
-      "When you tap one of your selected apps, LoA interrupts autopilot with a beautiful affirmation screen.",
+      "When you open LoA, spend a moment with a beautiful affirmation screen and reconnect with your intentions.",
   },
   {
     number: "04",

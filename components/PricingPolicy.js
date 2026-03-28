@@ -1,186 +1,477 @@
 "use client";
 
-import { useState } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import Link from "next/link";
+import { motion, AnimatePresence } from "framer-motion";
+import { Check, Minus, Zap, Shield, RefreshCw, Smartphone } from "lucide-react";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "@/utils/firebase";
+import { debugLoaAuth } from "@/utils/debugLoaAuth";
+import { useRevenueCat } from "@/contexts/RevenueCatContext";
+import { getPaidPlanPurchaseLabel } from "@/utils/revenuecatCta";
+import { getAllOfferingsWithPackages } from "@/utils/revenuecatOfferings";
+
+function subscribeFirebaseAuth(callback) {
+  return onAuthStateChanged(auth, callback);
+}
+
+function getNonAnonymousUserSnapshot() {
+  const u = auth.currentUser;
+  return u && !u.isAnonymous ? u : null;
+}
+
+function getNonAnonymousUserServerSnapshot() {
+  return null;
+}
+
+const MONTHLY = "monthly";
+const YEARLY = "yearly";
+
+/** Purchase / subscribe flow lives on the dashboard subscription page (RevenueCat). */
+const PURCHASE_BASE = "/dashboard/subscription";
+
+function buildPurchasePath(planId, billingPeriod) {
+  const period = billingPeriod === YEARLY ? "yearly" : "monthly";
+  if (planId === "basic" || planId === "pro") {
+    /** Opens RevenueCat checkout immediately after auth (no extra “Subscribe” tap). */
+    return `${PURCHASE_BASE}?plan=${planId}&period=${period}&checkout=1`;
+  }
+  return PURCHASE_BASE;
+}
+
+function getPlanCtaHref(plan, user, billingPeriod) {
+  if (plan.price.monthly === 0) {
+    return user ? "/dashboard" : `/login?redirect=${encodeURIComponent("/dashboard")}`;
+  }
+  const purchasePath = buildPurchasePath(plan.id, billingPeriod);
+  if (user) return purchasePath;
+  return `/login?redirect=${encodeURIComponent(purchasePath)}`;
+}
+
+/** When offerings are loaded, labels match RevenueCat trial / intro eligibility for this user. */
+function resolvePaidPlanCtaLabel(planId, billingPeriod, offerings, loading) {
+  if (!offerings || loading) return null;
+  const groups = getAllOfferingsWithPackages(offerings);
+  const group = groups.find((g) => g.identifier === planId);
+  if (!group) return null;
+  const pkg =
+    billingPeriod === YEARLY
+      ? group.yearlyPkg ?? group.monthlyPkg
+      : group.monthlyPkg ?? group.yearlyPkg;
+  if (!pkg) return null;
+  return getPaidPlanPurchaseLabel(pkg);
+}
 
 const plans = [
   {
-    id: "01",
-    title: "Manifest Starter",
-    priceMonthly: 0,
-    priceYearly: 0,
-    benefits: [
-      "Basic affirmations",
-      "Vision board",
-      "Basic streak tracking",
-      "Local only – no cloud backup",
+    id: "free",
+    title: "Free",
+    price: { monthly: 0, yearly: 0 },
+    billing: { monthly: "Free forever", yearly: "Free forever" },
+    saveLabel: null,
+    bestFor: "Manual practice",
+    popular: false,
+    cta: "Get started free",
+    features: [
+      { label: "AI affirmation generation", included: false },
+      { label: "Unlimited manual affirmations", included: true },
+      { label: "Basic streak tracking", included: true },
+      { label: "Image support", included: true },
+      { label: "Cloud backup", included: false },
+      { label: "Advanced templates", included: false },
+      { label: "Cross-device sync", included: false },
+      { label: "Premium insights", included: false },
+      { label: "Priority support", included: false },
+      { label: "Extra storage", included: false },
     ],
   },
   {
-    id: "02",
+    id: "basic",
     title: "Manifest Creator",
-    priceMonthly: 4.99,
-    priceYearly: 29.99,
-    benefits: [
-      "Everything in Manifest Starter",
-      "50 AI affirmation generations per month",
-      "1 GB storage for images & content",
-      "Cloud backup – sync & restore",
-      "Unlimited manual affirmations",
+    price: { monthly: 4.99, yearly: 29.99 },
+    billing: { monthly: "per month", yearly: "per year" },
+    saveLabel: "Save 50%",
+    yearlyMonthly: (29.99 / 12).toFixed(2),
+    bestFor: "Daily manifesting",
+    popular: true,
+    cta: "Get Basic",
+    features: [
+      { label: "50 AI affirmations / month", included: true },
+      { label: "Unlimited manual affirmations", included: true },
+      { label: "Basic streak tracking", included: true },
+      { label: "Image support", included: true },
+      { label: "1 GB cloud backup", included: true },
+      { label: "Advanced templates", included: true },
+      { label: "Cross-device sync", included: true },
+      { label: "Premium insights", included: false },
+      { label: "Priority support", included: false },
+      { label: "Restore across devices", included: true },
     ],
   },
   {
-    id: "03",
+    id: "pro",
     title: "Manifest Master",
-    priceMonthly: 9.99,
-    priceYearly: 79.99,
-    benefits: [
-      "Everything in Manifest Creator",
-      "150 AI affirmation generations per month",
-      "5 GB storage for images & content",
-      "Cloud backup – sync & restore",
-      "Priority support",
+    price: { monthly: 9.99, yearly: 79.99 },
+    billing: { monthly: "per month", yearly: "per year" },
+    saveLabel: "Save 33%",
+    yearlyMonthly: (79.99 / 12).toFixed(2),
+    bestFor: "Power users",
+    popular: false,
+    cta: "Get Pro",
+    features: [
+      { label: "150 AI affirmations / month", included: true },
+      { label: "Unlimited manual affirmations", included: true },
+      { label: "Basic streak tracking", included: true },
+      { label: "Image support", included: true },
+      { label: "5 GB cloud backup", included: true },
+      { label: "Advanced templates", included: true },
+      { label: "Cross-device sync", included: true },
+      { label: "Premium insights", included: true },
+      { label: "Priority support", included: true },
+      { label: "Restore across devices", included: true },
     ],
   },
 ];
 
-function formatPrice(n) {
-  return n === 0 ? "$0" : `$${n.toFixed(2)}`;
-}
+const cardVariants = {
+  hidden: { opacity: 0, y: 32 },
+  visible: (i) => ({
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.55, delay: i * 0.12, ease: [0.25, 0.1, 0.25, 1] },
+  }),
+};
 
-function yearlyDiscountPercent(monthly, yearly) {
-  if (monthly <= 0) return 0;
-  const fullYear = monthly * 12;
-  return Math.round(((fullYear - yearly) / fullYear) * 100);
-}
+const trustItems = [
+  { icon: Shield, label: "Secure payments" },
+  { icon: RefreshCw, label: "Cancel anytime" },
+  { icon: Smartphone, label: "iOS included" },
+];
 
 const PricingPlans = () => {
-  const [yearly, setYearly] = useState(true);
+  const [billingPeriod, setBillingPeriod] = useState(MONTHLY);
+  const [rcOfferings, setRcOfferings] = useState(null);
+  const [rcOfferingsLoading, setRcOfferingsLoading] = useState(false);
+  const { isConfigured, getOfferings } = useRevenueCat();
+  /** Avoid login href flash: useEffect runs after paint; this syncs before paint and matches Firebase’s current user. */
+  const user = useSyncExternalStore(
+    subscribeFirebaseAuth,
+    getNonAnonymousUserSnapshot,
+    getNonAnonymousUserServerSnapshot
+  );
+
+  useEffect(() => {
+    if (!user || !isConfigured) {
+      setRcOfferings(null);
+      setRcOfferingsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setRcOfferingsLoading(true);
+    getOfferings({ currency: "USD" })
+      .then((o) => {
+        if (!cancelled) setRcOfferings(o);
+      })
+      .catch(() => {
+        if (!cancelled) setRcOfferings(null);
+      })
+      .finally(() => {
+        if (!cancelled) setRcOfferingsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, isConfigured, getOfferings]);
+
+  useEffect(() => {
+    const cu = auth.currentUser;
+    const basic = plans.find((p) => p.id === "basic");
+    const pro = plans.find((p) => p.id === "pro");
+    debugLoaAuth("pricing", {
+      syncUser: user ? { uid: user.uid, email: user.email } : null,
+      authCurrentUser: cu
+        ? { uid: cu.uid, isAnonymous: cu.isAnonymous, email: cu.email }
+        : null,
+      billingPeriod,
+      hrefBasic: basic ? getPlanCtaHref(basic, user, billingPeriod) : null,
+      hrefPro: pro ? getPlanCtaHref(pro, user, billingPeriod) : null,
+    });
+  }, [user, billingPeriod]);
+
+  const getPrice = (plan) => {
+    if (plan.price.monthly === 0) return "$0";
+    if (billingPeriod === YEARLY) return `$${plan.yearlyMonthly}`;
+    return `$${plan.price.monthly.toFixed(2)}`;
+  };
+
+  const getBilling = (plan) => {
+    if (plan.price.monthly === 0) return "Free forever";
+    if (billingPeriod === YEARLY) {
+      return `Billed $${plan.price.yearly.toFixed(2)}/year`;
+    }
+    return "per month";
+  };
 
   return (
-    <motion.section
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1, transition: { duration: 0.8 } }}
-      className="relative z-10 w-full bg-white "
-    >
-      <article className="container mx-auto py-14 p-4 px-5 md:px-[5%] 2xl:px-0 max-w-[1200px] flex flex-col gap-4 items-center justify-center">
-        <div className="flex flex-col items-center justify-center">
-          <h2 className="text-h2 lg:text-h3 font-bold text-center tracking-tight w-full px-4">
-            <span className="block sm:inline">Affordable</span>
-            <span className="relative text-[#505050] inline-block">
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 418 42"
-                className="absolute top-2/3 left-0 h-[0.58em] w-full fill-black/50 dark:fill-black/30"
-                preserveAspectRatio="none"
-              >
-                <path d="M203.371.916c-26.013-2.078-76.686 1.963-124.73 9.946L67.3 12.749C35.421 18.062 18.2 21.766 6.004 25.934 1.244 27.561.828 27.778.874 28.61c.07 1.214.828 1.121 9.595-1.176 9.072-2.377 17.15-3.92 39.246-7.496C123.565 7.986 157.869 4.492 195.942 5.046c7.461.108 19.25 1.696 19.17 2.582-.107 1.183-7.874 4.31-25.75 10.366-21.992 7.45-35.43 12.534-36.701 13.884-2.173 2.308-.202 4.407 4.442 4.734 2.654.187 3.263.157 15.593-.780 35.401-2.686 57.944-3.488 88.365-3.143 46.327.526 75.721 2.23 130.788 7.584 19.787 1.924 20.814 1.98 24.557 1.332l.066-.011c1.201-.203 1.53-1.825.399-2.335-2.911-1.31-4.893-1.604-22.048-3.261-57.509-5.556-87.871-7.36-132.059-7.842-23.239-.254-33.617-.116-50.627.674-11.629.540-42.371 2.494-46.696 2.967-2.359.259 8.133-3.625 26.504-9.810 23.239-7.825 27.934-10.149 28.304-14.005 .417-4.348-3.529-6-16.878-7.066Z"></path>
-              </svg>
-              <span className="relative text-[#505050]"> Plans & Pricing</span>
-            </span>
-          </h2>
+    <section className="relative w-full text-white overflow-hidden pt-24 md:pt-32 pb-24">
+      {/* Background atmosphere */}
+      <div className="pointer-events-none absolute inset-0 -z-10">
+        {/* Dot grid texture */}
+        <div
+          className="absolute inset-0 opacity-[0.025]"
+          style={{
+            backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.8) 1px, transparent 0)",
+            backgroundSize: "36px 36px",
+          }}
+        />
+        {/* Nebula glows — on-brand indigo/purple */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] rounded-full bg-loa-indigo/[0.09] blur-[160px]" />
+        <div className="absolute top-1/3 right-1/4 w-[500px] h-[500px] rounded-full bg-loa-purple/[0.07] blur-[130px]" />
+        <div className="absolute bottom-0 left-1/4 w-[400px] h-[300px] rounded-full bg-loa-indigo/[0.05] blur-[100px]" />
+      </div>
 
-          <article className="flex flex-col items-center justify-center mt-16">
-            <p className="text-justify md:max-w-[60%] md:text-center text-gray-600">
-              Manifest Starter, Manifest Creator, and Manifest Master—plans that
-              grow with your practice. Clear limits on AI and storage keep pricing fair and sustainable.
-            </p>
-          </article>
+      <div className="mx-auto px-5 md:px-[5%] max-w-[1200px]">
+        {/* Header */}
+        <motion.div
+          className="text-center mb-14"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+        >
+          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold tracking-widest uppercase text-loa-indigo border border-loa-indigo/30 bg-loa-indigo/[0.08] mb-6">
+            <Zap className="w-3 h-3" />
+            Pricing
+          </span>
+
+          <h1 className="font-tiempos text-h2 lg:text-h3 font-semibold tracking-tight leading-tight text-white">
+            Simple, transparent pricing
+          </h1>
+          <p className="mt-4 text-white/50 text-base md:text-lg max-w-[480px] mx-auto leading-relaxed">
+            Start free. Upgrade when you&apos;re ready to unlock AI and advanced features.
+          </p>
 
           {/* Billing toggle */}
-          <div className="mt-10 flex items-center gap-3">
-            <span className={`text-sm font-medium ${!yearly ? "text-gray-900" : "text-gray-400"}`}>
-              Monthly
-            </span>
+          <div className="mt-8 inline-flex p-1 rounded-full bg-white/[0.05] border border-white/[0.08]">
             <button
               type="button"
-              role="switch"
-              aria-checked={yearly}
-              onClick={() => setYearly((v) => !v)}
-              className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 ${
-                yearly ? "bg-gray-900" : "bg-gray-300"
+              onClick={() => setBillingPeriod(MONTHLY)}
+              className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                billingPeriod === MONTHLY
+                  ? "bg-white text-black shadow-sm"
+                  : "text-white/50 hover:text-white"
               }`}
             >
-              <span
-                className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition ${
-                  yearly ? "translate-x-5" : "translate-x-1"
-                }`}
-              />
+              Monthly
             </button>
-            <span className={`text-sm font-medium ${yearly ? "text-gray-900" : "text-gray-400"}`}>
+            <button
+              type="button"
+              onClick={() => setBillingPeriod(YEARLY)}
+              className={`flex items-center gap-2 px-5 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                billingPeriod === YEARLY
+                  ? "bg-white text-black shadow-sm"
+                  : "text-white/50 hover:text-white"
+              }`}
+            >
               Yearly
-            </span>
-            <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
-              Save up to 50%
-            </span>
+              <span className="text-[10px] font-bold tracking-wide text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded-md">
+                Save 50%
+              </span>
+            </button>
           </div>
+        </motion.div>
+
+        {/* Pricing cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-5 items-start">
+          {plans.map((plan, i) => (
+            <motion.div
+              key={plan.id}
+              custom={i}
+              variants={cardVariants}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-40px" }}
+              className={`relative${plan.popular ? " md:-translate-y-3" : ""}`}
+            >
+              {/* Gradient border wrapper for popular card */}
+              {plan.popular ? (
+                <div className="relative rounded-2xl p-[1.5px] bg-gradient-to-b from-loa-indigo via-loa-purple/80 to-loa-purple/10 shadow-[0_0_80px_rgba(57,73,171,0.22)]">
+                  <div className="relative flex flex-col rounded-[14px] p-6 lg:p-7 bg-[#080810]">
+                    <PopularBadge />
+                    <CardContent
+                      plan={plan}
+                      billingPeriod={billingPeriod}
+                      getPrice={getPrice}
+                      getBilling={getBilling}
+                      ctaHref={getPlanCtaHref(plan, user, billingPeriod)}
+                      paidCtaLabel={
+                        plan.id === "basic" || plan.id === "pro"
+                          ? resolvePaidPlanCtaLabel(plan.id, billingPeriod, rcOfferings, rcOfferingsLoading)
+                          : null
+                      }
+                      user={user}
+                      popular
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="relative flex flex-col rounded-2xl p-6 lg:p-7 bg-white/[0.02] border border-white/[0.07] hover:bg-white/[0.04] hover:border-white/[0.12] transition-all duration-300">
+                  <CardContent
+                    plan={plan}
+                    billingPeriod={billingPeriod}
+                    getPrice={getPrice}
+                    getBilling={getBilling}
+                    ctaHref={getPlanCtaHref(plan, user, billingPeriod)}
+                    paidCtaLabel={
+                      plan.id === "basic" || plan.id === "pro"
+                        ? resolvePaidPlanCtaLabel(plan.id, billingPeriod, rcOfferings, rcOfferingsLoading)
+                        : null
+                    }
+                    user={user}
+                    popular={false}
+                  />
+                </div>
+              )}
+            </motion.div>
+          ))}
         </div>
 
-        <div className="mt-12 lg:mt-16 grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-10">
-          {plans.map((plan) => {
-            const isFree = plan.priceMonthly === 0 && plan.priceYearly === 0;
-            const discount = !isFree ? yearlyDiscountPercent(plan.priceMonthly, plan.priceYearly) : 0;
-            const priceMonthlyDisplay = yearly && !isFree ? plan.priceYearly / 12 : plan.priceMonthly;
-            const priceYearlyDisplay = plan.priceYearly;
+        {/* Trust strip */}
+        <motion.div
+          className="flex flex-wrap items-center justify-center gap-6 mt-12"
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.5, duration: 0.6 }}
+        >
+          {trustItems.map(({ icon: Icon, label }) => (
+            <div key={label} className="flex items-center gap-2 text-white/30 text-xs">
+              <Icon className="w-3.5 h-3.5 text-white/20" strokeWidth={1.5} />
+              {label}
+            </div>
+          ))}
+        </motion.div>
 
-            return (
-              <motion.article
-                key={plan.id}
-                initial={{ opacity: 0, y: 100 }}
-                whileInView={{ opacity: 1, y: 0, transition: { duration: 0.5 } }}
-                viewport={{ once: true }}
-                className="my-2 border shadow-lg flex flex-col gap-4 lg:p-10 p-10 rounded-xl relative"
-              >
-                {!isFree && yearly && discount > 0 && (
-                  <span className="absolute top-4 right-4 rounded-full bg-emerald-500 px-2.5 py-1 text-xs font-bold text-white">
-                    Save {discount}%
-                  </span>
-                )}
-                <h3 className="text-h2 font-bold">
-                  {isFree ? "Free" : formatPrice(priceMonthlyDisplay)}
-                  {!isFree && <span className="text-h5 font-inter">/month</span>}
-                </h3>
-                {yearly && !isFree && (
-                  <p className="text-sm text-[#505050] -mt-2">
-                    {formatPrice(priceYearlyDisplay)}/year billed annually
-                  </p>
-                )}
-                <h4 className="text-h4 font-bold font-inter mt-3 lg:mt-0">
-                  {plan.title}
-                </h4>
-                {(isFree || !yearly) && (
-                  <p className="text-[#505050]">
-                    {isFree ? "Free forever" : "Billed monthly"}
-                  </p>
-                )}
-                <ul className="mt-2 grid grid-cols-1 gap-4 mb-5">
-                  {plan.benefits.map((benefit, index) => (
-                    <li key={index} className="flex items-center">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="w-6 h-6 mr-3 shrink-0"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
-                      <span className="text-gray-700">{benefit}</span>
-                    </li>
-                  ))}
-                </ul>
-              </motion.article>
-            );
-          })}
-        </div>
-      </article>
-    </motion.section>
+        <motion.p
+          className="text-center text-white/20 text-xs mt-4"
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.6 }}
+        >
+          Prices in USD. Subscription managed on the App Store. Change or cancel anytime.
+        </motion.p>
+      </div>
+    </section>
   );
 };
+
+function PopularBadge() {
+  return (
+    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold tracking-wide text-white bg-gradient-to-r from-loa-indigo to-loa-purple shadow-[0_0_24px_rgba(57,73,171,0.6)]">
+        <span className="w-1.5 h-1.5 rounded-full bg-white/80 animate-pulse" />
+        Most popular
+      </span>
+    </div>
+  );
+}
+
+function CardContent({ plan, billingPeriod, getPrice, getBilling, ctaHref, paidCtaLabel, user, popular }) {
+  return (
+    <>
+      {/* Plan info */}
+      <div className="mb-6">
+        <p className="text-xs font-bold tracking-widest uppercase text-white/35 mb-3">
+          {plan.title}
+        </p>
+
+        <div className="flex items-baseline gap-1.5 mb-1.5">
+          <span className="text-4xl font-bold tabular-nums text-white">
+            {getPrice(plan)}
+          </span>
+          {plan.price.monthly !== 0 && (
+            <span className="text-white/35 text-sm">/mo</span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 min-h-[1.5rem]">
+          <p className="text-white/35 text-sm">{getBilling(plan)}</p>
+          {billingPeriod === "yearly" && plan.saveLabel && (
+            <motion.span
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="text-[10px] font-bold tracking-wide text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 px-1.5 py-0.5 rounded-md"
+            >
+              {plan.saveLabel}
+            </motion.span>
+          )}
+        </div>
+
+        <p className="mt-3 text-[13px] text-white/30">
+          Best for <span className="text-white/55">{plan.bestFor}</span>
+        </p>
+      </div>
+
+      {/* CTA button — prefetch off: href depends on auth; avoids caching /login when user is signed in */}
+      <Link
+        prefetch={false}
+        href={ctaHref}
+        onClick={() =>
+          debugLoaAuth("pricing-click", {
+            planId: plan.id,
+            ctaHref,
+            label: plan.price.monthly === 0 ? "free" : user ? plan.cta : "guest",
+          })
+        }
+        className={`block w-full text-center py-2.5 px-4 rounded-xl text-sm font-semibold transition-all duration-200 mb-6 ${
+          popular
+            ? "bg-gradient-to-r from-loa-indigo to-loa-purple text-white shadow-[0_0_28px_rgba(57,73,171,0.4)] hover:shadow-[0_0_40px_rgba(57,73,171,0.6)] hover:opacity-90"
+            : plan.id === "pro"
+              ? "bg-white/[0.08] hover:bg-white/[0.14] text-white border border-white/[0.1]"
+              : "bg-white/[0.05] hover:bg-white/[0.09] text-white/65 hover:text-white border border-white/[0.07]"
+        }`}
+      >
+        {plan.price.monthly === 0
+          ? "Get started free"
+          : user
+            ? paidCtaLabel ?? plan.cta
+            : "Sign in to continue"}
+      </Link>
+
+      {/* Divider */}
+      <div className="border-t border-white/[0.06] mb-5" />
+
+      {/* Feature list */}
+      <ul className="flex flex-col gap-3">
+        {plan.features.map((feature, fi) => (
+          <li key={fi} className="flex items-start gap-3">
+            <span
+              className={`mt-[1px] flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center ${
+                feature.included
+                  ? popular
+                    ? "bg-loa-indigo/20 text-loa-indigo"
+                    : "bg-white/[0.07] text-white/55"
+                  : "bg-transparent text-white/15"
+              }`}
+            >
+              {feature.included ? (
+                <Check className="w-2.5 h-2.5" strokeWidth={3} />
+              ) : (
+                <Minus className="w-2.5 h-2.5" strokeWidth={2.5} />
+              )}
+            </span>
+            <span
+              className={`text-[13px] leading-snug ${
+                feature.included ? "text-white/65" : "text-white/20"
+              }`}
+            >
+              {feature.label}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
 
 export default PricingPlans;
