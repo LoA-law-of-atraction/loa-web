@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { usePathname } from "next/navigation";
 import Navbar from "@/components/NavBar";
 import Footer from "@/components/Footer";
+import ContactFAB from "@/components/ContactFAB";
 import dynamic from "next/dynamic";
 import { Suspense } from "react";
 
@@ -19,15 +20,13 @@ export default function ClientLayout({ children }) {
   const isPricingPage = pathname === "/pricing";
 
   const pageVariants = {
-    initial: { opacity: 0, x: -100 },
+    initial: { opacity: 0 },
     animate: {
       opacity: 1,
-      x: 0,
       transition: { duration: 0.5, ease: "easeInOut" },
     },
     exit: {
       opacity: 0,
-      x: 100,
       transition: { duration: 0.3, ease: "easeInOut" },
     },
   };
@@ -61,6 +60,7 @@ export default function ClientLayout({ children }) {
       <div className="relative z-10">
         <Footer />
       </div>
+      <ContactFAB />
     </>
   );
 }

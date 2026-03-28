@@ -11,6 +11,7 @@ import { auth } from "@/utils/firebase";
 
 const NAV_LINKS = [
   { href: "/features", label: "Features" },
+  { href: "/resources", label: "Resources" },
   { href: "/about-us", label: "About" },
   { href: "/pricing", label: "Pricing" },
   { href: "/download", label: "Download" },
@@ -118,7 +119,7 @@ const Navbar = () => {
             <button
               onClick={() => setIsOpen(true)}
               aria-label="Open menu"
-              className="flex flex-col justify-center items-center gap-[5px] w-9 h-9"
+              className="flex flex-col justify-center items-center gap-[5px] w-12 h-12"
             >
               <span className="block w-6 h-[1.5px] bg-white rounded-full" />
               <span className="block w-6 h-[1.5px] bg-white rounded-full" />

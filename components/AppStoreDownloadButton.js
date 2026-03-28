@@ -37,7 +37,9 @@ const AppStoreDownloadButton = () => {
 
   return (
     <button
+      type="button"
       onClick={handleClick}
+      className="min-h-[48px] flex items-center"
       style={{ border: "none", background: "none", padding: 0 }}
     >
       <Image

@@ -521,21 +521,21 @@ grep -r "@anthropic-ai/sdk" --include="*.js" --include="*.ts" .
 
 ```
 CRITICAL (do now)
-[ ] C1 - Fix StructuredData.js staging URL → production domain
-[ ] C2 - Remove hardcoded aggregateRating
-[ ] C3 - Split all public pages to Server Component + Client Component
-[ ] C4 - Wrap SolarSystemBackground in dynamic() with ssr: false
-[ ] C5 - Fix base font size to 16px
+[x] C1 - Fix StructuredData.js staging URL → production domain
+[x] C2 - Remove hardcoded aggregateRating
+[x] C3 - Split all public pages to Server Component + Client Component
+[x] C4 - Wrap SolarSystemBackground in dynamic() with ssr: false
+[x] C5 - Fix base font size to 16px
 
 HIGH (this week)
-[ ] H1 - Add Disallow rules to robots.txt
-[ ] H2 - Fix CTA button tap targets to min-h-[48px]
-[ ] H3 - Fix hamburger to w-12 h-12
-[ ] H4 - Remove x: -100 from page transition
+[x] H1 - Add Disallow rules to robots.txt
+[x] H2 - Fix CTA button tap targets to min-h-[48px]
+[x] H3 - Fix hamburger to w-12 h-12
+[x] H4 - Remove x: -100 from page transition
 [ ] H5 - Replace <img> with <Image> in HowItWorks
 [ ] H6 - Replace Google Fonts @import with next/font/google
-[ ] H7 - Add OG image width/height to layout.js
-[ ] H8 - Fix operatingSystem from array to string
+[x] H7 - Add OG image width/height to layout.js
+[x] H8 - Fix operatingSystem from array to string
 [ ] H9 - Remove/rewrite Legacy.js copy
 [ ] H10 - Resolve "50,000 users" vs "Join Waitlist" conflict
 [ ] H11 - Add founder/team section to About page
@@ -543,7 +543,7 @@ HIGH (this week)
 
 MEDIUM (this month)
 [ ] M1 - Fix sitemap lastModified dates
-[ ] M2 - Add /download to sitemap
+[x] M2 - Add /download to sitemap
 [ ] M3 - Convert Tiempos Fine to .woff2
 [ ] M4 - Fix Ubuntu font (import or remove)
 [ ] M5 - Add prefers-reduced-motion to canvas

@@ -33,7 +33,7 @@ body {
   color: var(--foreground);
   font-family: "Inter", Helvetica, sans-serif;
   scroll-behavior: smooth;
-  font-size: 0.875rem;
+  font-size: 1rem;
 }
 
 .arc {
@@ -44,9 +44,6 @@ body {
 }
 
 @media screen and (min-width: 768px) {
-  body {
-    font-size: 1rem;
-  }
   .arc {
     background-size: 100% 40%;
     background-position: bottom;

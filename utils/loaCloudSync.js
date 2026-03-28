@@ -250,7 +250,8 @@ export async function ensureStreakDoc(uid) {
   }
 }
 
-export async function createAffirmation(uid, payload, limits = {}) {
+export async function createAffirmation(uid, payload, limits = {}, options = {}) {
+  const { onUploadedBytes } = options;
   const createdAtMs = payload.createdAtMs || Date.now();
   const docId = buildAffirmationDocId(payload.content, createdAtMs);
   const files = Array.isArray(payload.files)
@@ -264,15 +265,27 @@ export async function createAffirmation(uid, payload, limits = {}) {
     nextImageCount: files.length,
   });
   const cloudImagePaths = [];
+  const uploadedPaths = [];
 
-  for (let i = 0; i < files.length; i += 1) {
-    const current = files[i];
-    const ext = current.name.split(".").pop() || "jpg";
-    const objectPath = `users/${uid}/affirmations/${docId}/image-${i + 1}.${ext}`;
-    await uploadBytes(storageRef(storage, objectPath), current, {
-      contentType: current.type || "image/jpeg",
-    });
-    cloudImagePaths.push(objectPath);
+  try {
+    for (let i = 0; i < files.length; i += 1) {
+      const current = files[i];
+      const ext = current.name.split(".").pop() || "jpg";
+      const objectPath = `users/${uid}/affirmations/${docId}/image-${i + 1}.${ext}`;
+      await uploadBytes(storageRef(storage, objectPath), current, {
+        contentType: current.type || "image/jpeg",
+      });
+      cloudImagePaths.push(objectPath);
+      uploadedPaths.push(objectPath);
+      if (typeof onUploadedBytes === "function") {
+        await onUploadedBytes(current.size || 0);
+      }
+    }
+  } catch (e) {
+    await Promise.allSettled(
+      uploadedPaths.map((p) => deleteObject(storageRef(storage, p))),
+    );
+    throw e;
   }
 
   const createdAtTs = Timestamp.fromMillis(createdAtMs);
@@ -318,7 +331,8 @@ export async function updateAffirmation(uid, docId, patch, limits = {}) {
 }
 
 /** Upload additional image files to an existing affirmation. Returns the new storage paths. */
-export async function uploadAffirmationImages(uid, docId, files, startIndex = 0, limits = {}) {
+export async function uploadAffirmationImages(uid, docId, files, startIndex = 0, limits = {}, options = {}) {
+  const { onUploadedBytes } = options;
   const fileList = Array.isArray(files) ? files.filter(Boolean) : [];
   await enforceAffirmationLimits(uid, {
     maxImages: limits.maxImages,
@@ -326,14 +340,26 @@ export async function uploadAffirmationImages(uid, docId, files, startIndex = 0,
     excludeDocId: docId,
   });
   const newPaths = [];
-  for (let i = 0; i < fileList.length; i += 1) {
-    const file = fileList[i];
-    const ext = (file.name && file.name.split(".").pop()) || "jpg";
-    const objectPath = `users/${uid}/affirmations/${docId}/image-${startIndex + i + 1}.${ext}`;
-    await uploadBytes(storageRef(storage, objectPath), file, {
-      contentType: file.type || "image/jpeg",
-    });
-    newPaths.push(objectPath);
+  const uploadedPaths = [];
+  try {
+    for (let i = 0; i < fileList.length; i += 1) {
+      const file = fileList[i];
+      const ext = (file.name && file.name.split(".").pop()) || "jpg";
+      const objectPath = `users/${uid}/affirmations/${docId}/image-${startIndex + i + 1}.${ext}`;
+      await uploadBytes(storageRef(storage, objectPath), file, {
+        contentType: file.type || "image/jpeg",
+      });
+      newPaths.push(objectPath);
+      uploadedPaths.push(objectPath);
+      if (typeof onUploadedBytes === "function") {
+        await onUploadedBytes(file.size || 0);
+      }
+    }
+  } catch (e) {
+    await Promise.allSettled(
+      uploadedPaths.map((p) => deleteObject(storageRef(storage, p))),
+    );
+    throw e;
   }
   return newPaths;
 }

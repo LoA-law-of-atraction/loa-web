@@ -52,6 +52,12 @@ const Footer = () => {
                 Features
               </Link>
               <Link
+                href="/resources"
+                className="cursor-pointer transition-all min-w-fit hover:text-silver"
+              >
+                Resources
+              </Link>
+              <Link
                 href="/pricing"
                 className="cursor-pointer transition-all hover:text-silver"
               >

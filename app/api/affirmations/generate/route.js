@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { getUidFromAuthHeader } from "@/lib/loaAuthServer";
+import { nextUtcMonthStartIso } from "@/lib/loaPlanLimits";
+import { getUsageSummaryForUser, incrementAiGeneration } from "@/lib/loaUsageFirestore";
+
+export const runtime = "nodejs";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -20,10 +25,18 @@ Rules:
 
 export async function POST(request) {
   try {
+    const auth = await getUidFromAuthHeader(request);
+    if (!auth) {
+      return NextResponse.json(
+        { error: "Sign in required to generate affirmations.", code: "AUTH" },
+        { status: 401 },
+      );
+    }
+
     if (!process.env.ANTHROPIC_API_KEY) {
       return NextResponse.json(
-        { error: "AI service is not configured" },
-        { status: 503 }
+        { error: "AI service is not configured", code: "CONFIG" },
+        { status: 503 },
       );
     }
 
@@ -33,16 +46,31 @@ export async function POST(request) {
 
     if (!manifestInput) {
       return NextResponse.json(
-        { error: "manifestInput is required" },
-        { status: 400 }
+        { error: "manifestInput is required", code: "BAD_REQUEST" },
+        { status: 400 },
+      );
+    }
+
+    const summary = await getUsageSummaryForUser(auth.uid);
+    if (summary.aiLimit <= 0 || summary.aiUsed >= summary.aiLimit) {
+      return NextResponse.json(
+        {
+          error:
+            summary.aiLimit <= 0
+              ? "AI affirmation generation is available on paid plans only."
+              : `You've used your ${summary.aiLimit} AI affirmations for this billing month.`,
+          code: "AI_LIMIT",
+          aiUsed: summary.aiUsed,
+          aiLimit: summary.aiLimit,
+          resetsAt: summary.aiResetsAt || nextUtcMonthStartIso(),
+        },
+        { status: 403 },
       );
     }
 
     const userMessage = `What I want to manifest: ${manifestInput}\n\nGenerate one short affirmation and a category. Return only JSON: { "affirmation": "...", "category": "..." }`;
-
     const systemMessage = systemPromptFromClient || SYSTEM_PROMPT;
 
-    // Haiku for cost efficiency; override with ANTHROPIC_MODEL if needed
     const message = await anthropic.messages.create({
       model: process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001",
       max_tokens: 256,
@@ -59,8 +87,28 @@ export async function POST(request) {
 
     if (!affirmation) {
       return NextResponse.json(
-        { error: "AI did not return a valid affirmation" },
-        { status: 502 }
+        { error: "AI did not return a valid affirmation", code: "BAD_RESPONSE" },
+        { status: 502 },
+      );
+    }
+
+    try {
+      await incrementAiGeneration(auth.uid);
+    } catch (incErr) {
+      if (incErr?.code === "AI_LIMIT") {
+        return NextResponse.json(
+          {
+            error: "Monthly AI limit was just reached. Try again next month or upgrade.",
+            code: "AI_LIMIT",
+            resetsAt: incErr.resetAt || nextUtcMonthStartIso(),
+          },
+          { status: 403 },
+        );
+      }
+      console.error("[affirmations/generate] increment failed:", incErr);
+      return NextResponse.json(
+        { error: "Could not record usage. Please try again.", code: "USAGE_WRITE_FAILED" },
+        { status: 503 },
       );
     }
 
@@ -75,8 +123,9 @@ export async function POST(request) {
       {
         error: "Failed to generate affirmation",
         message: error?.message || "Unknown error",
+        code: "SERVER_ERROR",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

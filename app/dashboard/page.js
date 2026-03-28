@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -24,7 +24,8 @@ import {
   Trash2,
   Eye,
 } from "lucide-react";
-import { auth } from "@/utils/firebase";
+import { getMetadata, ref as storagePathRef } from "firebase/storage";
+import { auth, storage } from "@/utils/firebase";
 import {
   createAffirmation,
   ensureStreakDoc,
@@ -35,7 +36,14 @@ import {
   uploadAffirmationImages,
   deleteAffirmationImage,
 } from "@/utils/loaCloudSync";
-import { useRevenueCat } from "@/contexts/RevenueCatContext";
+import SubscribeContinueModal from "@/components/SubscribeContinueModal";
+import {
+  canFitStorage,
+  commitStorageDelta,
+  fetchUsageSummary,
+  formatBytes,
+  sumFileBytes,
+} from "@/utils/loaUsageClient";
 
 const tabs = [
   { id: "home", label: "Overview", icon: House },
@@ -210,7 +218,6 @@ function TemplateSelect({ value, onChange, defaultTemplates, label, variant = "m
 }
 
 function DashboardContent() {
-  const { isPro } = useRevenueCat();
   const router = useRouter();
   const searchParams = useSearchParams();
   const tabFromUrl = searchParams.get("tab");
@@ -246,6 +253,13 @@ function DashboardContent() {
   const [defaultTemplates, setDefaultTemplates] = useState([]);
   const [selectedTemplateIdManual, setSelectedTemplateIdManual] = useState("");
   const [selectedTemplateIdAi, setSelectedTemplateIdAi] = useState("");
+  const [usageSummary, setUsageSummary] = useState(null);
+  const [subscribeModal, setSubscribeModal] = useState({
+    open: false,
+    title: "",
+    description: "",
+  });
+
   const [editingAffirmationDocId, setEditingAffirmationDocId] = useState(null);
   const [editingContent, setEditingContent] = useState("");
   const [editingCategory, setEditingCategory] = useState("");
@@ -350,32 +364,58 @@ function DashboardContent() {
     [affirmations],
   );
 
-  const totalImageCount = useMemo(
-    () =>
-      affirmations.reduce((sum, item) => {
-        if (Array.isArray(item.imageUrls) && item.imageUrls.length > 0) return sum + item.imageUrls.length;
-        if (item.imageUrl) return sum + 1;
-        return sum;
-      }, 0),
-    [affirmations],
-  );
-
-  const isFreeWebUser = !isPro;
-  const freeWebAffirmationLimitReached = isFreeWebUser && affirmations.length >= 1;
-  const freeWebImageLimitReached = isFreeWebUser && totalImageCount >= 1;
-  const freeWebLimits = isFreeWebUser ? { maxAffirmations: 1, maxImages: 1 } : {};
-
-  const getFreeWebLimitError = ({ affirmationDelta = 0, imageDelta = 0, currentEditingImageCount = 0 } = {}) => {
-    if (!isFreeWebUser) return "";
-    if (affirmations.length + affirmationDelta > 1) {
-      return "Free web plan allows only 1 affirmation. Upgrade to create more.";
+  const refreshUsageSummary = useCallback(async () => {
+    try {
+      const s = await fetchUsageSummary();
+      setUsageSummary(s);
+    } catch (e) {
+      console.warn("[usage]", e?.message || e);
     }
-    if (imageDelta <= 0) return "";
-    const effectiveImageCount = totalImageCount - currentEditingImageCount;
-    if (effectiveImageCount + imageDelta > 1) {
-      return "Free web plan allows only 1 image total. Remove the current image or upgrade to add more.";
+  }, []);
+
+  useEffect(() => {
+    if (!uid) {
+      setUsageSummary(null);
+      return;
     }
-    return "";
+    refreshUsageSummary();
+  }, [uid, refreshUsageSummary]);
+
+  const aiBlocked = useMemo(() => {
+    if (!usageSummary) return true;
+    if (usageSummary.aiLimit <= 0) return true;
+    return usageSummary.aiUsed >= usageSummary.aiLimit;
+  }, [usageSummary]);
+
+  const aiSubtitle = useMemo(() => {
+    if (!usageSummary) return "Loading plan…";
+    if (usageSummary.aiLimit <= 0) {
+      return "AI generation requires Manifest Creator or Master.";
+    }
+    if (usageSummary.aiUsed >= usageSummary.aiLimit) {
+      return `Monthly limit reached (${usageSummary.aiUsed}/${usageSummary.aiLimit}). Resets next billing month.`;
+    }
+    return `${usageSummary.aiUsed} / ${usageSummary.aiLimit} AI affirmations this month · Describe your intention`;
+  }, [usageSummary]);
+
+  const openStorageModal = (description) => {
+    setSubscribeModal({
+      open: true,
+      title: "Storage limit",
+      description:
+        description ||
+        "Your cloud backup is full for your current plan. Upgrade for more space.",
+    });
+  };
+
+  const openAiModal = (description) => {
+    setSubscribeModal({
+      open: true,
+      title: "Subscribe to continue",
+      description:
+        description ||
+        "Upgrade to a paid plan to generate affirmations with AI or raise your monthly quota.",
+    });
   };
 
   const refreshCloud = async () => {
@@ -388,6 +428,7 @@ function DashboardContent() {
     setSchedulesJson(
       JSON.stringify(Array.isArray(cloud.schedules) ? cloud.schedules : [], null, 2),
     );
+    await refreshUsageSummary();
   };
 
   const withSaving = async (fn) => {
@@ -397,6 +438,9 @@ function DashboardContent() {
       await fn();
       await refreshCloud();
     } catch (err) {
+      if (err?.code === "STORAGE_LIMIT") {
+        openStorageModal(err?.message);
+      }
       setError(err?.message || "Operation failed.");
     } finally {
       setSaving(false);
@@ -406,22 +450,30 @@ function DashboardContent() {
   const addAffirmation = async () => {
     const content = newAffirmation.content.trim();
     if (!content || !uid) return;
-    const limitError = getFreeWebLimitError({
-      affirmationDelta: 1,
-      imageDelta: newAffirmation.files.length,
-    });
-    if (limitError) {
-      setError(limitError);
+    const totalBytes = sumFileBytes(newAffirmation.files);
+    if (usageSummary && !canFitStorage(usageSummary, totalBytes)) {
+      openStorageModal();
+      setError("Cloud storage is full for your plan. Remove images or upgrade.");
       return;
     }
     await withSaving(async () => {
-      await createAffirmation(uid, {
-        content,
-        category: newAffirmation.category.trim(),
-        isFavorite: newAffirmation.isFavorite,
-        affirmCount: 0,
-        files: newAffirmation.files,
-      }, freeWebLimits);
+      await createAffirmation(
+        uid,
+        {
+          content,
+          category: newAffirmation.category.trim(),
+          isFavorite: newAffirmation.isFavorite,
+          affirmCount: 0,
+          files: newAffirmation.files,
+        },
+        {},
+        {
+          onUploadedBytes: async (size) => {
+            await commitStorageDelta(size);
+            await refreshUsageSummary();
+          },
+        },
+      );
       setNewAffirmation({ content: "", category: "", isFavorite: false, files: [] });
       newAffirmationImagePreviews.forEach((url) => URL.revokeObjectURL(url));
       setNewAffirmationImagePreviews([]);
@@ -430,24 +482,37 @@ function DashboardContent() {
   };
 
   const generateAffirmationWithAI = async () => {
-    if (isFreeWebUser) {
-      setError("AI affirmation generation is available on paid plans only.");
-      return;
-    }
     const intention = manifestInput.trim();
     if (!intention) {
       setError("Enter what you want to manifest first.");
       return;
     }
+    const user = auth.currentUser;
+    if (!user) {
+      setError("Sign in required.");
+      return;
+    }
     try {
       setGeneratingAffirmation(true);
       setError("");
+      const token = await user.getIdToken();
       const res = await fetch("/api/affirmations/generate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ manifestInput: intention, systemPrompt: systemPrompt.trim() || undefined }),
       });
       const data = await res.json();
+      if (res.status === 403) {
+        if (data.code === "AI_LIMIT") {
+          openAiModal(data.error);
+        } else {
+          setError(data.error || "Request denied.");
+        }
+        return;
+      }
       if (!res.ok) throw new Error(data.error || data.message || "Failed to generate");
       const userMessage = `What I want to manifest: ${intention}${USER_PROMPT_SUFFIX}`;
       setAiGenerated({
@@ -455,6 +520,7 @@ function DashboardContent() {
         category: data.category || "Manifestation",
         prompt: data.prompt || userMessage,
       });
+      await refreshUsageSummary();
     } catch (err) {
       setError(err?.message || "Could not generate affirmation.");
     } finally {
@@ -464,22 +530,30 @@ function DashboardContent() {
 
   const saveAiAffirmation = async () => {
     if (!aiGenerated?.content?.trim() || !uid) return;
-    const limitError = getFreeWebLimitError({
-      affirmationDelta: 1,
-      imageDelta: aiAffirmationFiles.length,
-    });
-    if (limitError) {
-      setError(limitError);
+    const totalBytes = sumFileBytes(aiAffirmationFiles);
+    if (usageSummary && !canFitStorage(usageSummary, totalBytes)) {
+      openStorageModal();
+      setError("Cloud storage is full for your plan.");
       return;
     }
     await withSaving(async () => {
-      await createAffirmation(uid, {
-        content: aiGenerated.content.trim(),
-        category: aiGenerated.category.trim(),
-        isFavorite: false,
-        affirmCount: 0,
-        files: aiAffirmationFiles,
-      }, freeWebLimits);
+      await createAffirmation(
+        uid,
+        {
+          content: aiGenerated.content.trim(),
+          category: aiGenerated.category.trim(),
+          isFavorite: false,
+          affirmCount: 0,
+          files: aiAffirmationFiles,
+        },
+        {},
+        {
+          onUploadedBytes: async (size) => {
+            await commitStorageDelta(size);
+            await refreshUsageSummary();
+          },
+        },
+      );
       aiAffirmationImagePreviews.forEach((url) => URL.revokeObjectURL(url));
       setAiGenerated(null);
       setAiAffirmationFiles([]);
@@ -517,17 +591,12 @@ function DashboardContent() {
     let selected = Array.from(files || [])
       .filter(Boolean)
       .filter((f) => f.type?.startsWith?.("image/"));
-    if (isFreeWebUser) {
-      const currentDraftCount = append ? newAffirmation.files.length : 0;
-      const remainingSlots = Math.max(0, 1 - totalImageCount - currentDraftCount);
-      if (remainingSlots <= 0 && selected.length > 0) {
-        setError("Free web plan allows only 1 image total. Upgrade to add more.");
-        return;
-      }
-      if (selected.length > remainingSlots) {
-        selected = selected.slice(0, remainingSlots);
-        setError("Free web plan allows only 1 image total on web.");
-      }
+    const incomingBytes = sumFileBytes(selected);
+    const draftBase = append ? sumFileBytes(newAffirmation.files) : 0;
+    if (usageSummary && !canFitStorage(usageSummary, draftBase + incomingBytes)) {
+      openStorageModal();
+      setError("Not enough cloud storage for these images on your plan.");
+      return;
     }
     if (!selected.length) {
       if (!append) {
@@ -558,13 +627,16 @@ function DashboardContent() {
   };
 
   const handleAiAffirmationImageSelect = (files, append = false) => {
-    if (isFreeWebUser) {
-      setError("AI affirmation generation is available on paid plans only.");
-      return;
-    }
     const selected = Array.from(files || [])
       .filter(Boolean)
       .filter((f) => f.type?.startsWith?.("image/"));
+    const incomingBytes = sumFileBytes(selected);
+    const draftBase = append ? sumFileBytes(aiAffirmationFiles) : 0;
+    if (usageSummary && !canFitStorage(usageSummary, draftBase + incomingBytes)) {
+      openStorageModal();
+      setError("Not enough cloud storage for these images on your plan.");
+      return;
+    }
     if (!selected.length) {
       if (!append) {
         aiAffirmationImagePreviews.forEach((url) => URL.revokeObjectURL(url));
@@ -751,6 +823,13 @@ function DashboardContent() {
     const path = editingCloudImagePaths[index];
     if (!path || !uid || !editingAffirmationDocId) return;
     if (!window.confirm("Remove this image? It will be permanently deleted from storage.")) return;
+    let removedSize = 0;
+    try {
+      const meta = await getMetadata(storagePathRef(storage, path));
+      removedSize = meta.size || 0;
+    } catch {
+      removedSize = 0;
+    }
     await withSaving(async () => {
       await deleteAffirmationImage(uid, editingAffirmationDocId, path, editingCloudImagePaths);
       setEditingCloudImagePaths((prev) => prev.filter((_, i) => i !== index));
@@ -763,7 +842,13 @@ function DashboardContent() {
           return { ...a, cloudImagePaths: newPaths, imageUrls: newUrls };
         })
       );
-      await refreshCloud();
+      if (removedSize) {
+        try {
+          await commitStorageDelta(-removedSize);
+        } catch (e) {
+          console.warn("[usage] storage delta after delete", e);
+        }
+      }
     });
   };
 
@@ -771,18 +856,12 @@ function DashboardContent() {
     let selected = Array.from(files || [])
       .filter(Boolean)
       .filter((f) => f.type?.startsWith?.("image/"));
-    if (isFreeWebUser) {
-      const currentEditingCount = editingImageUrls.length;
-      const currentNewCount = append ? editingNewFiles.length : 0;
-      const remainingSlots = Math.max(0, 1 - (totalImageCount - currentEditingCount) - currentNewCount);
-      if (remainingSlots <= 0 && selected.length > 0) {
-        setError("Free web plan allows only 1 image total. Remove the current image or upgrade to add more.");
-        return;
-      }
-      if (selected.length > remainingSlots) {
-        selected = selected.slice(0, remainingSlots);
-        setError("Free web plan allows only 1 image total on web.");
-      }
+    const incomingBytes = sumFileBytes(selected);
+    const draftBase = append ? sumFileBytes(editingNewFiles) : 0;
+    if (usageSummary && !canFitStorage(usageSummary, draftBase + incomingBytes)) {
+      openStorageModal();
+      setError("Not enough cloud storage for these images on your plan.");
+      return;
     }
     if (!selected.length) {
       if (!append) {
@@ -815,12 +894,10 @@ function DashboardContent() {
 
   const saveEditAffirmation = async () => {
     if (!editingAffirmationDocId || !uid) return;
-    const limitError = getFreeWebLimitError({
-      imageDelta: editingNewFiles.length,
-      currentEditingImageCount: editingImageUrls.length,
-    });
-    if (limitError) {
-      setError(limitError);
+    const newBytes = sumFileBytes(editingNewFiles);
+    if (usageSummary && !canFitStorage(usageSummary, newBytes)) {
+      openStorageModal();
+      setError("Cloud storage is full for your plan.");
       return;
     }
     await withSaving(async () => {
@@ -832,7 +909,13 @@ function DashboardContent() {
           editingAffirmationDocId,
           editingNewFiles,
           finalPaths.length,
-          freeWebLimits
+          {},
+          {
+            onUploadedBytes: async (size) => {
+              await commitStorageDelta(size);
+              await refreshUsageSummary();
+            },
+          },
         );
         finalPaths = [...finalPaths, ...newPaths];
       }
@@ -840,7 +923,7 @@ function DashboardContent() {
         content: editingContent.trim() || "",
         category: editingCategory.trim() || "",
         cloudImagePaths: finalPaths,
-      }, freeWebLimits);
+      }, {});
       setAffirmations((prev) =>
         prev.map((a) => {
           if (a.docId !== editingAffirmationDocId) return a;
@@ -983,9 +1066,9 @@ function DashboardContent() {
                 />
               )}
               <div className="space-y-3">
-                {isFreeWebUser && (
-                  <div className="rounded-xl border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200/85">
-                    Free web users can create 1 affirmation with 1 image total. Upgrade for more.
+                {usageSummary && (
+                  <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[11px] text-white/70">
+                    Cloud backup: {formatBytes(usageSummary.storageUsed)} / {formatBytes(usageSummary.storageLimit)} used
                   </div>
                 )}
                 <textarea
@@ -1028,9 +1111,9 @@ function DashboardContent() {
                         Vision Images
                       </p>
                       <p className="text-[11px] text-white/40 mt-1">
-                        {isFreeWebUser
-                          ? "Free web: 1 image total."
-                          : "Add multiple images (drag & drop, select files, paste URL, or Ctrl+V)."}
+                        {usageSummary
+                          ? "Add images within your plan storage (drag & drop, select files, paste URL, or Ctrl+V)."
+                          : "Loading storage quota…"}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -1062,7 +1145,7 @@ function DashboardContent() {
                     ref={newAffirmationImageInputRef}
                     type="file"
                     accept="image/*"
-                    multiple={!isFreeWebUser}
+                    multiple
                     className="hidden"
                     onChange={(e) => {
                       const list = e.target.files;
@@ -1142,10 +1225,10 @@ function DashboardContent() {
               </div>
               <button
                 onClick={addAffirmation}
-                disabled={saving || freeWebAffirmationLimitReached}
+                disabled={saving}
                 className="w-full rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-400 hover:to-indigo-400 text-white px-3 py-2.5 text-sm font-semibold disabled:opacity-50 transition-all shadow-lg shadow-purple-500/20"
               >
-                {saving ? "Saving..." : freeWebAffirmationLimitReached ? "Free limit reached" : "Create Affirmation"}
+                {saving ? "Saving..." : "Create Affirmation"}
               </button>
             </div>
 
@@ -1159,9 +1242,7 @@ function DashboardContent() {
                 </div>
                 <div>
                   <h2 className="font-tiempos text-lg font-semibold text-white leading-tight">Generate with AI</h2>
-                  <p className="text-[11px] text-white/35 mt-0.5">
-                    {isFreeWebUser ? "Paid plans only on web" : "Describe your intention, receive an affirmation"}
-                  </p>
+                  <p className="text-[11px] text-white/35 mt-0.5">{aiSubtitle}</p>
                 </div>
               </div>
 
@@ -1180,15 +1261,21 @@ function DashboardContent() {
                 <input
                   value={manifestInput}
                   onChange={(e) => setManifestInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && !generatingAffirmation && manifestInput.trim() && generateAffirmationWithAI()}
+                  onKeyDown={(e) =>
+                    e.key === "Enter" &&
+                    !generatingAffirmation &&
+                    manifestInput.trim() &&
+                    !aiBlocked &&
+                    generateAffirmationWithAI()
+                  }
                   placeholder="What do you want to manifest?"
                   className="w-full rounded-xl bg-black/40 border border-amber-400/15 px-4 py-3.5 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-amber-400/40 focus:bg-black/50 transition-all pr-28"
-                  disabled={isFreeWebUser}
+                  disabled={aiBlocked}
                 />
                 <button
                   type="button"
                   onClick={generateAffirmationWithAI}
-                  disabled={generatingAffirmation || !manifestInput.trim() || isFreeWebUser}
+                  disabled={generatingAffirmation || !manifestInput.trim() || aiBlocked}
                   className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:bg-amber-500/25 disabled:text-black/40 disabled:cursor-not-allowed text-black font-semibold text-xs px-3 py-1.5 transition-all"
                 >
                   {generatingAffirmation ? "…" : "Generate"}
@@ -1727,6 +1814,12 @@ function DashboardContent() {
         </section>
       )}
 
+      <SubscribeContinueModal
+        open={subscribeModal.open}
+        onClose={() => setSubscribeModal((s) => ({ ...s, open: false }))}
+        title={subscribeModal.title}
+        description={subscribeModal.description}
+      />
       </div>
   );
 }

@@ -1,10 +1,12 @@
-# Allow all crawlers
 User-agent: *
 Allow: /
+Disallow: /admin/
+Disallow: /dashboard/
+Disallow: /login
+Disallow: /signup
+Disallow: /profile
 
-# Allow Googlebot to crawl favicon
 User-agent: Googlebot-Image
 Allow: /favicon/
 
-# Sitemap location
 Sitemap: https://www.loa-lawofattraction.co/sitemap.xml

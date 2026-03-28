@@ -1,29 +1,21 @@
-"use client";
+import PricingClient from "./PricingClient";
 
-import "../globals.css";
-import { useEffect } from "react";
+export const metadata = {
+  title: "Pricing | LoA App",
+  description:
+    "Start for free or unlock the full Law of Attraction experience with LoA Premium.",
+  alternates: {
+    canonical: "/pricing",
+  },
+  openGraph: {
+    title: "Pricing | LoA App",
+    description:
+      "Start for free or unlock the full Law of Attraction experience with LoA Premium.",
+    url: "https://www.loa-lawofattraction.co/pricing",
+    type: "website",
+  },
+};
 
-import Testimonial from "@/components/Testimonial";
-import Faqs from "@/components/Faqs";
-import ReadyToStart from "@/components/Ready";
-import PricingPlans from "@/components/PricingPolicy";
-import { RevenueCatProvider } from "@/contexts/RevenueCatContext";
-
-export default function Pricing() {
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, []);
-
-  return (
-    <div className="bg-black min-h-screen">
-      <RevenueCatProvider>
-        <PricingPlans />
-      </RevenueCatProvider>
-      <ReadyToStart dark />
-      <div className="[&_.bg-bg]:!bg-gradient-to-r [&_.bg-bg]:!from-loa-indigo [&_.bg-bg]:!to-loa-purple">
-        <Testimonial />
-      </div>
-      <Faqs />
-    </div>
-  );
+export default function PricingPage() {
+  return <PricingClient />;
 }

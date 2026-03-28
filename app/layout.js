@@ -45,7 +45,10 @@ export const metadata = {
     images: [
       {
         url: "https://www.loa-lawofattraction.co/og.png",
-        alt: "LoA App",
+        width: 1200,
+        height: 630,
+        type: "image/png",
+        alt: "LoA - Law of Attraction for the Digital Age",
       },
     ],
     type: "website",

@@ -1,30 +1,21 @@
-"use client";
+import FeaturesClient from "./FeaturesClient";
 
-import "../globals.css";
-import { useEffect } from "react";
-import { motion } from "framer-motion";
-import Testimonial from "@/components/Testimonial";
-import Faqs from "@/components/Faqs";
-import Feature from "@/components/Features";
-import ReadyToStart from "@/components/Ready";
-import SolarSystemBackground from "@/components/SolarSystemBackground";
+export const metadata = {
+  title: "Features | LoA App",
+  description:
+    "Explore LoA's affirmation screens, mindful pause tools, and consciousness-building features for the digital age.",
+  alternates: {
+    canonical: "/features",
+  },
+  openGraph: {
+    title: "Features | LoA App",
+    description:
+      "Explore LoA's affirmation screens, mindful pause tools, and consciousness-building features for the digital age.",
+    url: "https://www.loa-lawofattraction.co/features",
+    type: "website",
+  },
+};
 
-export default function Features() {
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, []);
-
-  return (
-    <>
-      {/* Solar System Background */}
-      <SolarSystemBackground />
-
-      <div className="pt-20">
-        <Feature />
-        <ReadyToStart dark />
-        <Testimonial />
-        <Faqs />
-      </div>
-    </>
-  );
+export default function FeaturesPage() {
+  return <FeaturesClient />;
 }
