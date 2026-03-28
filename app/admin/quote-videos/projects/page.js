@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useToast } from "@/components/admin/Toast";
 import { Plus, Trash2 } from "lucide-react";
@@ -63,12 +64,12 @@ export default function QuoteVideosProjectsPage() {
             Manage your motivational quote video projects
           </p>
         </div>
-        <a
+        <Link
           href="/admin/quote-videos"
           className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700"
         >
           <Plus size={18} /> New project
-        </a>
+        </Link>
       </div>
 
       {loading ? (
@@ -76,12 +77,12 @@ export default function QuoteVideosProjectsPage() {
       ) : projects.length === 0 ? (
         <div className="border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl p-12 text-center">
           <p className="text-gray-500 dark:text-gray-400 mb-4">No quote projects yet</p>
-          <a
+          <Link
             href="/admin/quote-videos"
             className="text-blue-600 dark:text-blue-400 hover:underline"
           >
             Create your first quote video →
-          </a>
+          </Link>
         </div>
       ) : (
         <div className="space-y-3">
@@ -128,12 +129,12 @@ export default function QuoteVideosProjectsPage() {
       )}
 
       <div className="mt-6">
-        <a
+        <Link
           href="/admin/quote-videos"
           className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
         >
           ← Back to Quote Videos
-        </a>
+        </Link>
       </div>
     </div>
   );

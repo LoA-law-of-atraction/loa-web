@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { ToastProvider } from "@/components/admin/Toast";
 import { useState, useEffect, useRef } from "react";
@@ -162,12 +163,12 @@ export default function AdminLayout({ children }) {
             <div className="max-w-6xl mx-auto px-4">
               <div className="flex justify-between items-center h-16">
                 <div className="flex items-center gap-8">
-                  <a
+                  <Link
                     href="/admin/setup"
                     className="text-xl font-semibold tracking-tight text-gray-900 dark:text-gray-100"
                   >
                     LoA Admin
-                  </a>
+                  </Link>
 
                   {/* Desktop Navigation */}
                   <nav
@@ -200,7 +201,7 @@ export default function AdminLayout({ children }) {
                           {characterShortsItems.map((item) => {
                             const active = item.match(pathname);
                             return (
-                              <a
+                              <Link
                                 key={item.href}
                                 href={item.href}
                                 onClick={() => setDesktopMenuOpen(null)}
@@ -212,7 +213,7 @@ export default function AdminLayout({ children }) {
                                 }
                               >
                                 {item.label}
-                              </a>
+                              </Link>
                             );
                           })}
                         </div>
@@ -245,7 +246,7 @@ export default function AdminLayout({ children }) {
                           {quoteVideosItems.map((item) => {
                             const active = item.match(pathname);
                             return (
-                              <a
+                              <Link
                                 key={item.href}
                                 href={item.href}
                                 onClick={() => setDesktopMenuOpen(null)}
@@ -257,19 +258,19 @@ export default function AdminLayout({ children }) {
                                 }
                               >
                                 {item.label}
-                              </a>
+                              </Link>
                             );
                           })}
                         </div>
                       )}
                     </div>
 
-                    <a
+                    <Link
                       href={apisItem.href}
                       className={navLinkClass(apisItem.match(pathname))}
                     >
                       {apisItem.label}
-                    </a>
+                    </Link>
 
                     <div className="relative">
                       <button
@@ -295,7 +296,7 @@ export default function AdminLayout({ children }) {
                           role="menu"
                           className="absolute left-0 top-full mt-2 w-48 admin-card-solid p-2 shadow-lg"
                         >
-                          <a
+                          <Link
                             href={setupItem.href}
                             onClick={() => setDesktopMenuOpen(null)}
                             className={
@@ -306,7 +307,7 @@ export default function AdminLayout({ children }) {
                             }
                           >
                             {setupItem.label}
-                          </a>
+                          </Link>
                         </div>
                       )}
                     </div>
@@ -316,13 +317,14 @@ export default function AdminLayout({ children }) {
                 {/* Right Side Actions */}
                 <div className="flex items-center gap-4">
                   <AdminThemeToggle className="hidden sm:inline-flex" />
-                  <a
+                  <Link
                     href="/"
                     target="_blank"
+                    rel="noopener noreferrer"
                     className="hidden sm:block text-sm text-gray-500 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
                   >
                     View Site
-                  </a>
+                  </Link>
                   <button
                     onClick={handleLogout}
                     className="hidden sm:block text-sm text-gray-500 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
@@ -372,7 +374,7 @@ export default function AdminLayout({ children }) {
                     {characterShortsItems.map((item) => {
                       const active = item.match(pathname);
                       return (
-                        <a
+                        <Link
                           key={item.href}
                           href={item.href}
                           onClick={() => setMobileMenuOpen(false)}
@@ -384,7 +386,7 @@ export default function AdminLayout({ children }) {
                           }
                         >
                           {item.label}
-                        </a>
+                        </Link>
                       );
                     })}
                     <div className="mt-2 px-3 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
@@ -393,7 +395,7 @@ export default function AdminLayout({ children }) {
                     {quoteVideosItems.map((item) => {
                       const active = item.match(pathname);
                       return (
-                        <a
+                        <Link
                           key={item.href}
                           href={item.href}
                           onClick={() => setMobileMenuOpen(false)}
@@ -405,11 +407,11 @@ export default function AdminLayout({ children }) {
                           }
                         >
                           {item.label}
-                        </a>
+                        </Link>
                       );
                     })}
 
-                    <a
+                    <Link
                       href={apisItem.href}
                       onClick={() => setMobileMenuOpen(false)}
                       className={
@@ -420,12 +422,12 @@ export default function AdminLayout({ children }) {
                       }
                     >
                       {apisItem.label}
-                    </a>
+                    </Link>
 
                     <div className="mt-2 px-3 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                       System
                     </div>
-                    <a
+                    <Link
                       href={setupItem.href}
                       onClick={() => setMobileMenuOpen(false)}
                       className={
@@ -436,20 +438,21 @@ export default function AdminLayout({ children }) {
                       }
                     >
                       {setupItem.label}
-                    </a>
+                    </Link>
 
                     {/* Mobile Actions */}
                     <div className="border-t mt-2 pt-2">
                       <div className="px-3 py-2">
                         <AdminThemeToggle className="inline-flex" />
                       </div>
-                      <a
+                      <Link
                         href="/"
                         target="_blank"
+                        rel="noopener noreferrer"
                         className="block px-3 py-2 text-sm text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
                       >
                         View Site
-                      </a>
+                      </Link>
                       <button
                         onClick={() => {
                           setMobileMenuOpen(false);

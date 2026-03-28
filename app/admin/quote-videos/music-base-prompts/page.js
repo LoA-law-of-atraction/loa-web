@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useToast } from "@/components/admin/Toast";
 import { Plus, Pencil, Trash2, Music2 } from "lucide-react";
@@ -252,12 +253,12 @@ export default function ManageMusicBasePromptsPage() {
       )}
 
       <div className="mt-8">
-        <a
+        <Link
           href="/admin/quote-videos"
           className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
         >
           ← Back to Quote Videos
-        </a>
+        </Link>
       </div>
     </div>
   );

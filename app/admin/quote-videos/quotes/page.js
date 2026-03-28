@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { MessageSquare } from "lucide-react";
 
@@ -72,12 +73,12 @@ export default function QuoteVideosQuotesPage() {
               : "No quotes yet. Create a quote video project and generate a quote."}
           </p>
           {!filter && (
-            <a
+            <Link
               href="/admin/quote-videos"
               className="mt-3 inline-block text-blue-600 dark:text-blue-400 hover:underline text-sm"
             >
               Go to Generator →
-            </a>
+            </Link>
           )}
         </div>
       ) : (
@@ -98,24 +99,24 @@ export default function QuoteVideosQuotesPage() {
                 )}
                 <span>{q.projectName}</span>
               </div>
-              <a
+              <Link
                 href={`/admin/quote-videos?project_id=${q.id}&step=1`}
                 className="mt-2 inline-block text-sm text-blue-600 dark:text-blue-400 hover:underline"
               >
                 Open project →
-              </a>
+              </Link>
             </div>
           ))}
         </div>
       )}
 
       <div className="mt-6">
-        <a
+        <Link
           href="/admin/quote-videos"
           className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
         >
           ← Back to Quote Videos
-        </a>
+        </Link>
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useToast } from "@/components/admin/Toast";
 import { Film, Pencil, Trash2, Wallet } from "lucide-react";
@@ -97,14 +98,14 @@ export default function ProjectsPage() {
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-3xl font-bold">Video Projects</h1>
           <div className="flex gap-2">
-            <a href="/admin/video-generator" className="admin-btn-secondary">
+            <Link href="/admin/video-generator" className="admin-btn-secondary">
               <Film size={16} />
               Generator
-            </a>
-            <a href="/admin/budget" className="admin-btn-secondary">
+            </Link>
+            <Link href="/admin/budget" className="admin-btn-secondary">
               <Wallet size={16} />
               Budget
-            </a>
+            </Link>
           </div>
         </div>
         <p className="admin-muted">
@@ -117,12 +118,12 @@ export default function ProjectsPage() {
       ) : projects.length === 0 ? (
         <div className="admin-card-solid p-12 text-center">
           <p className="admin-muted mb-4">No projects created yet</p>
-          <a
+          <Link
             href="/admin/video-generator"
             className="text-blue-600 hover:underline"
           >
             Create your first project →
-          </a>
+          </Link>
         </div>
       ) : (
         <div className="space-y-4">

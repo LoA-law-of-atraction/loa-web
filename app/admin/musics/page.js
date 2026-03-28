@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useToast } from "@/components/admin/Toast";
 import { Music, Trash2, ExternalLink } from "lucide-react";
@@ -76,12 +77,12 @@ export default function MusicsPage() {
         <div className="border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl p-12 text-center">
           <Music className="w-12 h-12 mx-auto text-gray-400 dark:text-gray-500 mb-3" />
           <p className="text-gray-500 dark:text-gray-400">No music generated yet.</p>
-          <a
+          <Link
             href="/admin/video-generator"
             className="mt-3 inline-block text-blue-600 dark:text-blue-400 hover:underline text-sm"
           >
             Generate music in Character Shorts →
-          </a>
+          </Link>
         </div>
       ) : (
         <div className="space-y-3">
@@ -103,12 +104,12 @@ export default function MusicsPage() {
                 </p>
                 <div className="flex flex-wrap gap-2 mt-1 text-xs text-gray-500 dark:text-gray-400">
                   {m.project_id && (
-                    <a
+                    <Link
                       href={`/admin/video-generator?project_id=${m.project_id}`}
                       className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline"
                     >
                       Project <ExternalLink size={12} />
-                    </a>
+                    </Link>
                   )}
                   <span>{formatDate(m.timestamp)}</span>
                   {m.duration_ms != null && (
@@ -142,12 +143,12 @@ export default function MusicsPage() {
       )}
 
       <div className="mt-6">
-        <a
+        <Link
           href="/admin/video-generator"
           className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
         >
           ← Character Shorts
-        </a>
+        </Link>
       </div>
     </div>
   );

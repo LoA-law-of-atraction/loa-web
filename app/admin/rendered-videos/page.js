@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Video, ExternalLink } from "lucide-react";
 
@@ -63,18 +64,18 @@ export default function RenderedVideosPage() {
           <Video className="w-12 h-12 mx-auto text-gray-400 dark:text-gray-500 mb-3" />
           <p className="text-gray-500 dark:text-gray-400">No rendered videos yet.</p>
           <div className="mt-3 flex flex-wrap justify-center gap-4 text-sm">
-            <a
+            <Link
               href="/admin/video-generator"
               className="text-blue-600 dark:text-blue-400 hover:underline"
             >
               Character Shorts →
-            </a>
-            <a
+            </Link>
+            <Link
               href="/admin/quote-videos"
               className="text-blue-600 dark:text-blue-400 hover:underline"
             >
               Quote Videos →
-            </a>
+            </Link>
           </div>
         </div>
       ) : (
@@ -137,12 +138,12 @@ export default function RenderedVideosPage() {
       )}
 
       <div className="mt-6">
-        <a
+        <Link
           href="/admin/video-generator"
           className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
         >
           ← Character Shorts
-        </a>
+        </Link>
       </div>
     </div>
   );
