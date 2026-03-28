@@ -48,7 +48,7 @@ export default function ClientLayout({ children }) {
       </header>
 
       <motion.main
-        className={`w-full mx-auto relative z-10 ${isPricingPage ? "bg-black" : "py-8"}`}
+        className={`w-full mx-auto relative z-10 ${isPricingPage ? "bg-black" : "pb-8"}`}
         variants={pageVariants}
         initial="initial"
         animate="animate"

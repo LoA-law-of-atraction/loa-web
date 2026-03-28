@@ -61,7 +61,7 @@ const OurPhilosophy = () => {
             </article>
             <Image
               src="/mockups/workImg.webp"
-              alt="LoA Mockup"
+              alt="LoA app vision board and affirmation collage on a phone screen"
               className="w-full"
               width={500}
               height={400}

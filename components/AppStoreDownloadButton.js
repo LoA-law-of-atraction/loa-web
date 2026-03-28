@@ -8,14 +8,11 @@ const AppStoreDownloadButton = () => {
 
   const handleClick = () => {
     if (typeof window !== "undefined") {
-      import("react-facebook-pixel").then((module) => {
-        const ReactPixel = module.default;
-        ReactPixel.init(process.env.NEXT_PUBLIC_META_PIXEL_ID);
-        ReactPixel.trackCustom("APP_STORE_Click", {
+      if (typeof window.fbq === "function") {
+        window.fbq("trackCustom", "APP_STORE_Click", {
           button_name: "App Store",
         });
-        console.log("App Store button clicked");
-      });
+      }
 
       const userAgent = navigator.userAgent || navigator.vendor || window.opera;
 
@@ -46,8 +43,8 @@ const AppStoreDownloadButton = () => {
         src="/buttons/app-store-badge.svg"
         alt="Download on the App Store"
         className="w-[150px] h-[45px]"
-        width={150} // Adjust width as needed
-        height={10} // Adjust height as neede
+        width={150}
+        height={45}
       />
     </button>
   );

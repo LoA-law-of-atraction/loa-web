@@ -1,15 +1,9 @@
-import { useState } from "react";
+"use client";
+
 import { motion } from "framer-motion";
-import { MdKeyboardArrowDown, MdKeyboardArrowUp } from "react-icons/md";
 import faqs from "./data/faqs.js";
 
 const FaqsWhite = () => {
-  const [activeIndex, setActiveIndex] = useState(null);
-
-  const toggleAnswer = (index) => {
-    setActiveIndex(activeIndex === index ? null : index);
-  };
-
   return (
     <motion.section
       initial={{ opacity: 0 }}
@@ -26,44 +20,41 @@ const FaqsWhite = () => {
         <ul className="space-y-4 mt-14 w-full">
           {faqs.map((faq, index) => (
             <li key={index}>
-              <div
-                className={`faq-item border-b-2 border-gray-300 p-4 ${
-                  activeIndex === index ? "py-6 px-4" : ""
-                }`}
-              >
-                <div className="flex justify-between items-start py-3">
-                  <div className="faq-question cursor-pointer max-w-[90%]">
-                    <span className="text-lg font-semibold">
-                      {faq.question}
-                    </span>
-                  </div>
-                  <button
-                    className="toggle-button"
-                    onClick={() => toggleAnswer(index)}
+              <details className="group border-b-2 border-gray-300 p-4 open:py-6 open:px-4">
+                <summary className="flex cursor-pointer list-none justify-between items-start gap-3 py-3 [&::-webkit-details-marker]:hidden">
+                  <span className="text-lg font-semibold max-w-[90%] pr-2">
+                    {faq.question}
+                  </span>
+                  <span
+                    className="shrink-0 transition-transform group-open:rotate-180"
+                    aria-hidden
                   >
-                    {activeIndex === index ? (
-                      <MdKeyboardArrowUp className="w-8 h-8" />
-                    ) : (
-                      <MdKeyboardArrowDown className="w-8 h-8" />
-                    )}
-                  </button>
-                </div>
-
-                <div className="faq-answer mt-">
-                  {activeIndex === index && (
-                    <>
-                      <p className="text-gray-500">{faq?.answer}</p>
-                      {faq?.list && (
-                        <ul className="list-disc pl-6">
-                          {faq.list.map((item, idx) => (
-                            <li key={idx}>{item}</li>
-                          ))}
-                        </ul>
-                      )}
-                    </>
+                    <svg
+                      className="w-8 h-8"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
+                      />
+                    </svg>
+                  </span>
+                </summary>
+                <div className="faq-answer mt-2 pb-2">
+                  <p className="text-gray-500">{faq?.answer}</p>
+                  {faq?.list && (
+                    <ul className="list-disc pl-6 mt-2">
+                      {faq.list.map((item, idx) => (
+                        <li key={idx}>{item}</li>
+                      ))}
+                    </ul>
                   )}
                 </div>
-              </div>
+              </details>
             </li>
           ))}
         </ul>

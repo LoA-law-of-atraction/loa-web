@@ -1,15 +1,9 @@
-import { useState } from "react";
+"use client";
+
 import { motion } from "framer-motion";
-import { MdKeyboardArrowDown, MdKeyboardArrowUp } from "react-icons/md";
 import faqs from "./data/faqs.js";
 
 const Faqs = () => {
-  const [activeIndex, setActiveIndex] = useState(null);
-
-  const toggleAnswer = (index) => {
-    setActiveIndex(activeIndex === index ? null : index);
-  };
-
   return (
     <motion.section
       initial={{ opacity: 0 }}
@@ -32,46 +26,41 @@ const Faqs = () => {
               transition={{ duration: 0.3, delay: 0.2 }}
               viewport={{ once: true }}
             >
-              <div
-                className={`faq-item border-b border-white/20 rounded-xl p-4 ${
-                  activeIndex === index
-                    ? "py-6 px-4 bg-white/10 backdrop-blur-sm"
-                    : ""
-                }`}
-              >
-                <div className="flex justify-between items-start py-3">
-                  <div className="faq-question cursor-pointer max-w-[90%]">
-                    <span className="text-lg font-semibold text-white">
-                      {faq.question}
-                    </span>
-                  </div>
-                  <button
-                    className="toggle-button text-white"
-                    onClick={() => toggleAnswer(index)}
+              <details className="faq-item group border-b border-white/20 rounded-xl p-4 open:bg-white/10 open:backdrop-blur-sm open:py-6 open:px-4">
+                <summary className="flex cursor-pointer list-none justify-between items-start gap-3 py-3 [&::-webkit-details-marker]:hidden">
+                  <span className="text-lg font-semibold text-white max-w-[90%] pr-2">
+                    {faq.question}
+                  </span>
+                  <span
+                    className="shrink-0 text-white transition-transform group-open:rotate-180"
+                    aria-hidden
                   >
-                    {activeIndex === index ? (
-                      <MdKeyboardArrowUp className="w-8 h-8" />
-                    ) : (
-                      <MdKeyboardArrowDown className="w-8 h-8" />
-                    )}
-                  </button>
-                </div>
-
-                <div className="faq-answer mt-2 text-white/80">
-                  {activeIndex === index && (
-                    <>
-                      <p>{faq?.answer}</p>
-                      {faq?.list && (
-                        <ul className="list-disc pl-6">
-                          {faq.list.map((item, idx) => (
-                            <li key={idx}>{item}</li>
-                          ))}
-                        </ul>
-                      )}
-                    </>
+                    <svg
+                      className="w-8 h-8"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
+                      />
+                    </svg>
+                  </span>
+                </summary>
+                <div className="faq-answer mt-2 pb-2 text-white/80">
+                  <p>{faq?.answer}</p>
+                  {faq?.list && (
+                    <ul className="list-disc pl-6 mt-2">
+                      {faq.list.map((item, idx) => (
+                        <li key={idx}>{item}</li>
+                      ))}
+                    </ul>
                   )}
                 </div>
-              </div>
+              </details>
             </motion.li>
           ))}
         </ul>

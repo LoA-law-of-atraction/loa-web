@@ -5,27 +5,32 @@ const values = [
   {
     id: "01",
     title: "Consciousness Over Convenience",
-    desc: `Every moment with your phone can serve your highest good, not scatter your energy. LoA helps you build intentional pauses—inside the app—so you choose awareness over autopilot, without monitoring other applications.<br /><span class="italic text-black/60">💡 Your attention is your most valuable resource — invest it wisely.</span>`,
+    desc: "Every moment with your phone can serve your highest good, not scatter your energy. LoA helps you build intentional pauses—inside the app—so you choose awareness over autopilot, without monitoring other applications.",
+    insight: "Your attention is your most valuable resource — invest it wisely.",
   },
   {
     id: "02",
     title: "Your Manifestation Journey Is Sacred",
-    desc: `Your affirmations, goals, and spiritual practice belong to you alone. We keep everything private on your device because your path to abundance shouldn't be data to be harvested — it's sacred work that deserves protection.<br /><span class="italic text-black/60">💡 True manifestation happens in private, sacred spaces — not public feeds.</span>`,
+    desc: "Your affirmations, goals, and spiritual practice belong to you alone. We keep everything private on your device because your path to abundance shouldn't be data to be harvested — it's sacred work that deserves protection.",
+    insight: "True manifestation happens in private, sacred spaces — not public feeds.",
   },
   {
     id: "03",
     title: "Small Shifts Create Big Transformations",
-    desc: `You don't need to overhaul your entire life overnight. With each mindful pause and conscious affirmation, LoA helps you gradually realign your energy with your desires — building powerful momentum one moment at a time.<br /><span class="italic text-black/60">💡 Consistency in small practices creates quantum leaps in manifestation.</span>`,
+    desc: "You don't need to overhaul your entire life overnight. With each mindful pause and conscious affirmation, LoA helps you gradually realign your energy with your desires — building powerful momentum one moment at a time.",
+    insight: "Consistency in small practices creates quantum leaps in manifestation.",
   },
   {
     id: "04",
     title: "Technology Should Support Your Spirit",
-    desc: `Instead of technology draining your energy, it should amplify your spiritual practice. LoA transforms your phone from a distraction device into a manifestation tool that supports your conscious living journey.<br /><span class="italic text-black/60">💡 When technology serves consciousness, magic happens.</span>`,
+    desc: "Instead of technology draining your energy, it should amplify your spiritual practice. LoA transforms your phone from a distraction device into a manifestation tool that supports your conscious living journey.",
+    insight: "When technology serves consciousness, magic happens.",
   },
   {
     id: "05",
     title: "Alignment Over Achievement",
-    desc: `We're not building another productivity app focused on doing more. We're creating space for being more — helping you align your digital habits with your soul's purpose and attract what truly serves your highest good.<br /><span class="italic text-black/60">💡 When you're aligned, manifestation becomes effortless.</span>`,
+    desc: "We're not building another productivity app focused on doing more. We're creating space for being more — helping you align your digital habits with your soul's purpose and attract what truly serves your highest good.",
+    insight: "When you're aligned, manifestation becomes effortless.",
   },
 ];
 
@@ -74,10 +79,12 @@ const CoreValues = () => {
               <h4 className="mt-6 text-lg font-semibold text-center lg:text-left">
                 {item.title}
               </h4>
-              <p
-                className="text-base text-center lg:text-left text-black/90"
-                dangerouslySetInnerHTML={{ __html: item.desc }}
-              />
+              <p className="text-base text-center lg:text-left text-black/90">
+                {item.desc}
+              </p>
+              <p className="mt-3 italic text-sm text-center lg:text-left text-black/50">
+                💡 {item.insight}
+              </p>
             </motion.article>
           ))}
         </div>

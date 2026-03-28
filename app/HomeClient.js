@@ -196,7 +196,7 @@ export default function HomeClient() {
               <h3 className="text-xl font-semibold mb-3 text-white/80">
                 Unconscious Scrolling
               </h3>
-              <p className="text-white/50 leading-relaxed">
+              <p className="text-white/70 leading-relaxed">
                 Mindless phone use scattered your attention, feeding energy into
                 distraction, anxiety, and endless comparison.
               </p>

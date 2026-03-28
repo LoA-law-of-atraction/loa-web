@@ -46,6 +46,9 @@ GoogleService-Info.plist
 # vercel
 .vercel
 
+# local tooling (font/WebP conversion)
+.venv-seo-tools/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

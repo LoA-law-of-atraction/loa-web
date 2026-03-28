@@ -1,3 +1,5 @@
+import BreadcrumbJsonLd from "@/components/BreadcrumbJsonLd";
+import WebPageJsonLd from "@/components/WebPageJsonLd";
 import ContactClient from "./ContactClient";
 
 export const metadata = {
@@ -17,5 +19,21 @@ export const metadata = {
 };
 
 export default function ContactPage() {
-  return <ContactClient />;
+  return (
+    <>
+      <WebPageJsonLd
+        type="ContactPage"
+        title="Contact Us | LoA - Law of Attraction App"
+        description="Get in touch with the LoA team about the Law of Attraction app, partnerships, sponsorships, or support."
+        path="/contact-us"
+      />
+      <BreadcrumbJsonLd
+        items={[
+          { name: "Home", path: "/" },
+          { name: "Contact", path: "/contact-us" },
+        ]}
+      />
+      <ContactClient />
+    </>
+  );
 }

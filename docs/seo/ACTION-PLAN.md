@@ -1,6 +1,14 @@
 # SEO Action Plan — loa-lawofattraction.co
-**Date:** 2026-03-27
-**Health Score:** 41 / 100
+**Last updated:** 2026-03-28
+**Health Score:** ~52 / 100 *(directional; re-score after GSC stabilizes post-deploy)*
+
+## Recent Investigations (2026-03-28)
+- [Competitor Analysis](competitor-analysis-2026-03-28.md) — Only 2 ranking keywords; competitor data unreliable at this traffic level
+- [Ranked Keywords](ranked-keywords-2026-03-28.md) — Ranking for "loa love" (#38) and "loa coach" (#53) only; no target keywords ranking
+- [Content Analysis: /resources](content-analysis-resources-2026-03-28.md) — Original audit: thin content; **superseded by on-site expansion** (see C6 / M14 below)
+- [**DataForSEO keyword research**](DATAFORSEO-KEYWORD-RESEARCH-2026-03-28.md) — Labs data for primary keywords (e.g. “law of attraction app” KD ~2); **live SERP top-10** not retrieved (API 402/credits—retry later)
+
+---
 
 ---
 
@@ -102,6 +110,31 @@ const SolarSystemBackground = dynamic(
   }
 );
 ```
+
+---
+
+### C6. Add target keywords to /resources page
+**File:** `app/resources/ResourcesClient.js`
+**Effort:** 30 minutes
+**Source:** content-analysis-resources-2026-03-28.md
+
+The /resources page has ~230 words (target: 500+) and contains zero target keywords. Quick wins:
+
+1. Update H1 from "Guides, support, and product pages" to "Law of Attraction Resources: Guides, Tools & Support"
+2. Add an intro paragraph (~60 words) below the H1:
+
+```jsx
+<p className="max-w-[620px] text-base leading-relaxed text-white/55 sm:text-lg">
+  Everything you need to understand and use LoA — the Law of Attraction app
+  built for your digital life. Explore how affirmations, mindful pauses, and
+  conscious reflection tools work together to shift your daily phone use into
+  a manifestation practice. Browse guides, product info, and support pages below.
+</p>
+```
+
+3. Update meta title in `app/resources/page.js` from "Resources | LoA App" to "Law of Attraction Resources | LoA App"
+
+**Status:** ✅ **Done (2026-03-28).** H1 and body copy expanded (500+ words), primer + internal links, FAQ (`<details>`) + **FAQPage** JSON-LD (`app/resources/resourcesFaq.js`), meta title **Law of Attraction Resources & Guides \| LoA App**. See also M14.
 
 ---
 
@@ -317,7 +350,47 @@ Add a team section with:
 - LinkedIn profile links
 - Founding year and mission statement
 
-This is the single highest-leverage E-E-A-T improvement available and requires no technical complexity.
+This is the single highest-leverage E-E-A-T improvement and requires no technical complexity.
+
+**Status:** ⚠️ **Partial (2026-03-28).** “Who builds LoA” + trust copy (pricing/privacy transparency, contact) added in `AboutUsClient.js`. **Still open:** named founders, photos, LinkedIn, founding year—add when assets are ready.
+
+---
+
+### H13. Add "law of attraction" to all page meta titles
+**Files:** All `page.js` metadata exports
+**Effort:** 15 minutes
+**Source:** ranked-keywords-2026-03-28.md
+
+The site currently ranks for zero target keywords. The primary keyword "law of attraction" must appear in meta titles to signal relevance to Google. Update all page metadata titles to include the keyword naturally:
+
+| Page | Suggested Title |
+|------|----------------|
+| `/` | LoA — Law of Attraction App for the Digital Age |
+| `/features` | Features \| LoA Law of Attraction App |
+| `/about-us` | About Us \| LoA Law of Attraction App |
+| `/pricing` | Pricing \| LoA Law of Attraction App |
+| `/download` | Download \| LoA Law of Attraction App |
+| `/resources` | Law of Attraction Resources \| LoA App |
+
+**Status:** ✅ **Done (2026-03-28)** for main marketing routes (`/`, `/features`, `/about-us`, `/pricing`, `/download`, `/updates`, `/resources`, etc.). Login/signup remain client-only without `metadata` exports.
+
+---
+
+### H14. Run SERP research on target keywords
+**Effort:** 1 hour (research only)
+**Source:** competitor-analysis-2026-03-28.md, ranked-keywords-2026-03-28.md
+
+The competitor analysis returned only podcast platforms and irrelevant sites because the site has too few rankings. Run SERP analysis on real target keywords to map the competitive landscape:
+
+```
+/seo dataforseo serp "law of attraction app"
+/seo dataforseo serp "manifestation app"
+/seo dataforseo keywords "law of attraction app"
+```
+
+Use results to identify true competitors and inform content strategy.
+
+**Status:** ⚠️ **Partial (2026-03-28).** Keyword Overview / difficulty / intent captured in [**DATAFORSEO-KEYWORD-RESEARCH-2026-03-28.md**](DATAFORSEO-KEYWORD-RESEARCH-2026-03-28.md). **Live organic SERP** (top URLs) **not** pulled—**retry** `serp_organic_live_advanced` or competitors endpoint when DataForSEO credits/billing are active.
 
 ---
 
@@ -344,6 +417,8 @@ await fetch("https://api.indexnow.org/indexnow", {
 });
 ```
 
+**Status:** ✅ **Done** — key file in `public/`, `app/api/indexnow/route.js`, `INDEXNOW_KEY` / optional `INDEXNOW_SUBMIT_SECRET` in `.env.example`.
+
 ---
 
 ## Medium Priority — Fix Within 1 Month
@@ -368,6 +443,8 @@ Add `{ url: "${baseUrl}/download", lastModified: "2026-01-19" }` to the returned
 **File:** `app/globals.css:21-29`
 **Effort:** 1 hour
 
+**Status:** ✅ **Done (2026-03-28).** `TiemposFine-Regular.woff2` and `TiemposFine-Semibold.woff2` in `public/fonts/`; `@font-face` uses family `"Tiempos Fine"` with weights 400 / 600. OTF sources retained in repo for design handoff.
+
 Convert `/public/fonts/TiemposFine-Regular.otf` and `TiemposFine-Semibold.otf` to `.woff2` using `fonttools` or an online converter. Update `@font-face` declarations:
 
 ```css
@@ -391,6 +468,8 @@ Convert `/public/fonts/TiemposFine-Regular.otf` and `TiemposFine-Semibold.otf` t
 ### M4. Fix Ubuntu font — import or remove
 **Files:** `app/globals.css`, `tailwind.config.mjs`, `components/NavBar.js:49`
 **Effort:** 15 minutes
+
+**Status:** ✅ **Done (2026-03-28).** `Ubuntu` from `next/font/google` in `app/layout.js` (`--font-ubuntu`); `tailwind.config.mjs` uses `var(--font-ubuntu)`.
 
 Either add Ubuntu to the Google Fonts import via `next/font/google`, or remove the `font-ubuntu` class from NavBar and remove the `ubuntu` entry from `tailwind.config.mjs`.
 
@@ -486,6 +565,37 @@ Add a third JSON-LD block (see `FULL-AUDIT-REPORT.md` for the complete schema).
 
 Add legal entity name, registered business address, and company registration number. Required for full Trustworthiness (E-E-A-T) compliance for a subscription app.
 
+**Status:** ⚠️ **Partial (2026-03-28).** `ContactClient.js` shows legal name (default **Banana Sapience**) + optional `NEXT_PUBLIC_COMPANY_ADDRESS` / `NEXT_PUBLIC_COMPANY_REGISTRATION_NUMBER` (see `.env.example`). **Set values in production** for full display.
+
+---
+
+### M14. Expand /resources page content depth
+**File:** `app/resources/ResourcesClient.js`
+**Effort:** 1–2 hours
+**Source:** content-analysis-resources-2026-03-28.md
+
+Beyond the C6 quick win, add substantive content to bring the page to 500+ words:
+- Short "What is the Law of Attraction?" section (~100 words)
+- FAQ section with 3–5 common LOA questions (AI citation opportunity)
+- Link to 1–2 external authoritative sources on LOA/manifestation research
+
+**Status:** ✅ **Done (2026-03-28)** — rolled into C6 (same release). Optional: add 1–2 external citations in primer for extra E-E-A-T.
+
+---
+
+### M15. Re-run competitor analysis after technical fixes
+**Effort:** 30 minutes (DataForSEO)
+**Source:** competitor-analysis-2026-03-28.md
+
+Target: 30–60 days after C3 (server component fix) is deployed. Once the site ranks for 20+ keywords, DataForSEO competitor overlap data becomes reliable and will surface true LOA niche competitors.
+
+```
+/seo dataforseo competitors loa-lawofattraction.co
+/seo dataforseo ranked loa-lawofattraction.co
+```
+
+Baseline to beat: 50+ ranking keywords.
+
 ---
 
 ### M13. Confirm `@anthropic-ai/sdk` is server-only
@@ -498,26 +608,34 @@ Grep the codebase for all imports of `@anthropic-ai/sdk` and confirm every usage
 grep -r "@anthropic-ai/sdk" --include="*.js" --include="*.ts" .
 ```
 
+**Status:** ✅ **Verified (2026-03-28)** — all imports under `app/api/**` only; none in client components.
+
 ---
 
 ## Low Priority — Backlog
 
-| # | Issue | Effort |
-|---|---|---|
-| L1 | Add `SoftwareApplication` + `Offer` schema to `/pricing` page | 20 min |
-| L2 | Add `AboutPage` / `ContactPage` WebPage schema to respective pages | 15 min |
-| L3 | Create page-specific OG images for `/about-us`, `/features`, `/pricing` | 2 hrs |
-| L4 | Add App Store and Google Play Store links to `Organization.sameAs` | 5 min |
-| L5 | Convert planet images (`mercury.png` etc.) to WebP | 30 min |
-| L6 | Add `Cache-Control: public, max-age=31536000, immutable` for static assets in `next.config.mjs` | 20 min |
-| L7 | Remove `changeFrequency` and `priority` from sitemap — Google ignores both | 5 min |
-| L8 | Add descriptive alt text to phone mockup images (not just `"LoA App Interface"`) | 15 min |
-| L9 | Add `BreadcrumbList` schema to inner pages | 30 min |
-| L10 | Throttle `SolarSystemBackground` canvas to 30fps, remove `shadowBlur` | 1 hr |
+| # | Issue | Effort | Status |
+|---|---|---|-----|
+| L1 | Add `SoftwareApplication` + `Offer` schema to `/pricing` page | 20 min | ✅ Done — `components/PricingJsonLd.js` |
+| L2 | Add `AboutPage` / `ContactPage` WebPage schema to respective pages | 15 min | ✅ Done — `components/WebPageJsonLd.js` on `/about-us`, `/contact-us` |
+| L3 | Create page-specific OG images for `/about-us`, `/features`, `/pricing` | 2 hrs | ✅ Done — `opengraph-image.js` per route (`next/og` ImageResponse) |
+| L4 | Add App Store and Google Play Store links to `Organization.sameAs` | 5 min | ✅ Done |
+| L5 | Convert planet images (`mercury.png` etc.) to WebP | 30 min | ✅ Done — `public/*.webp` + canvas loads `.webp` |
+| L6 | Add `Cache-Control: public, max-age=31536000, immutable` for static assets in `next.config.mjs` | 20 min | ✅ Done — `_next/static`, fonts, favicon, mock, bg, icons, extension match |
+| L7 | Remove `changeFrequency` and `priority` from sitemap — Google ignores both | 5 min | ✅ Done |
+| L8 | Add descriptive alt text to phone mockup images (not just `"LoA App Interface"`) | 15 min | ✅ Done — Start, OurStory, OurPhilosophy, Features grid, Updates, etc. |
+| L9 | Add `BreadcrumbList` schema to inner pages | 30 min | ✅ Done — `components/BreadcrumbJsonLd.js` on marketing routes |
+| L10 | Throttle `SolarSystemBackground` canvas to 30fps, remove `shadowBlur` | 1 hr | ✅ Done |
+
+### Additional content shipped (not in original checklist)
+- **`/features`** — SEO intro + H1 in `FeaturesClient.js`; expanded blurb in `components/Features.js`; metadata **Law of Attraction App Features \| LoA**.
+- **`/download`** — richer hero + “Why download…” section; metadata refresh.
 
 ---
 
 ## Summary Checklist
+
+*Updated 2026-03-28. `[~]` = partial.*
 
 ```
 CRITICAL (do now)
@@ -526,33 +644,41 @@ CRITICAL (do now)
 [x] C3 - Split all public pages to Server Component + Client Component
 [x] C4 - Wrap SolarSystemBackground in dynamic() with ssr: false
 [x] C5 - Fix base font size to 16px
+[x] C6 - Target keywords + expanded content + FAQ + JSON-LD on /resources
 
 HIGH (this week)
 [x] H1 - Add Disallow rules to robots.txt
 [x] H2 - Fix CTA button tap targets to min-h-[48px]
 [x] H3 - Fix hamburger to w-12 h-12
 [x] H4 - Remove x: -100 from page transition
-[ ] H5 - Replace <img> with <Image> in HowItWorks
-[ ] H6 - Replace Google Fonts @import with next/font/google
+[x] H5 - Replace <img> with <Image> in HowItWorks
+[x] H6 - Replace Google Fonts @import with next/font/google
 [x] H7 - Add OG image width/height to layout.js
 [x] H8 - Fix operatingSystem from array to string
-[ ] H9 - Remove/rewrite Legacy.js copy
-[ ] H10 - Resolve "50,000 users" vs "Join Waitlist" conflict
-[ ] H11 - Add founder/team section to About page
-[ ] H12 - Implement IndexNow
+[x] H9 - Remove/rewrite Legacy.js copy
+[x] H10 - Resolve "50,000 users" vs "Join Waitlist" conflict
+[~] H11 - Founder/team on About (short “Who builds LoA” + trust copy; bios/photos TBD)
+[x] H12 - Implement IndexNow
+[x] H13 - “Law of attraction” in marketing page meta titles
+[~] H14 - Keyword research report (see DATAFORSEO-*); live SERP URLs retry when credits OK
 
 MEDIUM (this month)
-[ ] M1 - Fix sitemap lastModified dates
-[x] M2 - Add /download to sitemap
-[ ] M3 - Convert Tiempos Fine to .woff2
-[ ] M4 - Fix Ubuntu font (import or remove)
-[ ] M5 - Add prefers-reduced-motion to canvas
-[ ] M6 - Remove console.log from SolarSystemBackground
-[ ] M7 - Fix Meta Pixel click handler re-import
-[ ] M8 - Raise text-white/50 contrast to /70
-[ ] M9 - Fix double hero padding in ClientLayout
-[ ] M10 - Render FAQ answers server-side
-[ ] M11 - Add WebSite schema with SearchAction
-[ ] M12 - Add physical address to Contact page
-[ ] M13 - Audit @anthropic-ai/sdk is server-only
+[x] M1 - Sitemap lastModified (SITE_REFRESH + legal page dates)
+[x] M2 - /download in sitemap
+[x] M3 - Convert Tiempos Fine to .woff2
+[x] M4 - Fix Ubuntu font (import or remove)
+[x] M5 - Add prefers-reduced-motion to canvas
+[x] M6 - Remove console.log from SolarSystemBackground
+[x] M7 - Fix Meta Pixel click handler re-import
+[x] M8 - Raise text-white/50 contrast to /70
+[x] M9 - Fix double hero padding in ClientLayout
+[x] M10 - Render FAQ answers server-side
+[x] M11 - Add WebSite schema with SearchAction
+[~] M12 - Contact legal block + env vars; set address in prod for full E-E-A-T
+[x] M13 - @anthropic-ai/sdk server-only (all under app/api)
+[x] M14 - /resources 500+ words + FAQ (with C6)
+[~] M15 - Re-run competitor analysis after more rankings / GSC data (scheduled; needs DataForSEO + traction)
+
+LOW (backlog L1–L10)
+[x] L1–L10 — see table above (all shipped 2026-03-28)
 ```

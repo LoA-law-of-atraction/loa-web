@@ -74,9 +74,9 @@ const UserTestimonials = () => {
             viewport={{ once: true }}
             className="text-base text-white/60 max-w-2xl mx-auto"
           >
-            Join thousands of manifestors who are using LoA to align their
-            digital habits with their highest intentions and attract more of
-            what they truly desire.
+            Join a growing community of people using LoA to align their digital
+            habits with their highest intentions and attract more of what they
+            truly desire.
           </motion.p>
         </div>
 
@@ -138,7 +138,7 @@ const UserTestimonials = () => {
         >
           <div className="bg-gradient-to-r from-indigo-900 via-purple-900 to-black text-white p-8 rounded-lg">
             <h3 className="text-2xl font-bold mb-4">
-              Join Over 50,000 Conscious Manifestors
+              Start your conscious practice today
             </h3>
             <p className="text-purple-100 mb-6 max-w-2xl mx-auto">
               Begin your journey of digital consciousness today. Transform every

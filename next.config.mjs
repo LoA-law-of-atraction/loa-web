@@ -19,7 +19,41 @@ const securityHeaders = [
 const nextConfig = {
   reactStrictMode: true,
   async headers() {
+    const immutable = [
+      {
+        key: "Cache-Control",
+        value: "public, max-age=31536000, immutable",
+      },
+    ];
     return [
+      {
+        source: "/_next/static/:path*",
+        headers: immutable,
+      },
+      {
+        source: "/fonts/:path*",
+        headers: immutable,
+      },
+      {
+        source: "/favicon/:path*",
+        headers: immutable,
+      },
+      {
+        source: "/mock/:path*",
+        headers: immutable,
+      },
+      {
+        source: "/bg/:path*",
+        headers: immutable,
+      },
+      {
+        source: "/icons/:path*",
+        headers: immutable,
+      },
+      {
+        source: "/:all*(svg|jpg|jpeg|png|gif|webp|ico|woff2|otf)",
+        headers: immutable,
+      },
       {
         source: "/.well-known/apple-app-site-association",
         headers: [

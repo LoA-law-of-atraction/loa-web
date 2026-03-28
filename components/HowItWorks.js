@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import { motion } from "framer-motion";
 
 const steps = [
@@ -71,9 +72,13 @@ const HowItWorks = () => {
 
               {/* Phone image */}
               <div className="relative">
-                <img
+                <Image
                   src="/mock/mock6.png"
-                  alt="LoA App Interface"
+                  alt="LoA app affirmation screen shown mid-scroll on Android"
+                  width={400}
+                  height={720}
+                  loading="lazy"
+                  sizes="(max-width: 640px) 100vw, 400px"
                   className="w-full max-w-sm lg:max-w-md h-auto drop-shadow-2xl"
                 />
               </div>

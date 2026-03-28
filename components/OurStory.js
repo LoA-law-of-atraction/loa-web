@@ -28,7 +28,7 @@ const OurStory = () => {
           <div className="flex items-center justify-center lg:justify-start mt-6">
             <img
               src="/mock/mock6.png"
-              alt="LoA App Mockup"
+              alt="LoA Law of Attraction app affirmation and streak tracking screen on a phone"
               className="w-auto h-auto max-w-[300px] lg:max-w-[350px]"
             />
           </div>

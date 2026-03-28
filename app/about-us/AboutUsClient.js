@@ -1,11 +1,10 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useEffect } from "react";
 import { motion } from "framer-motion";
-import { RiSecurePaymentFill } from "react-icons/ri";
-import { MdOutlineWifiFind } from "react-icons/md";
-import { TbClockRecord } from "react-icons/tb";
+import { FiSmartphone, FiStar, FiLock } from "react-icons/fi";
 import OurStory from "@/components/OurStory";
 import Legacy from "@/components/Legacy";
 import Testimonial from "@/components/Testimonial";
@@ -29,19 +28,19 @@ const values = [
     id: 1,
     title: "Conscious Digital Living",
     desc: "We believe technology should serve your highest good, not scatter your energy. LoA helps you build intentional pauses into your day so you can align your attention with your manifestation practice and conscious awareness.",
-    icon: <RiSecurePaymentFill className="w-8 h-8 text-[#505050]" />,
+    icon: <FiSmartphone className="w-6 h-6 text-[#505050]" />,
   },
   {
     id: 2,
     title: "Manifestation Through Action",
     desc: "Every affirmation screen is an opportunity to align your actions with your aspirations. By practicing the Law of Attraction as you move through your day, you turn ordinary moments into conscious manifestation.",
-    icon: <MdOutlineWifiFind className="w-8 h-8 text-[#505050]" />,
+    icon: <FiStar className="w-6 h-6 text-[#505050]" />,
   },
   {
     id: 3,
     title: "Privacy-First Approach",
     desc: "Your manifestation journey and personal affirmations are yours alone. LoA is local-first by default, with optional secure sync when you use LoA across devices—so your practice stays private and under your control.",
-    icon: <TbClockRecord className="w-8 h-8 text-[#505050]" />,
+    icon: <FiLock className="w-6 h-6 text-[#505050]" />,
   },
 ];
 export default function AboutUsClient() {
@@ -99,12 +98,13 @@ export default function AboutUsClient() {
             </h2>
             <span className="w-16 h-1 mt-3 bg-bg" />
           </div>
-          <div className=" text-left w-full max-w-3xl mt-8 space-y-10">
+          <div className="text-left w-full max-w-3xl mt-8 space-y-10">
             <div>
-              <h3 className="text-xl font-bold">
-                📱 Conscious Digital Alignment
+              <h3 className="text-xl font-bold flex items-center gap-3">
+                <span className="w-1 h-5 bg-primary rounded-full shrink-0" />
+                Conscious Digital Alignment
               </h3>
-              <p>
+              <p className="mt-2 pl-4">
                 No judgment, just awareness. LoA does not monitor other apps or
                 interrupt them. Your practice lives inside LoA—affirmations,
                 streaks, and reflection—so you can pause and align with your
@@ -112,10 +112,11 @@ export default function AboutUsClient() {
               </p>
             </div>
             <div>
-              <h3 className="text-xl font-bold">
-                🧘 Mindfulness Meets Manifestation
+              <h3 className="text-xl font-bold flex items-center gap-3">
+                <span className="w-1 h-5 bg-primary rounded-full shrink-0" />
+                Mindfulness Meets Manifestation
               </h3>
-              <p>
+              <p className="mt-2 pl-4">
                 Transform time with your phone into an opportunity for conscious
                 growth. Our affirmation screens help you practice the Law of
                 Attraction and mindfulness whenever you open LoA—moments of
@@ -124,15 +125,18 @@ export default function AboutUsClient() {
               </p>
             </div>
             <div>
-              <h3 className="text-xl font-bold">📊 Insights Without Shame</h3>
-              <p>
+              <h3 className="text-xl font-bold flex items-center gap-3">
+                <span className="w-1 h-5 bg-primary rounded-full shrink-0" />
+                Insights Without Shame
+              </h3>
+              <p className="mt-2 pl-4">
                 Knowledge is power, but only when it&apos;s used with
                 compassion. LoA surfaces streaks, progress, and reflection
                 inside the app—without tracking how you use other
                 applications—so you can steer your manifestation practice with
                 clarity, not shame.
               </p>
-              <p className="mt-2 font-semibold">
+              <p className="mt-2 pl-4 font-semibold">
                 Because awareness is the first step toward conscious
                 transformation.
               </p>
@@ -163,6 +167,45 @@ export default function AboutUsClient() {
       </motion.article>
       <OurStory />
       <CoreValues />
+      <motion.section
+        initial={{ opacity: 0, y: 24 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.5 }}
+        className="relative z-10 w-full bg-white py-20 border-t border-gray-100"
+      >
+        <div className="mx-auto max-w-3xl px-5 text-center md:px-[5%]">
+          <div className="inline-flex items-center gap-3 mb-5">
+            <span className="h-px w-8 bg-primary/40" />
+            <span className="text-xs font-semibold tracking-widest uppercase text-primary/70">
+              The Team
+            </span>
+            <span className="h-px w-8 bg-primary/40" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 md:text-3xl">
+            Who builds LoA
+          </h2>
+          <p className="mt-5 text-left text-base leading-relaxed text-gray-600 md:text-center">
+            LoA is developed by a small team that cares about the Law of
+            Attraction and digital wellbeing. We ship thoughtfully, listen to
+            feedback from the community, and keep your practice private by
+            design—local-first by default, with optional sync when you want it
+            across devices.
+          </p>
+          <p className="mt-4 text-left text-sm leading-relaxed text-gray-500 md:text-center">
+            Pricing, privacy, and terms are published on this site so you can
+            verify how the product works before you subscribe. For press,
+            partnerships, or business questions, reach out—we read every message
+            from users and partners.
+          </p>
+          <Link
+            href="/contact-us"
+            className="mt-8 inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors"
+          >
+            Contact us →
+          </Link>
+        </div>
+      </motion.section>
       <Legacy />
       <Testimonial />
       <FaqsWhite />

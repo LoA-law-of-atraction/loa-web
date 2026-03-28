@@ -1,6 +1,20 @@
+import { Inter, Ubuntu } from "next/font/google";
 import "./globals.css";
 import ClientLayout from "@/components/ClientLayout";
 import StructuredData from "@/components/StructuredData";
+
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-inter",
+});
+
+const ubuntu = Ubuntu({
+  weight: ["400", "700"],
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-ubuntu",
+});
 
 export const metadata = {
   title: "LoA - Law of Attraction for the Digital Age",
@@ -76,9 +90,13 @@ export const metadata = {
 
 export default function Layout({ children }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`${inter.variable} ${ubuntu.variable}`}
+      suppressHydrationWarning
+    >
       <body
-        className="text-gray-900 min-h-screen flex flex-col bg-black"
+        className={`${inter.className} text-gray-900 min-h-screen flex flex-col bg-black`}
         suppressHydrationWarning
       >
         <StructuredData />

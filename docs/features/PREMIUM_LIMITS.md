@@ -71,5 +71,5 @@ Limits reset at the start of each billing period (monthly).
 If costs or usage change, update:
 
 1. This doc  
-2. `components/PricingPolicy.js` (and any other marketing copy)  
+2. `components/PricingPolicy.js` (marketing pricing) and `components/SubscriptionPanel.js` (dashboard plans)  
 3. Backend limit constants and any in-app strings

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import AppStoreDownloadButton from "@/components/AppStoreDownloadButton";
@@ -38,7 +39,7 @@ export default function DownloadClient() {
                   height={56}
                 />
                 <h1 className="text-4xl md:text-5xl font-bold text-white">
-                  Download LoA
+                  Download the LoA Law of Attraction app
                 </h1>
               </motion.div>
 
@@ -47,10 +48,20 @@ export default function DownloadClient() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4, duration: 0.8 }}
-                className="text-lg text-gray-400 max-w-md mb-10"
+                className="text-lg text-gray-400 max-w-xl mb-6 leading-relaxed"
               >
-                Start your manifestation journey today. Available on iOS and
-                Android.
+                Get LoA on the{" "}
+                <strong className="font-semibold text-gray-300">App Store</strong>{" "}
+                or{" "}
+                <strong className="font-semibold text-gray-300">
+                  Google Play
+                </strong>{" "}
+                and practice{" "}
+                <strong className="font-semibold text-gray-300">
+                  manifestation
+                </strong>
+                , affirmations, and streaks in one privacy-first app—no need to
+                trade your attention for guilt-based screen tracking.
               </motion.p>
 
               {/* QR Codes & Download Buttons */}
@@ -95,7 +106,7 @@ export default function DownloadClient() {
             >
               <Image
                 src="/mock/mock6.png"
-                alt="LoA App"
+                alt="LoA Law of Attraction app affirmation screen on a phone"
                 width={280}
                 height={560}
                 className="w-auto h-auto max-w-[280px] rounded-3xl"
@@ -104,6 +115,85 @@ export default function DownloadClient() {
           </div>
         </div>
       </motion.section>
+
+      <section
+        className="relative z-10 border-t border-white/[0.06] bg-zinc-950/80 py-16 md:py-20"
+        aria-labelledby="download-why-heading"
+      >
+        <div className="mx-auto max-w-3xl px-6">
+          <h2
+            id="download-why-heading"
+            className="text-2xl font-bold text-white md:text-3xl"
+          >
+            Why download a Law of Attraction app?
+          </h2>
+          <div className="mt-6 space-y-4 text-base leading-relaxed text-gray-400">
+            <p>
+              Most people do not lack motivation—they lack a calm, repeatable
+              place to return to their intentions. A dedicated{" "}
+              <strong className="font-semibold text-gray-200">
+                Law of Attraction app
+              </strong>{" "}
+              gives you affirmation screens, vision board moments, and progress
+              you can feel—without turning the rest of your phone into a report
+              card.
+            </p>
+            <p>
+              LoA is built for{" "}
+              <strong className="font-semibold text-gray-200">
+                daily manifestation practice
+              </strong>
+              : write or generate affirmations (AI on paid plans), build streaks,
+              and sync when you choose. Start free on{" "}
+              <strong className="font-semibold text-gray-200">
+                Manifest Starter
+              </strong>
+              , then upgrade if you want cloud backup and higher AI limits.
+            </p>
+          </div>
+          <ul className="mt-8 space-y-3 text-gray-300">
+            <li className="flex gap-3">
+              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-purple-500" />
+              <span>
+                Explore every feature in depth on our{" "}
+                <Link
+                  href="/features"
+                  className="text-purple-400 underline-offset-2 hover:underline"
+                >
+                  Features
+                </Link>{" "}
+                page.
+              </span>
+            </li>
+            <li className="flex gap-3">
+              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-purple-500" />
+              <span>
+                Compare{" "}
+                <Link
+                  href="/pricing"
+                  className="text-purple-400 underline-offset-2 hover:underline"
+                >
+                  Manifest Creator and Manifest Master
+                </Link>{" "}
+                for AI and storage limits.
+              </span>
+            </li>
+            <li className="flex gap-3">
+              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-purple-500" />
+              <span>
+                Browse{" "}
+                <Link
+                  href="/resources"
+                  className="text-purple-400 underline-offset-2 hover:underline"
+                >
+                  Law of Attraction resources
+                </Link>{" "}
+                and FAQs in one hub.
+              </span>
+            </li>
+          </ul>
+        </div>
+      </section>
     </>
   );
 }

@@ -332,17 +332,18 @@ function DashboardShellInner({ children }) {
               <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-amber-500/20 text-amber-400 mb-4">
                 <Lock className="h-7 w-7" />
               </div>
-              <h2 className="text-xl font-semibold text-white mb-2">Premium feature</h2>
+              <h2 className="text-xl font-semibold text-white mb-2">Paid feature</h2>
               <p className="text-white/70 text-sm mb-6">
-                This is how the paywall appears in the app. Upgrade to LoA Premium to unlock advanced
-                manifestation tools and unlimited affirmations.
+                This is how the paywall appears in the app. AI affirmation generation and cloud backup
+                require Manifest Creator or Manifest Master—manual affirmations stay unlimited on paid
+                plans; only AI-generated lines count toward monthly limits.
               </p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <Link
                   href="/pricing"
                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-semibold px-5 py-2.5 text-sm transition-colors"
                 >
-                  View Premium
+                  View plans
                 </Link>
                 <button
                   type="button"

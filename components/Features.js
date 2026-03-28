@@ -109,17 +109,24 @@ const Feature = () => {
             What LoA Offers
           </span>
           <h2 className="text-h2 lg:text-h3 font-bold leading-tight max-w-[680px]">
-            Features &amp; Benefits
+            Features &amp; benefits
           </h2>
           <div className="flex items-center gap-3 mt-5">
             <div className="w-14 h-px bg-gradient-to-r from-transparent to-[#3949AB]" />
             <div className="w-1.5 h-1.5 rounded-full bg-[#3949AB]" />
             <div className="w-14 h-px bg-gradient-to-l from-transparent to-[#3949AB]" />
           </div>
-          <p className="mt-6 text-white/50 max-w-[540px] leading-relaxed text-[15px]">
-            LoA turns time in the app into a manifestation opportunity. With
-            personalized affirmations, streaks, and reflection—your spiritual
-            journey stays intentional and yours.
+          <p className="mt-6 text-white/50 max-w-[640px] leading-relaxed text-[15px]">
+            LoA turns time in the app into a{" "}
+            <strong className="font-semibold text-white/65">manifestation</strong>{" "}
+            opportunity:{" "}
+            <strong className="font-semibold text-white/65">affirmations</strong>
+            , streaks, vision board moments, and reflection you control. Whether
+            you follow the Law of Attraction as daily ritual or occasional reset,
+            the same idea applies—align attention, repeat what supports you, and
+            let the app hold your practice without surveilling the rest of your
+            phone. Your journey stays intentional, local-first on the free tier,
+            with optional cloud sync on paid plans.
           </p>
         </motion.div>
 
@@ -168,7 +175,7 @@ const Feature = () => {
                   >
                     <Image
                       src={feature.mockImage}
-                      alt={feature.title}
+                      alt={`${feature.title} — LoA Law of Attraction app screen`}
                       fill
                       className="object-contain object-top"
                     />

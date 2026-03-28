@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 const SolarSystemBackground = () => {
   const canvasRef = useRef(null);
@@ -9,25 +9,28 @@ const SolarSystemBackground = () => {
   const imagesRef = useRef({});
   const imagesLoadedRef = useRef(false);
   const [isClient, setIsClient] = useState(false);
-
-  console.log("SolarSystemBackground component rendering, isClient:", isClient);
+  const [useStaticBackdrop, setUseStaticBackdrop] = useState(false);
 
   useEffect(() => {
-    console.log("First useEffect running - setting isClient to true");
     setIsClient(true);
   }, []);
 
-  useEffect(() => {
-    console.log("Second useEffect running - isClient:", isClient);
+  useLayoutEffect(() => {
     if (!isClient) return;
 
-    const canvas = canvasRef.current;
-    if (!canvas) {
-      console.log("Canvas ref is null!");
+    if (
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      setUseStaticBackdrop(true);
       return;
     }
 
-    console.log("Initializing solar system, canvas:", canvas);
+    const canvas = canvasRef.current;
+    if (!canvas) {
+      return;
+    }
+
     const ctx = canvas.getContext("2d");
     const scale = 1.3;
     const coreSize = 40.0 * scale;
@@ -66,14 +69,14 @@ const SolarSystemBackground = () => {
 
     // Planet image paths
     const planetImages = [
-      "/mercury.png",
-      "/venus.png",
-      "/earth.png",
-      "/mars.png",
-      "/jupiter.png",
-      "/saturn.png",
-      "/uranus.png",
-      "/neptune.png",
+      "/mercury.webp",
+      "/venus.webp",
+      "/earth.webp",
+      "/mars.webp",
+      "/jupiter.webp",
+      "/saturn.webp",
+      "/uranus.webp",
+      "/neptune.webp",
     ];
 
     // Planet colors for glow effects
@@ -91,7 +94,7 @@ const SolarSystemBackground = () => {
     // Load images
     const loadImages = () => {
       const images = { sun: new Image() };
-      images.sun.src = "/sun.png";
+      images.sun.src = "/sun.webp";
 
       planetImages.forEach((src, i) => {
         images[`planet${i}`] = new Image();
@@ -138,7 +141,15 @@ const SolarSystemBackground = () => {
     resize();
     window.addEventListener("resize", resize);
 
-    const animate = () => {
+    const FRAME_MS = 1000 / 30;
+    let lastDraw = 0;
+
+    const animate = (now) => {
+      animationRef.current = requestAnimationFrame(animate);
+      const ts = typeof now === "number" ? now : performance.now();
+      if (lastDraw !== 0 && ts - lastDraw < FRAME_MS) return;
+      lastDraw = ts;
+
       const width = window.innerWidth;
       const height = window.innerHeight;
 
@@ -161,8 +172,8 @@ const SolarSystemBackground = () => {
       // Clear canvas
       ctx.clearRect(0, 0, width, height);
 
-      // Time-based animation
-      timeRef.current += 16.67; // ~60fps
+      // Time-based animation (~30fps rendered)
+      timeRef.current += FRAME_MS;
       const time = timeRef.current;
       const baseAngle = time * 0.00006; // Increased from 0.00003 for faster orbit
       const pulseValue = Math.sin(time * 0.0015) * 0.5 + 0.5;
@@ -204,7 +215,7 @@ const SolarSystemBackground = () => {
         imagesRef.current.sun?.naturalWidth > 0
       ) {
         ctx.save();
-        ctx.shadowBlur = 50 * scale;
+        ctx.shadowBlur = 0;
         ctx.shadowColor = "rgba(255, 165, 0, 0.8)";
         ctx.beginPath();
         ctx.arc(centerX, centerY, corePulseSize / 2, 0, Math.PI * 2);
@@ -220,12 +231,11 @@ const SolarSystemBackground = () => {
       } else {
         // Fallback sun rendering
         ctx.fillStyle = "#FFA500";
-        ctx.shadowBlur = 30 * scale;
+        ctx.shadowBlur = 0;
         ctx.shadowColor = "rgba(255, 165, 0, 0.8)";
         ctx.beginPath();
         ctx.arc(centerX, centerY, corePulseSize / 2, 0, Math.PI * 2);
         ctx.fill();
-        ctx.shadowBlur = 0;
       }
 
       // Draw planets
@@ -262,7 +272,7 @@ const SolarSystemBackground = () => {
           planetImg?.naturalWidth > 0
         ) {
           ctx.save();
-          ctx.shadowBlur = i === 4 || i === 5 ? 16 : 12;
+          ctx.shadowBlur = 0;
           ctx.shadowColor = planetColors[i];
           ctx.beginPath();
           ctx.arc(px, py, size, 0, Math.PI * 2);
@@ -272,19 +282,17 @@ const SolarSystemBackground = () => {
         } else {
           // Fallback planet rendering
           ctx.fillStyle = planetColors[i];
-          ctx.shadowBlur = i === 4 || i === 5 ? 16 : 12;
+          ctx.shadowBlur = 0;
           ctx.shadowColor = planetColors[i];
           ctx.beginPath();
           ctx.arc(px, py, size, 0, Math.PI * 2);
           ctx.fill();
-          ctx.shadowBlur = 0;
         }
       });
 
-      animationRef.current = requestAnimationFrame(animate);
     };
 
-    animate();
+    animationRef.current = requestAnimationFrame(animate);
 
     return () => {
       window.removeEventListener("resize", resize);
@@ -295,11 +303,19 @@ const SolarSystemBackground = () => {
   }, [isClient]);
 
   if (!isClient) {
-    console.log("Returning null - isClient is false");
     return null;
   }
 
-  console.log("Rendering canvas element");
+  if (useStaticBackdrop) {
+    return (
+      <div
+        className="fixed inset-0 w-full h-full bg-[#050508] pointer-events-none"
+        style={{ zIndex: 5 }}
+        aria-hidden
+      />
+    );
+  }
+
   return (
     <canvas
       ref={canvasRef}

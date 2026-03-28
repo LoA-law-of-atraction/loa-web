@@ -45,7 +45,7 @@ const Start = () => {
         </div>
         <img
           src="/mock/mock5.png"
-          alt="Manifest Your Dreams"
+          alt="LoA Law of Attraction app “Manifest your dreams” affirmation screen"
           className="w-auto h-auto max-w-[280px] md:max-w-[320px]"
         />
       </article>

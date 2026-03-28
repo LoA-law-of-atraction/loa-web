@@ -1,66 +1,49 @@
+/** Last meaningful content updates — bump dates when pages change (SEO). */
+const SITE_REFRESH = "2026-03-28";
+
 export default async function sitemap() {
   const baseUrl = "https://www.loa-lawofattraction.co";
 
   const staticPages = [
     {
       url: baseUrl,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 1,
+      lastModified: new Date(SITE_REFRESH),
     },
     {
       url: `${baseUrl}/about-us`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.8,
+      lastModified: new Date(SITE_REFRESH),
     },
     {
       url: `${baseUrl}/features`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.8,
+      lastModified: new Date(SITE_REFRESH),
     },
     {
       url: `${baseUrl}/resources`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.7,
+      lastModified: new Date(SITE_REFRESH),
     },
     {
       url: `${baseUrl}/pricing`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.7,
+      lastModified: new Date(SITE_REFRESH),
     },
     {
       url: `${baseUrl}/download`,
-      lastModified: new Date("2026-03-28"),
-      changeFrequency: "monthly",
-      priority: 0.85,
+      lastModified: new Date(SITE_REFRESH),
     },
     {
       url: `${baseUrl}/updates`,
-      lastModified: new Date(),
-      changeFrequency: "weekly",
-      priority: 0.6,
+      lastModified: new Date(SITE_REFRESH),
     },
     {
       url: `${baseUrl}/contact-us`,
       lastModified: new Date("2025-10-22"),
-      changeFrequency: "monthly",
-      priority: 0.7,
     },
     {
       url: `${baseUrl}/privacy-policy`,
       lastModified: new Date("2025-10-22"),
-      changeFrequency: "yearly",
-      priority: 0.5,
     },
     {
       url: `${baseUrl}/terms-and-conditions`,
       lastModified: new Date("2025-10-22"),
-      changeFrequency: "yearly",
-      priority: 0.5,
     },
   ];
 

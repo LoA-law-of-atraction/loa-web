@@ -9,10 +9,10 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        tiempos: ["TiemposFine-Regular", "serif"],
-        tiemposBold: ["TiemposFine-Semibold", "serif"],
-        ubuntu: ["Ubuntu", "sans-serif"],
-        inter: ["Inter", "sans-serif"],
+        tiempos: ['"Tiempos Fine"', "serif"],
+        tiemposBold: ['"Tiempos Fine"', "serif"],
+        ubuntu: ["var(--font-ubuntu)", "sans-serif"],
+        inter: ["var(--font-inter)", "sans-serif"],
       },
       colors: {
         bg: "#121212",

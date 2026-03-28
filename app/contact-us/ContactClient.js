@@ -12,6 +12,11 @@ import { db } from "@/utils/firebase";
 import { addDoc, collection } from "firebase/firestore";
 import SolarSystemBackground from "@/components/SolarSystemBackground";
 
+const legalName =
+  process.env.NEXT_PUBLIC_COMPANY_LEGAL_NAME?.trim() || "Banana Sapience";
+const companyAddress = process.env.NEXT_PUBLIC_COMPANY_ADDRESS?.trim();
+const companyReg = process.env.NEXT_PUBLIC_COMPANY_REGISTRATION_NUMBER?.trim();
+
 const ContactClient = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showTray, setShowTray] = useState(false);
@@ -117,6 +122,20 @@ const ContactClient = () => {
             <p className="text-white/80">
               Fill the form below and we will be in touch.
             </p>
+          </div>
+
+          <div
+            className="mx-auto max-w-[600px] rounded-xl border border-white/15 bg-white/[0.06] px-5 py-4 text-left text-sm leading-relaxed text-white/75"
+            role="region"
+            aria-label="Business details"
+          >
+            <p className="font-semibold text-white/90">{legalName}</p>
+            {companyAddress ? (
+              <p className="mt-2 whitespace-pre-line">{companyAddress}</p>
+            ) : null}
+            {companyReg ? (
+              <p className="mt-2 text-white/70">Registration: {companyReg}</p>
+            ) : null}
           </div>
 
           <motion.form

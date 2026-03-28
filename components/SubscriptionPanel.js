@@ -16,23 +16,22 @@ const YEARLY = "yearly";
 const PLAN_CONTENT = {
   free: {
     id: "free",
-    title: "Free",
+    title: "Manifest Starter",
     price: "$0",
     billing: "Free forever",
     saveLabel: null,
-    bestFor: "Manual practice",
+    bestFor: "Local practice",
     cta: "Get started free",
     features: [
-      { label: "AI affirmation generation", included: false },
-      { label: "Unlimited manual affirmations", included: true },
+      { label: "Basic affirmations", included: true },
+      { label: "Vision board", included: true },
       { label: "Basic streak tracking", included: true },
-      { label: "Image support", included: true },
-      { label: "Cloud backup", included: false },
+      { label: "Image support (on device)", included: true },
+      { label: "AI affirmation generation", included: false },
+      { label: "Cloud backup & sync", included: false },
       { label: "Advanced templates", included: false },
-      { label: "Cross-device sync", included: false },
       { label: "Premium insights", included: false },
       { label: "Priority support", included: false },
-      { label: "Extra storage", included: false },
     ],
   },
   basic: {
@@ -41,13 +40,13 @@ const PLAN_CONTENT = {
     popular: true,
     saveLabel: "Save 50%",
     bestFor: "Daily manifesting",
-    cta: "Subscribe",
+    cta: "Subscribe to Creator",
     features: [
       { label: "50 AI affirmations / month", included: true },
       { label: "Unlimited manual affirmations", included: true },
       { label: "Basic streak tracking", included: true },
       { label: "Image support", included: true },
-      { label: "1 GB cloud backup", included: true },
+      { label: "1 GB cloud storage & backup", included: true },
       { label: "Advanced templates", included: true },
       { label: "Cross-device sync", included: true },
       { label: "Premium insights", included: false },
@@ -60,13 +59,13 @@ const PLAN_CONTENT = {
     title: "Manifest Master",
     saveLabel: "Save 33%",
     bestFor: "Power users",
-    cta: "Subscribe",
+    cta: "Subscribe to Master",
     features: [
       { label: "150 AI affirmations / month", included: true },
       { label: "Unlimited manual affirmations", included: true },
       { label: "Basic streak tracking", included: true },
       { label: "Image support", included: true },
-      { label: "5 GB cloud backup", included: true },
+      { label: "5 GB cloud storage & backup", included: true },
       { label: "Advanced templates", included: true },
       { label: "Cross-device sync", included: true },
       { label: "Premium insights", included: true },
@@ -215,7 +214,7 @@ export function SubscriptionScreen({ embedded = false }) {
     }
   }, [purchase]);
 
-  /** From pricing “Get Basic/Pro”: after login, open RevenueCat checkout immediately (no extra Subscribe tap). */
+  /** From pricing “Get Creator/Master”: after login, open RevenueCat checkout immediately (no extra Subscribe tap). */
   useEffect(() => {
     if (embedded) return;
     if (searchParams.get("checkout") !== "1") return;
@@ -691,7 +690,7 @@ export function MembershipStatusLink() {
     if (!isConfigured) return "Not configured";
     if (busy) return "Checking…";
     if (isPro) return "Premium";
-    return "Free";
+    return "Manifest Starter";
   })();
 
   return (

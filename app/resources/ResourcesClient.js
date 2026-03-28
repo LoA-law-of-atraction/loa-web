@@ -12,12 +12,13 @@ import {
   Shield,
   Sparkles,
 } from "lucide-react";
+import { RESOURCES_FAQ_ITEMS } from "./resourcesFaq";
 
 const heroGuide = {
   href: "/features",
   title: "How LoA supports your daily digital practice",
   description:
-    "See how affirmation screens, mindful pauses, and reflection tools fit together into one intentional routine.",
+    "Law of Attraction features in one flow: affirmation screens, mindful pauses, and reflection—see how they support manifestation without surveilling other apps.",
   icon: Sparkles,
   tag: "Guide",
   readTime: "5 min read",
@@ -141,9 +142,9 @@ function HeroCard({ item }) {
               </span>
               <span className="text-[11px] text-white/30">{item.readTime}</span>
             </div>
-            <h1 className="mb-2.5 text-xl font-bold leading-snug text-white transition-colors group-hover:text-white/90">
+            <h3 className="mb-2.5 text-xl font-bold leading-snug text-white transition-colors group-hover:text-white/90">
               {item.title}
-            </h1>
+            </h3>
             <p className="max-w-lg text-sm leading-relaxed text-white/60">
               {item.description}
             </p>
@@ -219,7 +220,7 @@ export default function ResourcesClient() {
       </nav>
 
       <motion.header
-        className="flex flex-col gap-3"
+        className="flex flex-col gap-4"
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: "easeOut" }}
@@ -228,13 +229,130 @@ export default function ResourcesClient() {
           Resources
         </p>
         <h1 className="text-3xl font-bold leading-tight tracking-tight text-white sm:text-4xl">
-          Guides, support, and product pages
+          Law of Attraction resources: guides, tools, and support
         </h1>
-        <p className="max-w-[620px] text-base leading-relaxed text-white/55 sm:text-lg">
-          A single place for the key LoA pages: product guides, downloads,
-          updates, and support information for your daily practice.
-        </p>
+        <div className="max-w-[640px] space-y-4 text-base leading-relaxed text-white/60 sm:text-lg">
+          <p>
+            Welcome to the LoA resource hub for anyone building a{" "}
+            <strong className="font-semibold text-white/85">
+              Law of Attraction
+            </strong>{" "}
+            and{" "}
+            <strong className="font-semibold text-white/85">
+              manifestation
+            </strong>{" "}
+            practice on their phone. Here you will find clear paths to our
+            feature overview, download links for iOS and Android, transparent
+            pricing for Manifest Starter through Manifest Master, product
+            updates, and the policies that govern how the app and site work.
+          </p>
+          <p>
+            Whether you are new to{" "}
+            <strong className="font-semibold text-white/85">affirmations</strong>{" "}
+            or refining a long-term routine, this page connects you to the right
+            guides—so you spend less time searching and more time aligning your
+            attention with your goals.
+          </p>
+        </div>
       </motion.header>
+
+      <motion.section
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.05, ease: "easeOut" }}
+        className="flex flex-col gap-5 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6 sm:p-8"
+        aria-labelledby="primer-heading"
+      >
+        <SectionLabel>Primer</SectionLabel>
+        <h2
+          id="primer-heading"
+          className="text-xl font-bold text-white sm:text-2xl"
+        >
+          What is the Law of Attraction?
+        </h2>
+        <div className="space-y-4 text-base leading-relaxed text-white/65">
+          <p>
+            The Law of Attraction is the idea that focused attention and
+            emotional alignment can help you move toward what you want—by
+            clarifying intentions, repeating affirmations, and noticing
+            opportunities that match your goals. It is a practice, not a
+            guarantee of outcomes: consistency and self-kindness matter more
+            than perfection.
+          </p>
+          <p>
+            <strong className="font-semibold text-white/80">
+              Manifestation
+            </strong>{" "}
+            in this context is not magic—it is the steady work of choosing
+            thoughts and actions that match the life you are building. Many
+            people combine visualization, journaling, and spoken or written
+            affirmations; LoA focuses on the mobile moment: short sessions you
+            can repeat whenever you open the app.
+          </p>
+          <h3 className="text-lg font-semibold text-white/90">
+            Digital habits and conscious phone use
+          </h3>
+          <p>
+            A modern Law of Attraction practice has to coexist with
+            notifications and feeds. LoA is designed so your{" "}
+            <strong className="font-semibold text-white/80">
+              affirmation
+            </strong>{" "}
+            and reflection work happens inside the app—without tracking how you
+            use other applications—so you can build awareness without shame-based
+            surveillance.
+          </p>
+          <p>
+            Use the sections below to explore philosophy (
+            <Link href="/about-us" className="text-purple-300 underline-offset-2 hover:underline">
+              About us
+            </Link>
+            ), capabilities (
+            <Link href="/features" className="text-purple-300 underline-offset-2 hover:underline">
+              Features
+            </Link>
+            ), and how to get started (
+            <Link href="/download" className="text-purple-300 underline-offset-2 hover:underline">
+              Download
+            </Link>
+            ). When you are ready, open LoA and align your day with your
+            intentions—one screen at a time.
+          </p>
+        </div>
+      </motion.section>
+
+      <motion.section
+        initial={{ opacity: 0, y: 12 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
+        className="flex flex-col gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 sm:p-8"
+        aria-labelledby="faq-heading"
+        id="faq"
+      >
+        <SectionLabel>Questions</SectionLabel>
+        <h2 id="faq-heading" className="text-xl font-bold text-white sm:text-2xl">
+          Common questions
+        </h2>
+        <div className="flex flex-col gap-2">
+          {RESOURCES_FAQ_ITEMS.map((item, index) => (
+            <details
+              key={index}
+              className="group rounded-xl border border-white/[0.08] bg-white/[0.02] px-4 py-3 open:border-white/[0.12] open:bg-white/[0.04]"
+            >
+              <summary className="cursor-pointer list-none text-sm font-medium text-white/85 outline-none marker:content-none [&::-webkit-details-marker]:hidden">
+                <span className="flex items-center justify-between gap-3">
+                  {item.question}
+                  <ChevronRight className="h-4 w-4 shrink-0 text-white/35 transition-transform group-open:rotate-90" />
+                </span>
+              </summary>
+              <p className="mt-3 border-t border-white/[0.06] pt-3 text-sm leading-relaxed text-white/60">
+                {item.answer}
+              </p>
+            </details>
+          ))}
+        </div>
+      </motion.section>
 
       <section id="featured" className="flex scroll-mt-28 flex-col gap-3">
         <SectionLabel>Featured</SectionLabel>
