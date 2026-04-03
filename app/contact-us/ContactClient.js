@@ -63,11 +63,22 @@ const ContactClient = () => {
           },
           timestamp: new Date(),
         });
+
+        const res = await fetch("/api/contact", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(values),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || "Failed to send notification email");
+        }
+
         setIsLoading(false);
         setShowTray(true);
         formik.resetForm();
       } catch (error) {
-        console.error("Error adding document: ", error);
+        console.error("Error submitting contact form: ", error);
         setIsLoading(false);
       } finally {
         setIsLoading(false);
@@ -75,13 +86,18 @@ const ContactClient = () => {
     },
   });
 
+  const hasErrors = Object.keys(formik.errors).length > 0;
+
   useEffect(() => {
+    if (!hasErrors) return;
+
     const timer = setTimeout(() => {
       formik.setErrors({});
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, [formik, formik.errors]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasErrors]);
 
   return (
     <>
