@@ -8,8 +8,6 @@ import { PhoneInput } from "react-international-phone";
 import "react-international-phone/style.css";
 import { InfinitySpin } from "react-loader-spinner";
 import { MdCancel } from "react-icons/md";
-import { db } from "@/utils/firebase";
-import { addDoc, collection } from "firebase/firestore";
 import SolarSystemBackground from "@/components/SolarSystemBackground";
 
 const legalName =
@@ -49,21 +47,6 @@ const ContactClient = () => {
     onSubmit: async (values) => {
       setIsLoading(true);
       try {
-        const contactsCollectionRef = collection(db, "contacts");
-        await addDoc(contactsCollectionRef, {
-          name: values.name,
-          email: values.email,
-          phone: values.phone,
-          comment: values.comment,
-          areaOfInterest: {
-            loaUsage: values.areaOfInterest.loaUsage,
-            adsSponsorship: values.areaOfInterest.adsSponsorship,
-            partnership: values.areaOfInterest.partnership,
-            others: values.areaOfInterest.others,
-          },
-          timestamp: new Date(),
-        });
-
         const res = await fetch("/api/contact", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
