@@ -1,21 +1,16 @@
 import React from "react";
 import Image from "next/image"; // If using Next.js
+import { trackEvent } from "@/utils/analytics";
 
 const GooglePlayDownloadButton = () => {
   const androidUrl =
     "https://play.google.com/store/apps/details?id=com.loa.lawofattraction.prod";
-  const iosAppId = "6754241860";
-  const androidPackageName = "com.loa.lawofattraction.prod";
 
   const handleClick = () => {
-    if (typeof window !== "undefined") {
-      if (typeof window.fbq === "function") {
-        window.fbq("trackCustom", "GOOGLE_PLAY_Click", {
-          button_name: "Google Play",
-        });
-      }
-    }
-
+    trackEvent("app_download_clicked", {
+      button_name: "google_play",
+      destination_store: "google_play",
+    });
     window.open(androidUrl, "_blank");
   };
 
@@ -29,9 +24,10 @@ const GooglePlayDownloadButton = () => {
       <Image
         src="/buttons/google-play-badge.png"
         alt="Get it on Google Play"
-        className="h-auto"
-        width={150}
-        height={45}
+        width={270}
+        height={80}
+        className="w-[150px] h-auto"
+        style={{ width: 150, height: "auto" }}
       />
     </button>
   );

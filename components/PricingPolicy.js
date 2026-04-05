@@ -7,6 +7,7 @@ import { Check, Minus, Zap, Shield, RefreshCw, Smartphone } from "lucide-react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/utils/firebase";
 import { debugLoaAuth } from "@/utils/debugLoaAuth";
+import { trackEvent } from "@/utils/analytics";
 import { useRevenueCat } from "@/contexts/RevenueCatContext";
 import { getPaidPlanPurchaseLabel } from "@/utils/revenuecatCta";
 import { getAllOfferingsWithPackages } from "@/utils/revenuecatOfferings";
@@ -415,13 +416,20 @@ function CardContent({ plan, billingPeriod, getPrice, getBilling, ctaHref, paidC
       <Link
         prefetch={false}
         href={ctaHref}
-        onClick={() =>
+        onClick={() => {
+          trackEvent("pricing_plan_cta_clicked", {
+            plan_id: plan.id,
+            billing_period: billingPeriod,
+            is_authenticated: !!user,
+            cta_href: ctaHref,
+          });
+
           debugLoaAuth("pricing-click", {
             planId: plan.id,
             ctaHref,
             label: plan.price.monthly === 0 ? "free" : user ? plan.cta : "guest",
-          })
-        }
+          });
+        }}
         className={`block w-full text-center py-2.5 px-4 rounded-xl text-sm font-semibold transition-all duration-200 mb-6 ${
           popular
             ? "bg-gradient-to-r from-loa-indigo to-loa-purple text-white shadow-[0_0_28px_rgba(57,73,171,0.4)] hover:shadow-[0_0_40px_rgba(57,73,171,0.6)] hover:opacity-90"

@@ -1,5 +1,6 @@
 import React from "react";
 import Image from "next/image"; // If using Next.js
+import { trackEvent } from "@/utils/analytics";
 
 const AppStoreDownloadButton = () => {
   const iosUrl = "https://apps.apple.com/app/6754241860";
@@ -8,15 +9,11 @@ const AppStoreDownloadButton = () => {
 
   const handleClick = () => {
     if (typeof window !== "undefined") {
-      if (typeof window.fbq === "function") {
-        window.fbq("trackCustom", "APP_STORE_Click", {
-          button_name: "App Store",
-        });
-      }
-
       const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+      let destinationStore = "app_store";
 
       if (/android/i.test(userAgent)) {
+        destinationStore = "google_play";
         // Open Google Play Store in a new tab
         window.open(
           `https://play.google.com/store/apps/details?id=${androidPackageName}`,
@@ -29,6 +26,11 @@ const AppStoreDownloadButton = () => {
         // Fallback to a landing page or website
         window.open(iosUrl, "_blank");
       }
+
+      trackEvent("app_download_clicked", {
+        button_name: "app_store",
+        destination_store: destinationStore,
+      });
     }
   };
 

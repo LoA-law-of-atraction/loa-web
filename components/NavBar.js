@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -63,14 +64,14 @@ const Navbar = () => {
             className="flex items-center gap-2 cursor-pointer font-ubuntu font-bold text-white text-lg"
             onClick={() => setIsOpen(false)}
           >
-            <img
+            <Image
               src="/app_logo.svg"
               alt="LoA Logo"
               width={28}
               height={28}
-              decoding="async"
-              fetchPriority="high"
               className="h-7 w-7 shrink-0"
+              priority
+              unoptimized
             />
             LoA
           </Link>
@@ -178,13 +179,13 @@ const Navbar = () => {
                   onClick={() => setIsOpen(false)}
                   className="flex items-center gap-2 font-ubuntu font-bold text-white text-base"
                 >
-                  <img
+                  <Image
                     src="/app_logo.svg"
                     alt="LoA Logo"
                     width={24}
                     height={24}
-                    decoding="async"
                     className="h-6 w-6 shrink-0"
+                    unoptimized
                   />
                   LoA
                 </Link>

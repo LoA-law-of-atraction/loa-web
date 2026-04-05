@@ -2,75 +2,76 @@
 
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
+import { isAnalyticsEnabled } from "@/utils/analytics";
 
 export const MetaPixelEvents = () => {
   const pathname = usePathname();
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      import("react-facebook-pixel").then((module) => {
-        const ReactPixel = module.default;
+    if (!isAnalyticsEnabled() || typeof window === "undefined") return;
 
-        if (!window.fbqInitialized) {
-          ReactPixel.init(process.env.NEXT_PUBLIC_META_PIXEL_ID);
-          window.fbqInitialized = true;
-          console.log("Meta Pixel Initialized ✅");
-        }
+    import("react-facebook-pixel").then((module) => {
+      const ReactPixel = module.default;
 
-        ReactPixel.pageView();
-        console.log(`Meta Pixel Event: PageView triggered for ${pathname}`);
+      if (!window.fbqInitialized) {
+        ReactPixel.init(process.env.NEXT_PUBLIC_META_PIXEL_ID);
+        window.fbqInitialized = true;
+        console.log("Meta Pixel Initialized ✅");
+      }
 
-        // ✅ Track "ViewContent" for key pages dynamically
-        const trackedPages = ["/features", "/pricing", "/about-us", "/updates"];
+      ReactPixel.pageView();
+      console.log(`Meta Pixel Event: PageView triggered for ${pathname}`);
 
-        if (trackedPages.includes(pathname)) {
-          ReactPixel.track("ViewContent", {
-            content_name: pathname.replace("/", "").toUpperCase() + " Page",
-          });
+      // ✅ Track "ViewContent" for key pages dynamically
+      const trackedPages = ["/features", "/pricing", "/about-us", "/updates"];
 
-          console.log(`Meta Pixel Event: ViewContent triggered on ${pathname}`);
-        }
+      if (trackedPages.includes(pathname)) {
+        ReactPixel.track("ViewContent", {
+          content_name: pathname.replace("/", "").toUpperCase() + " Page",
+        });
 
-        // ✅ Track Scroll Depth 50%
-        const handleScroll = () => {
-          const scrollY = window.scrollY;
-          const pageHeight = document.body.scrollHeight;
-          const windowHeight = window.innerHeight;
+        console.log(`Meta Pixel Event: ViewContent triggered on ${pathname}`);
+      }
 
-          const scrollPercentage =
-            (scrollY / (pageHeight - windowHeight)) * 100;
+      // ✅ Track Scroll Depth 50%
+      const handleScroll = () => {
+        const scrollY = window.scrollY;
+        const pageHeight = document.body.scrollHeight;
+        const windowHeight = window.innerHeight;
 
-          if (scrollPercentage > 50) {
-            ReactPixel.trackCustom("ScrollDepth50", {
-              content_name: "50% Page Scroll",
-              page: pathname,
-            });
+        const scrollPercentage =
+          (scrollY / (pageHeight - windowHeight)) * 100;
 
-            console.log("Meta Pixel Event: ScrollDepth50 triggered");
-
-            // Remove event listener after firing event once
-            window.removeEventListener("scroll", handleScroll);
-          }
-        };
-
-        window.addEventListener("scroll", handleScroll);
-
-        // ✅ Track Time on Page (fires after 30 seconds)
-        const timeOnPageTimeout = setTimeout(() => {
-          ReactPixel.trackCustom("TimeOnPage", {
-            time_spent: "30 seconds",
+        if (scrollPercentage > 50) {
+          ReactPixel.trackCustom("ScrollDepth50", {
+            content_name: "50% Page Scroll",
             page: pathname,
           });
 
-          console.log("Meta Pixel Event: TimeOnPage triggered");
-        }, 30000); // Fires after 30 seconds
+          console.log("Meta Pixel Event: ScrollDepth50 triggered");
 
-        return () => {
+          // Remove event listener after firing event once
           window.removeEventListener("scroll", handleScroll);
-          clearTimeout(timeOnPageTimeout);
-        };
-      });
-    }
+        }
+      };
+
+      window.addEventListener("scroll", handleScroll);
+
+      // ✅ Track Time on Page (fires after 30 seconds)
+      const timeOnPageTimeout = setTimeout(() => {
+        ReactPixel.trackCustom("TimeOnPage", {
+          time_spent: "30 seconds",
+          page: pathname,
+        });
+
+        console.log("Meta Pixel Event: TimeOnPage triggered");
+      }, 30000); // Fires after 30 seconds
+
+      return () => {
+        window.removeEventListener("scroll", handleScroll);
+        clearTimeout(timeOnPageTimeout);
+      };
+    });
   }, [pathname]);
 
   return null;

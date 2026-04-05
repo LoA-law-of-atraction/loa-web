@@ -1,12 +1,16 @@
+"use client";
+
 import { motion } from "framer-motion";
 import Image from "next/image";
 import { MdCancel } from "react-icons/md";
 import { useEffect } from "react";
+import { isAnalyticsEnabled } from "@/utils/analytics";
 
 const Success = ({ closeForm }) => {
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      import("react-facebook-pixel")
+    if (!isAnalyticsEnabled() || typeof window === "undefined") return;
+
+    import("react-facebook-pixel")
         .then((module) => {
           const ReactPixel = module.default;
 
@@ -19,7 +23,6 @@ const Success = ({ closeForm }) => {
           console.log("Meta Pixel Event: Lead triggered");
         })
         .catch((error) => console.error("Meta Pixel Error:", error));
-    }
   }, []);
   return (
     <motion.section

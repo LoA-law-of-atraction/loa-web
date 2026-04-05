@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import LeadForm from "./LeadForm";
+import { isAnalyticsEnabled } from "@/utils/analytics";
 
 const Button = ({ text }) => {
   const [showForm, setShowForm] = useState(false);
 
   const handleForm = () => {
-    if (typeof window !== "undefined") {
+    if (isAnalyticsEnabled() && typeof window !== "undefined") {
       import("react-facebook-pixel").then((module) => {
         const ReactPixel = module.default;
 

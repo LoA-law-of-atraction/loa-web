@@ -1,6 +1,7 @@
 "use client";
 
 import Script from "next/script";
+import { isAnalyticsEnabled } from "@/utils/analytics";
 
 function getValidatedGaId() {
   const raw = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID?.trim();
@@ -9,6 +10,8 @@ function getValidatedGaId() {
 
 /** Client-only GA4; uses JSON.stringify so the measurement ID cannot break inline script syntax. */
 export default function GoogleAnalyticsLoader() {
+  if (!isAnalyticsEnabled()) return null;
+
   const gaId = getValidatedGaId();
   if (!gaId) return null;
 

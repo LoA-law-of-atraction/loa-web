@@ -15,6 +15,7 @@ import { ArrowRight } from "lucide-react";
 import { FcGoogle } from "react-icons/fc";
 import { auth } from "@/utils/firebase";
 import { debugLoaAuth } from "@/utils/debugLoaAuth";
+import { trackEvent } from "@/utils/analytics";
 
 function LoginContent() {
   const router = useRouter();
@@ -49,8 +50,13 @@ function LoginContent() {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email.trim(), password);
+      trackEvent("login_completed", { method: "email" });
       router.replace(redirectTo);
     } catch (err) {
+      trackEvent("login_failed", {
+        method: "email",
+        error_code: err?.code || "unknown",
+      });
       setError(err?.message || "Failed to sign in.");
     } finally {
       setLoading(false);
@@ -63,17 +69,27 @@ function LoginContent() {
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
+      trackEvent("login_completed", { method: "google" });
       router.replace(redirectTo);
     } catch (err) {
       const code = err?.code || "";
       if (code === "auth/popup-blocked" || code === "auth/cancelled-popup-request") {
         try {
+          trackEvent("login_redirect_started", { method: "google" });
           await signInWithRedirect(auth, provider);
           return;
         } catch (redirectErr) {
+          trackEvent("login_failed", {
+            method: "google_redirect",
+            error_code: redirectErr?.code || "unknown",
+          });
           setError(redirectErr?.message || "Google sign-in failed.");
         }
       } else {
+        trackEvent("login_failed", {
+          method: "google_popup",
+          error_code: code || "unknown",
+        });
         setError(err?.message || "Google sign-in failed.");
       }
     } finally {

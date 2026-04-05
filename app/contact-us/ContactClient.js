@@ -7,6 +7,7 @@ import * as Yup from "yup";
 import { PhoneInput } from "react-international-phone";
 import "react-international-phone/style.css";
 import SolarSystemBackground from "@/components/SolarSystemBackground";
+import { trackEvent } from "@/utils/analytics";
 
 const legalName =
   process.env.NEXT_PUBLIC_COMPANY_LEGAL_NAME?.trim() || "Banana Sapience";
@@ -78,10 +79,21 @@ const ContactClient = () => {
               : "";
           throw new Error(detail ? `${base} (${detail})` : base);
         }
+        const selectedInterests = Object.entries(values.areaOfInterest)
+          .filter(([, isSelected]) => !!isSelected)
+          .map(([key]) => key);
+
+        trackEvent("contact_form_submitted", {
+          selected_interests: selectedInterests,
+          has_comment: values.comment.trim().length > 0,
+        });
         setShowSuccess(true);
         formik.resetForm();
       } catch (error) {
         console.error("Error submitting contact form: ", error);
+        trackEvent("contact_form_failed", {
+          error_type: error instanceof Error ? "request_error" : "unknown_error",
+        });
         setSubmitError(
           error instanceof Error
             ? error.message

@@ -1,26 +1,16 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { Eye, Heart, Zap } from "lucide-react";
 import AppStoreDownloadButton from "@/components/AppStoreDownloadButton";
 import GooglePlayDownloadButton from "@/components/GooglePlayDownloadButton";
+import SolarSystemBackground from "@/components/SolarSystemBackground";
 import HowItWorks from "@/components/HowItWorks";
 import AppFeatures from "@/components/AppFeatures";
 import UserTestimonials from "@/components/UserTestimonials";
 import Start from "@/components/Start";
 import Faqs from "@/components/Faqs";
-
-const SolarSystemBackground = dynamic(
-  () => import("@/components/SolarSystemBackground"),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="fixed inset-0 bg-[#050508] z-0" aria-hidden />
-    ),
-  }
-);
 
 export default function HomeClient() {
   useEffect(() => {

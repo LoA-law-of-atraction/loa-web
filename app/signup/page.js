@@ -14,6 +14,7 @@ import {
 import { ArrowRight } from "lucide-react";
 import { FcGoogle } from "react-icons/fc";
 import { auth } from "@/utils/firebase";
+import { trackEvent } from "@/utils/analytics";
 
 function SignupContent() {
   const router = useRouter();
@@ -50,8 +51,13 @@ function SignupContent() {
     setLoading(true);
     try {
       await createUserWithEmailAndPassword(auth, email.trim(), password);
+      trackEvent("signup_completed", { method: "email" });
       router.replace(redirectTo);
     } catch (err) {
+      trackEvent("signup_failed", {
+        method: "email",
+        error_code: err?.code || "unknown",
+      });
       setError(err?.message || "Failed to sign up.");
     } finally {
       setLoading(false);
@@ -64,17 +70,27 @@ function SignupContent() {
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
+      trackEvent("signup_completed", { method: "google" });
       router.replace(redirectTo);
     } catch (err) {
       const code = err?.code || "";
       if (code === "auth/popup-blocked" || code === "auth/cancelled-popup-request") {
         try {
+          trackEvent("signup_redirect_started", { method: "google" });
           await signInWithRedirect(auth, provider);
           return;
         } catch (redirectErr) {
+          trackEvent("signup_failed", {
+            method: "google_redirect",
+            error_code: redirectErr?.code || "unknown",
+          });
           setError(redirectErr?.message || "Google sign-up failed.");
         }
       } else {
+        trackEvent("signup_failed", {
+          method: "google_popup",
+          error_code: code || "unknown",
+        });
         setError(err?.message || "Google sign-up failed.");
       }
     } finally {
