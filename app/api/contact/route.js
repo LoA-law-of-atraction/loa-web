@@ -1,6 +1,10 @@
 import { Resend } from "resend";
 import { NextResponse } from "next/server";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const maxDuration = 30;
+
 /** Shared org Resend account: free tier allows one verified sending domain (codeyourreality.com). */
 const DEFAULT_FROM_EMAIL = "noreply@codeyourreality.com";
 
@@ -128,13 +132,13 @@ export async function POST(request) {
       if (verbose) {
         payload.detail = msg || error?.name || "unknown";
       }
-      return NextResponse.json(payload, { status: 502 });
+      return NextResponse.json(payload, { status: 503 });
     }
 
-    const messageId = data?.id;
+    const messageId = data?.id ?? data?.data?.id;
     if (!messageId) {
       console.error("Contact email: missing id in Resend response", data);
-      return NextResponse.json({ error: "Failed to send message" }, { status: 502 });
+      return NextResponse.json({ error: "Failed to send message" }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });

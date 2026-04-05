@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePathname } from "next/navigation";
@@ -64,7 +63,15 @@ const Navbar = () => {
             className="flex items-center gap-2 cursor-pointer font-ubuntu font-bold text-white text-lg"
             onClick={() => setIsOpen(false)}
           >
-            <Image src="/app_logo.svg" alt="LoA Logo" width={28} height={28} priority />
+            <img
+              src="/app_logo.svg"
+              alt="LoA Logo"
+              width={28}
+              height={28}
+              decoding="async"
+              fetchPriority="high"
+              className="h-7 w-7 shrink-0"
+            />
             LoA
           </Link>
 
@@ -171,7 +178,14 @@ const Navbar = () => {
                   onClick={() => setIsOpen(false)}
                   className="flex items-center gap-2 font-ubuntu font-bold text-white text-base"
                 >
-                  <Image src="/app_logo.svg" alt="LoA Logo" width={24} height={24} priority />
+                  <img
+                    src="/app_logo.svg"
+                    alt="LoA Logo"
+                    width={24}
+                    height={24}
+                    decoding="async"
+                    className="h-6 w-6 shrink-0"
+                  />
                   LoA
                 </Link>
                 <button

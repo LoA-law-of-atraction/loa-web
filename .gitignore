@@ -56,3 +56,6 @@ loa-ga4-key.json
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# GA4 Keys
+*-ga4-key.json

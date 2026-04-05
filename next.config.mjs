@@ -18,6 +18,8 @@ const securityHeaders = [
 
 const nextConfig = {
   reactStrictMode: true,
+  /** Avoid bundling Resend into the serverless bundle (can cause runtime 502s on Vercel). */
+  serverExternalPackages: ["resend"],
   async headers() {
     const isDev = process.env.NODE_ENV !== "production";
     const immutable = [

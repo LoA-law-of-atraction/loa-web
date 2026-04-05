@@ -65,8 +65,13 @@ const ContactClient = () => {
           body: JSON.stringify(values),
         });
         if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          const base = err.error || "Failed to send notification email";
+          const ct = res.headers.get("content-type") || "";
+          const err = ct.includes("application/json")
+            ? await res.json().catch(() => ({}))
+            : {};
+          const base =
+            (typeof err.error === "string" && err.error.trim()) ||
+            `Request failed (${res.status})`;
           const detail =
             typeof err.detail === "string" && err.detail.trim()
               ? err.detail.trim()
