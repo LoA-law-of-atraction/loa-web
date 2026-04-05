@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MdCancel } from "react-icons/md";
 import { useFormik } from "formik";
-import { InfinitySpin } from "react-loader-spinner";
 import * as Yup from "yup";
 import Success from "@/components/Success";
 import { db } from "@/utils/firebase";
@@ -71,11 +70,10 @@ function LeadForm({ handleClose }) {
         onClick={() => handleClose()}
         className="min-h-screen flex w-full z-[100] items-center justify-center fixed top-0 left-0 bg-opacity-85 bg-primary"
       >
-        <InfinitySpin
-          visible
-          width="200"
-          color="#505050"
-          ariaLabel="infinity-spin-loading"
+        <div
+          className="h-14 w-14 shrink-0 rounded-full border-4 border-white/20 border-t-[#505050] animate-spin"
+          role="status"
+          aria-label="Loading"
         />
       </motion.section>
     );

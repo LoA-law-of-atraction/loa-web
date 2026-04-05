@@ -29,9 +29,9 @@ const GooglePlayDownloadButton = () => {
       <Image
         src="/buttons/google-play-badge.png"
         alt="Get it on Google Play"
-        className="w-[150px] h-[45px]"
-        width={150} // Adjust width as needed
-        height={50} // Adjust height as needed
+        className="h-auto"
+        width={150}
+        height={45}
       />
     </button>
   );

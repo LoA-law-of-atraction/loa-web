@@ -1,10 +1,7 @@
 import { Inter, Ubuntu } from "next/font/google";
-import { GoogleAnalytics } from "@next/third-parties/google";
 import "./globals.css";
 import ClientLayout from "@/components/ClientLayout";
 import StructuredData from "@/components/StructuredData";
-
-const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 
 const inter = Inter({
   subsets: ["latin"],
@@ -22,7 +19,7 @@ const ubuntu = Ubuntu({
 export const metadata = {
   title: "LoA - Law of Attraction for the Digital Age",
   description:
-    "LoA transforms your phone into a tool for conscious living. Practice the Law of Attraction with personalized affirmations, streaks, and reflection—your practice lives in LoA, without monitoring other apps.",
+    "LoA transforms your phone into a tool for conscious living. Practice the Law of Attraction with personalized affirmations, streaks, and reflection-your practice lives in LoA, without monitoring other apps.",
   metadataBase: new URL("https://www.loa-lawofattraction.co"),
   alternates: {
     canonical: "/",
@@ -56,7 +53,7 @@ export const metadata = {
   openGraph: {
     title: "LoA - Law of Attraction for the Digital Age",
     description:
-      "Build a daily Law of Attraction practice with affirmations and intention—inside LoA, on your terms.",
+      "Build a daily Law of Attraction practice with affirmations and intention-inside LoA, on your terms.",
     url: "https://www.loa-lawofattraction.co",
     siteName: "LoA App",
     images: [
@@ -75,19 +72,12 @@ export const metadata = {
     site: "@LoAApp",
     title: "LoA - Law of Attraction for the Digital Age",
     description:
-      "Build a daily Law of Attraction practice with affirmations and intention—inside LoA, on your terms.",
+      "Build a daily Law of Attraction practice with affirmations and intention-inside LoA, on your terms.",
     images: ["https://www.loa-lawofattraction.co/og.png"],
   },
   robots: {
     index: true,
     follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      "max-video-preview": -1,
-      "max-image-preview": "large",
-      "max-snippet": -1,
-    },
   },
 };
 
@@ -103,9 +93,6 @@ export default function Layout({ children }) {
         suppressHydrationWarning
       >
         <StructuredData />
-        {gaMeasurementId ? (
-          <GoogleAnalytics gaId={gaMeasurementId} />
-        ) : null}
         <ClientLayout>{children}</ClientLayout>
       </body>
     </html>

@@ -5,13 +5,8 @@ import { usePathname } from "next/navigation";
 import Navbar from "@/components/NavBar";
 import Footer from "@/components/Footer";
 import ContactFAB from "@/components/ContactFAB";
-import dynamic from "next/dynamic";
-import { Suspense } from "react";
-
-// ✅ Load Meta Pixel only on the client (Prevents SSR issues)
-const MetaPixelNoSSR = dynamic(() => import("@/components/MetaPixelEvents"), {
-  ssr: false,
-});
+import GoogleAnalyticsLoader from "@/components/GoogleAnalyticsLoader";
+import MetaPixelEvents from "@/components/MetaPixelEvents";
 
 export default function ClientLayout({ children }) {
   const pathname = usePathname();
@@ -31,17 +26,16 @@ export default function ClientLayout({ children }) {
     },
   };
 
-  // Don't show main site navbar/footer on admin or dashboard (including preview – dashboard has its own bar)
+  // Don't show main site navbar/footer on admin or dashboard (including preview - dashboard has its own bar)
   if (isAdminPage || isDashboardPage) {
     return children;
   }
 
   return (
     <>
-      {/* ✅ Ensure Meta Pixel loads only on the client */}
-      <Suspense fallback={null}>
-        <MetaPixelNoSSR />
-      </Suspense>
+      <GoogleAnalyticsLoader />
+      {/* Pixel loads fb only inside useEffect; no dynamic chunk (avoids stale async chunk / blank page in dev) */}
+      <MetaPixelEvents />
 
       <header className="w-full relative z-50">
         <Navbar />

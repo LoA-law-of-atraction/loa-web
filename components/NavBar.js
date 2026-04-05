@@ -64,7 +64,7 @@ const Navbar = () => {
             className="flex items-center gap-2 cursor-pointer font-ubuntu font-bold text-white text-lg"
             onClick={() => setIsOpen(false)}
           >
-            <Image src="/app_logo.svg" alt="LoA Logo" width={28} height={28} />
+            <Image src="/app_logo.svg" alt="LoA Logo" width={28} height={28} priority />
             LoA
           </Link>
 
@@ -171,7 +171,7 @@ const Navbar = () => {
                   onClick={() => setIsOpen(false)}
                   className="flex items-center gap-2 font-ubuntu font-bold text-white text-base"
                 >
-                  <Image src="/app_logo.svg" alt="LoA Logo" width={24} height={24} />
+                  <Image src="/app_logo.svg" alt="LoA Logo" width={24} height={24} priority />
                   LoA
                 </Link>
                 <button

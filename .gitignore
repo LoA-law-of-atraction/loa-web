@@ -43,6 +43,10 @@ google-services.json
 GoogleService-Info.plist
 *-firebase-adminsdk-*.json
 
+# GA4 / Google Cloud service account keys (never commit)
+loa-ga4-key.json
+*-ga4-key.json
+
 # vercel
 .vercel
 
